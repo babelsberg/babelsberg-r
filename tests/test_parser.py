@@ -520,9 +520,12 @@ class TestParser(BaseRuPyPyTest):
         ]))
 
     def test_dynamic_string(self, ec):
-        assert ec.space.parse(ec, '"#{x}"') == ast.Main(ast.Block([
-            ast.Statement(ast.DynamicString("#{x}"))
+        dyn_string = lambda *components: ast.Main(ast.Block([
+            ast.Statement(ast.DynamicString(list(components)))
         ]))
+        assert ec.space.parse(ec, '"#{x}"') == dyn_string(ast.Send(ast.Self(1), "x", [], None, 1))
+        assert ec.space.parse(ec, '"abc #{2} abc"') == dyn_string(ast.ConstantString("abc "), ast.ConstantInt(2), ast.ConstantString(" abc"))
+        assert ec.space.parse(ec, '"#{"}"}') == dyn_string(ast.ConstantString("}"))
 
     def test_class(self, ec):
         r = ec.space.parse(ec, """
