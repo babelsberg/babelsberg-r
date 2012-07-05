@@ -4,7 +4,6 @@ import os
 
 from pypy.rlib import jit
 from pypy.rlib.objectmodel import specialize
-from pypy.rlib.parsing.parsing import ParseError
 from pypy.tool.cache import Cache
 
 from rupypy.astcompiler import CompilerContext, SymbolTable
@@ -13,7 +12,7 @@ from rupypy.error import RubyError
 from rupypy.executioncontext import ExecutionContext
 from rupypy.frame import Frame
 from rupypy.interpreter import Interpreter
-from rupypy.lexer import LexerError
+from rupypy.lexer import Lexer, LexerError
 from rupypy.lib.dir import W_Dir
 from rupypy.lib.random import W_Random
 from rupypy.module import ClassCache, ModuleCache
@@ -45,7 +44,7 @@ from rupypy.objects.rangeobject import W_RangeObject
 from rupypy.objects.regexpobject import W_RegexpObject
 from rupypy.objects.stringobject import W_StringObject
 from rupypy.objects.symbolobject import W_SymbolObject
-from rupypy.parser import Transformer, _parse, ToASTVisitor
+from rupypy.parser import Parser, ParserError
 
 
 class SpaceCache(Cache):
@@ -62,47 +61,47 @@ class ObjectSpace(object):
         self.cache = SpaceCache(self)
         self.symbol_cache = {}
         self._executioncontext = None
-        self.globals = CellDict()
+        # self.globals = CellDict()
         self.bootstrap = True
-        self.w_top_self = W_Object(self, self.getclassfor(W_Object))
+        # self.w_top_self = W_Object(self, self.getclassfor(W_Object))
 
         self.w_true = W_TrueObject(self)
         self.w_false = W_FalseObject(self)
         self.w_nil = W_NilObject(self)
 
-        # This is bootstrap. We have to delay sending until true, false and nil
-        # are defined
-        w_mod = self.getmoduleobject(Kernel.moduledef)
-        self.send(self.getclassfor(W_Object), self.newsymbol("include"), [w_mod])
-        self.bootstrap = False
+        # # This is bootstrap. We have to delay sending until true, false and nil
+        # # are defined
+        # w_mod = self.getmoduleobject(Kernel.moduledef)
+        # self.send(self.getclassfor(W_Object), self.newsymbol("include"), [w_mod])
+        # self.bootstrap = False
 
-        for cls in [
-            W_NilObject, W_TrueObject, W_FalseObject,
-            W_BaseObject, W_Object,
-            W_StringObject, W_SymbolObject,
-            W_NumericObject, W_IntegerObject, W_FloatObject, W_FixnumObject,
-            W_ArrayObject, W_HashObject,
-            W_IOObject, W_FileObject,
-            W_ExceptionObject, W_NoMethodError, W_LoadError, W_ZeroDivisionError, W_SyntaxError,
-            W_TypeError, W_ArgumentError, W_RuntimeError, W_StandardError,
-            W_Random, W_Dir, W_ProcObject
-        ]:
-            self.add_class(cls)
+        # for cls in [
+        #     W_NilObject, W_TrueObject, W_FalseObject,
+        #     W_BaseObject, W_Object,
+        #     W_StringObject, W_SymbolObject,
+        #     W_NumericObject, W_IntegerObject, W_FloatObject, W_FixnumObject,
+        #     W_ArrayObject, W_HashObject,
+        #     W_IOObject, W_FileObject,
+        #     W_ExceptionObject, W_NoMethodError, W_LoadError, W_ZeroDivisionError, W_SyntaxError,
+        #     W_TypeError, W_ArgumentError, W_RuntimeError, W_StandardError,
+        #     W_Random, W_Dir, W_ProcObject
+        # ]:
+        #     self.add_class(cls)
 
-        for module in [Math, Comparable, Enumerable, Kernel, Process]:
-            self.add_module(module)
+        # for module in [Math, Comparable, Enumerable, Kernel, Process]:
+        #     self.add_module(module)
 
-        w_load_path = self.newarray([
-            self.newstr_fromstr(
-                os.path.join(os.path.dirname(__file__), os.path.pardir, "lib-ruby")
-            )
-        ])
-        self.globals.set("$LOAD_PATH", w_load_path)
-        self.globals.set("$:", w_load_path)
+        # w_load_path = self.newarray([
+        #     self.newstr_fromstr(
+        #         os.path.join(os.path.dirname(__file__), os.path.pardir, "lib-ruby")
+        #     )
+        # ])
+        # self.globals.set("$LOAD_PATH", w_load_path)
+        # self.globals.set("$:", w_load_path)
 
-        w_loaded_features = self.newarray([])
-        self.globals.set("$LOADED_FEATURES", w_loaded_features)
-        self.globals.set('$"', w_loaded_features)
+        # w_loaded_features = self.newarray([])
+        # self.globals.set("$LOADED_FEATURES", w_loaded_features)
+        # self.globals.set('$"', w_loaded_features)
 
     def _freeze_(self):
         return True
@@ -129,11 +128,13 @@ class ObjectSpace(object):
 
     def parse(self, source, initial_lineno=1):
         try:
-            st = ToASTVisitor().transform(_parse(source, initial_lineno=initial_lineno))
-            return Transformer().visit_main(st)
-        except ParseError as e:
-            self.raise_(self.getclassfor(W_SyntaxError), "line %d" % e.source_pos.lineno)
+            tokens = Lexer(source, initial_lineno=initial_lineno).tokenize()
         except LexerError:
+            self.raise_(self.getclassfor(W_SyntaxError))
+        try:
+            return Parser(tokens).parse()
+        except ParserError:
+            raise
             self.raise_(self.getclassfor(W_SyntaxError))
 
     def compile(self, source, filepath, initial_lineno=1):
