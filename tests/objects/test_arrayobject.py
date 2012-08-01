@@ -74,6 +74,10 @@ class TestArrayObject(BaseRuPyPyTest):
         w_res = space.execute("return [1, 2, 3, 4, 5].at(2)")
         assert space.int_w(w_res) == 3
 
+    def test_push(self, space):
+        w_res = space.execute("return [1, 2].push(3, 4)")
+        assert self.unwrap(space, w_res) == [1, 2, 3, 4]
+
     def test_unshift(self, space):
         w_res = space.execute("return [1, 2].unshift(3, 4)")
         assert self.unwrap(space, w_res) == [3, 4, 1, 2]
