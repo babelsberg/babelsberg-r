@@ -73,14 +73,12 @@ class Match(object):
 # RFFI-related stuff #
 ######################
 
-# TODO: This initialization only works if we initiate the build within the root
-#       directory of the rupypy-project. Change that.
-
 class CConfig:
     includes = ["oniguruma.h", "rffi_helper.h"]
 
-    onig_lib_path = os.getcwd() + "/rupypy/utils/re/onig-5.9.2/.libs"
-    onig_path = os.getcwd() + "/rupypy/utils/re/onig-5.9.2" 
+    filedir = os.path.dirname(__file__)
+    onig_path = os.path.join(filedir, "oniguruma")
+    onig_lib_path = os.path.join(onig_path, ".libs")
 
     if not os.path.exists(onig_lib_path):
 	#trigger a build of the oniguruma lib
@@ -92,11 +90,10 @@ class CConfig:
 
     eci = ExternalCompilationInfo(
             includes=includes,
-            include_dirs=[onig_path,
-		 	  os.getcwd() + "/rupypy/utils/re"],
+            include_dirs=[onig_path, filedir],
             libraries=["onig"],
 	    library_dirs=[onig_lib_path],
-            separate_module_files=["rupypy/utils/re/rffi_helper.c"]
+            separate_module_files=[os.path.join(filedir, "rffi_helper.c")]
     )
 
     regex_t_ptr = COpaquePtr("regex_t", compilation_info=eci) 

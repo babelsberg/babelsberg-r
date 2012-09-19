@@ -1,0 +1,3 @@
+[submodule "rupypy/utils/re/oniguruma"]
+	path = rupypy/utils/re/oniguruma
+	url = https://github.com/timfel/onig.git
