@@ -620,13 +620,13 @@ class ObjectSpace(object):
         for prio, priorityqueue in self.constraints:
             for w_constraint in priorityqueue:
                 if not self.is_true(self.send(w_constraint, self.newsymbol("satisfied?"))):
-                    self.send(constraint, space.newsymbol("satisfy!"))
+                    self.send(w_constraint, self.newsymbol("satisfy!"))
                 if not self.is_true(self.send(w_constraint, self.newsymbol("satisfied?"))):
                     self.executing_constraints = False
                     raise self.error(
                         self.w_RuntimeError,
-                        "inconsistent constraint %s" % self.send(
+                        "inconsistent constraint %s" % self.str_w(self.send(
                             w_constraint, self.newsymbol("inspect")
-                        )
+                        ))
                     )
         self.executing_constraints = False
