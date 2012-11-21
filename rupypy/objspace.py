@@ -604,13 +604,13 @@ class ObjectSpace(object):
     def remove_constraint(self, w_constraint):
         priority = w_constraint.get_priority()
         if len(self.constraints) < priority:
-            return space.w_nil
+            return self.w_nil
         priorityqueue = self.constraints[priority]
         if w_constraint in priorityqueue:
             priorityqueue.remove(w_constraint)
-            return space.w_true
+            return self.w_true
         else:
-            return space.w_true
+            return self.w_true
 
     def ensure_constraints(self):
         if self.executing_constraints:
