@@ -1,10 +1,13 @@
+require File.expand_path("../libprime.rb", __FILE__)
 
-lineno = 1
-
-c = Constraint.new(10,
-                   proc { lineno > previous(lineno) },
-                   proc { lineno = previous(lineno) + 1 })
-c.enable
+lineno = 0
+# c = Constraint.new(10,
+#                    proc { lineno > previous(lineno) },
+#                    proc { lineno = previous(lineno) + 1 })
+primec = Constraint.new(10,
+                        proc { lineno.prime? },
+                        proc { lineno = Prime.new(lineno - 1).succ })
+primec.enable
 
 puts "And now for something completely different ..."
 
