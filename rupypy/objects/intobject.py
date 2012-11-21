@@ -95,24 +95,7 @@ class W_FixnumObject(W_RootObject):
     method_add = new_binop(classdef, "+", operator.add)
     method_sub = new_binop(classdef, "-", operator.sub)
     method_mul = new_binop(classdef, "*", operator.mul)
-
-    @classdef.method("**")
-    def method(self, space, w_other):
-        if space.is_kind_of(w_other, space.w_fixnum):
-            other = space.int_w(w_other)
-            try:
-                value = ovfcheck(self.intvalue ** other)
-            except OverflowError:
-                return space.send(
-                    space.newbigint_fromint(self.intvalue), space.newsymbol("**"),
-                    [w_other]
-                )
-            else:
-                return space.newint(value)
-        elif space.is_kind_of(w_other, space.w_float):
-            return space.newfloat(self.intvalue ** space.float_w(w_other))
-        else:
-            return W_NumericObject.retry_binop_coercing(space, self, w_other, "**")
+    method_pow = new_binop(classdef, "**", operator.pow)
 
     @classdef.method("floor")
     def method_floor(self, space):
