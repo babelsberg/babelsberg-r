@@ -46,6 +46,7 @@ from rupypy.objects.intobject import W_FixnumObject
 from rupypy.objects.methodobject import W_MethodObject, W_UnboundMethodObject
 from rupypy.objects.integerobject import W_IntegerObject
 from rupypy.objects.moduleobject import W_ModuleObject
+from rupypy.objects.constraintobject import W_ConstraintObject
 from rupypy.objects.nilobject import W_NilObject
 from rupypy.objects.numericobject import W_NumericObject
 from rupypy.objects.objectobject import W_Object, W_BaseObject
@@ -76,6 +77,9 @@ class ObjectSpace(object):
         self.globals = GlobalsDict()
         self.bootstrap = True
         self.exit_handlers_w = []
+
+        self.executing_constraints = False
+        self.constraints = []
 
         self.w_true = W_TrueObject(self)
         self.w_false = W_FalseObject(self)
@@ -134,6 +138,7 @@ class ObjectSpace(object):
 
             self.w_kernel, self.w_topaz,
 
+            self.getclassfor(W_ConstraintObject),
             self.getclassfor(W_NilObject),
             self.getclassfor(W_TrueObject),
             self.getclassfor(W_FalseObject),
@@ -571,3 +576,57 @@ class ObjectSpace(object):
             )
         else:
             return w_res
+
+    def add_constraint(self, w_constraint):
+        priority = w_constraint.get_priority()
+        # Add in front
+        if len(self.constraints) == 0 or self.constraints[0][0] > priority:
+            self.constraints.insert(0, (priority, [w_constraint]))
+            return self.w_true
+        # Add at end
+        elif self.constraints[-1][0] < priority:
+            self.constraints.append((priority, [w_constraint]))
+            return self.w_true
+        # Add in the middle
+        else:
+            for idx, (prio, priorityqueue) in enumerate(self.constraints):
+                if prio > priority:
+                    self.constraints.insert(idx, (priority, [w_constraint]))
+                    return self.w_true
+                elif prio == priority:
+                    if w_constraint not in priorityqueue:
+                        priorityqueue.append(w_constraint)
+                        return self.w_true
+                    else:
+                        return self.w_false
+        raise NotImplementedError("should not reach here")
+
+    def remove_constraint(self, w_constraint):
+        priority = w_constraint.get_priority()
+        if len(self.constraints) < priority:
+            return space.w_nil
+        priorityqueue = self.constraints[priority]
+        if w_constraint in priorityqueue:
+            priorityqueue.remove(w_constraint)
+            return space.w_true
+        else:
+            return space.w_true
+
+    def ensure_constraints(self):
+        if self.executing_constraints:
+            return
+        self.executing_constraints = True
+        # Execute from low to high priority
+        for prio, priorityqueue in self.constraints:
+            for w_constraint in priorityqueue:
+                if not self.is_true(self.send(w_constraint, self.newsymbol("satisfied?"))):
+                    self.send(constraint, space.newsymbol("satisfy!"))
+                if not self.is_true(self.send(w_constraint, self.newsymbol("satisfied?"))):
+                    self.executing_constraints = False
+                    raise self.error(
+                        self.w_RuntimeError,
+                        "inconsistent constraint %s" % self.send(
+                            w_constraint, self.newsymbol("inspect")
+                        )
+                    )
+        self.executing_constraints = False

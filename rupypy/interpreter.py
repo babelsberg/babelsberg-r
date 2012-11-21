@@ -100,6 +100,9 @@ class Interpreter(object):
         if num_args >= 3:
             raise NotImplementedError
 
+        if name.startswith("LOAD_"):
+            # time to enforce the constraints
+            space.ensure_constraints()
         method = getattr(self, name)
         try:
             res = method(space, bytecode, frame, pc, *args)
