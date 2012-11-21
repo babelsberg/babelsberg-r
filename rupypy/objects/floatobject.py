@@ -1,4 +1,5 @@
 import operator
+import math
 
 from pypy.rlib.objectmodel import compute_hash
 
@@ -75,3 +76,7 @@ class W_FloatObject(W_NumericObject):
     @classdef.method("abs")
     def method_abs(self, space):
         return space.newfloat(abs(self.floatvalue))
+
+    @classdef.method("floor")
+    def method_floor(self, space):
+        return space.newint(int(math.floor(self.floatvalue)))
