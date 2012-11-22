@@ -7,25 +7,44 @@ class BaseCell(W_Root):
 
 class LocalCell(BaseCell):
     def get(self, frame, pos):
-        return frame.localsstack_w[pos]
+        stackpos = frame.localsstack_w[pos]
+        if stackpos is not None:
+            return frame.localsstack_w[pos][0]
+        else:
+            return None
+
+    def get_prev(self, frame, pos):
+        stackpos = frame.localsstack_w[pos]
+        if stackpos is not None:
+            return frame.localsstack_w[pos][1]
+        else:
+            return None
 
     def set(self, frame, pos, w_value):
-        frame.localsstack_w[pos] = w_value
+        if frame.localsstack_w[pos] is not None:
+            frame.localsstack_w[pos][1] = frame.localsstack_w[pos][0]
+            frame.localsstack_w[pos][0] = w_value
+        else:
+            frame.localsstack_w[pos] = [w_value, None]
 
     def upgrade_to_closure(self, frame, pos):
-        frame.cells[pos] = result = ClosureCell(self.get(frame, pos))
+        frame.cells[pos] = result = ClosureCell(self.get(frame, pos), self.get_prev(frame, pos))
         return result
 
 
 class ClosureCell(BaseCell):
-    def __init__(self, w_value):
-        self.w_value = w_value
+    def __init__(self, w_value, w_prev = None):
+        self.w_value = [w_value, w_prev]
 
     def get(self, frame, pos):
-        return self.w_value
+        return self.w_value[0]
+
+    def get_prev(self, frame, pos):
+        return self.w_value[1]
 
     def set(self, frame, pos, w_value):
-        self.w_value = w_value
+        self.w_value[1] = self.w_value[0]
+        self.w_value[0] = w_value
 
     def upgrade_to_closure(self, frame, pos):
         return self
