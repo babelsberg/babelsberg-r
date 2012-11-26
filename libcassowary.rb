@@ -11,6 +11,7 @@ module Cassowary
     end
 
     def cn_leq(expr, strength = Strength::RequiredStrength, weight = 1.0)
+      expr = expr.as_linear_expression if expr.is_a?(Numeric) && self.is_a?(Variable)
       cn_equality(LinearInequality, expr - self, strength, weight)
     end
 
@@ -255,8 +256,8 @@ module Cassowary
     end
 
     def initialize
-      constant = 0.0
-      terms = {}
+      self.constant = 0.0
+      self.terms = {}
     end
 
     def any_variable
@@ -333,7 +334,7 @@ module Cassowary
       expr.each_variable_and_coefficient do |v, c|
         if old_coeff = terms[v]
           new_coeff = old_coeff + (multiplier * c)
-          if new_coeff cl_approx_zero
+          if new_coeff.cl_approx_zero
             terms.delete v
             solver.note_removed_variable v, subject
           else
@@ -380,6 +381,7 @@ module Cassowary
       expr.each_variable_and_coefficient do |v, c|
         result.add_variable(v, c)
       end
+      result
     end
 
     def -(x)
@@ -387,11 +389,12 @@ module Cassowary
       result = LinearExpression.new
       result.constant = constant - expr.constant
       terms.each_pair do |v, c|
-        retuls.terms[v] = c
+        result.terms[v] = c
       end
       expr.each_variable_and_coefficient do |v, c|
         result.add_variable(v, c)
       end
+      result
     end
 
     def inspect
@@ -589,6 +592,19 @@ module Cassowary
       self.edit_constraints = []
     end
 
+    def note_added_variable(var, subject)
+      if subject
+        columns[var] ||= Set.new
+        columns[var] << subject
+      end
+    end
+
+    def note_removed_variable(var, subject)
+      if subject
+        columns[var].delete(subject)
+      end
+    end
+
     private
     def add_row(var, expr)
       rows[var] = expr
@@ -599,7 +615,7 @@ module Cassowary
     end
 
     def add_with_artificial_variable(expr)
-      ac = SlackVariable.new
+      av = SlackVariable.new
       az = ObjectiveVariable.new
       azrow = LinearExpression.new
 
@@ -902,19 +918,6 @@ module Cassowary
       expr
     end
 
-    def note_added_variable(var, subject)
-      if subject
-        columns[var] ||= Set.new
-        columns[var] << subject
-      end
-    end
-
-    def note_removed_variable(var, subject)
-      if subject
-        columns[var].delete(subject)
-      end
-    end
-
     def optimize(zvar)
       # Minimize the value of the objective.  (The tableau should
       # already be feasible.)
@@ -1110,11 +1113,11 @@ module Cassowary
       case levels
       when Hash
         levels.each_pair do |k, v|
-          @levels[k] = v
+          @levels[k - 1] = v
         end
       when Array
         levels.each_with_index do |e, idx|
-          @levels[idx] = e
+          @levels[idx - 1] = e
         end
       else
         raise InternalError
@@ -1139,6 +1142,7 @@ module Cassowary
       each_with_index do |e, idx|
         result[idx] = e * n
       end
+      result
     end
 
     def /(n)
@@ -1147,6 +1151,7 @@ module Cassowary
       each_with_index do |e, idx|
         result[idx] = e / n
       end
+      result
     end
 
     def +(n)
@@ -1155,6 +1160,7 @@ module Cassowary
       each_with_index do |e, idx|
         result[idx] = e + n[idx]
       end
+      result
     end
 
     def -(n)
@@ -1163,6 +1169,7 @@ module Cassowary
       each_with_index do |e, idx|
         result[idx] = e - n[idx]
       end
+      result
     end
 
     def <=>(other)
@@ -1244,7 +1251,7 @@ module Cassowary
       elsif float == 0.0
         abs < epsilon
       else
-        (self - aFloat).abs < (abs * epsilon)
+        (self - float).abs < (abs * epsilon)
       end
     end
 
@@ -1287,6 +1294,7 @@ class CassowaryTests < Test::Unit::TestCase
   include Cassowary
 
   def test_add_delete1
+    x = Variable.new(name: 'x')
     solver = SimplexSolver.new
     solver.add_constraint x.cn_equal(100.0, Strength::WeakStrength)
     c10 = x.cn_leq 10.0
