@@ -11,7 +11,7 @@ module Cassowary
     end
 
     def cn_leq(expr, strength = Strength::RequiredStrength, weight = 1.0)
-      expr = expr.as_linear_expression if expr.is_a?(Numeric) && self.is_a?(Variable)
+      expr = expr.as_linear_expression if expr.is_a?(Numeric)
       cn_equality(LinearInequality, expr - self, strength, weight)
     end
 
@@ -392,7 +392,7 @@ module Cassowary
         result.terms[v] = c
       end
       expr.each_variable_and_coefficient do |v, c|
-        result.add_variable(v, c)
+        result.add_variable(v, -c)
       end
       result
     end
