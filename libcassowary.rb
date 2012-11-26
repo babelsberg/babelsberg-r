@@ -1097,6 +1097,10 @@ module Cassowary
     end
   end
 
+  class Strength
+    Levels = 3
+  end
+
   class SymbolicWeight
     include Enumerable
     include Comparable
@@ -1206,11 +1210,6 @@ module Cassowary
   class Strength
     attr_accessor :name, :symbolic_weight
 
-    RequiredStrength = new "required"
-    StrongStrength = new "strong", SymbolicWeight.new(1 => 1.0, 2 => 0.0, 3 => 0.0)
-    MediumStrength = new "medium", SymbolicWeight.new(1 => 0.0, 2 => 1.0, 3 => 0.0)
-    WeakStrength = new "weak", SymbolicWeight.new(1 => 0.0, 2 => 0.0, 3 => 1.0)
-
     def initialize(name = nil, symbolic_weight = nil)
       self.name = name
       self.symbolic_weight = symbolic_weight
@@ -1230,7 +1229,10 @@ module Cassowary
       end
     end
 
-    Levels = 3
+    RequiredStrength = new "required"
+    StrongStrength = new "strong", SymbolicWeight.new(1 => 1.0, 2 => 0.0, 3 => 0.0)
+    MediumStrength = new "medium", SymbolicWeight.new(1 => 0.0, 2 => 1.0, 3 => 0.0)
+    WeakStrength = new "weak", SymbolicWeight.new(1 => 0.0, 2 => 0.0, 3 => 1.0)
   end
 
   class ::Float
@@ -1274,5 +1276,40 @@ module Cassowary
       expr.constant = self.to_f
       expr
     end
+  end
+end
+
+__END__
+
+require "test/unit"
+
+class CassowaryTests < Test::Unit::TestCase
+  include Cassowary
+
+  def test_add_delete1
+    solver = SimplexSolver.new
+    solver.add_constraint x.cn_equal(100.0, Strength::WeakStrength)
+    c10 = x.cn_leq 10.0
+    c20 = x.cn_leq 20.0
+    solver.add_constraint c10
+    solver.add_constraint c20
+    assert x.value.cl_approx(10.0)
+
+    solver.remove_constraint c10
+    assert x.value.cl_approx(20.0)
+
+    solver.remove_constraint c20
+    assert x.value.cl_approx(100.0)
+
+    c10again = x.cn_leq 10.0
+    solver.add_constraint c10
+    solver.add_constraint c10again
+    assert x.value.cl_approx(10.0)
+
+    solver.remove_constraint c10
+    assert x.value.cl_approx(10.0)
+
+    solver.remove_constraint c10again
+    assert x.value.cl_approx(100.0)
   end
 end
