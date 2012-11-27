@@ -272,3 +272,11 @@ class Kernel(Module):
     @moduledef.method("instance_of?")
     def method_instance_of(self, space, w_mod):
         return space.newbool(space.getnonsingletonclass(self) is w_mod)
+
+    @moduledef.method("previous")
+    def method_previous(self, space, w_variable):
+        frame = space.getexecutioncontext().gettoprubyframe()
+        for idx, cell in enumerate(frame.cells):
+            if w_variable is cell.get(frame, idx):
+                return cell.get_prev(frame, idx) or w_variable
+        return space.w_nil

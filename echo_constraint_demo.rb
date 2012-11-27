@@ -1,9 +1,10 @@
 require File.expand_path("../libprime.rb", __FILE__)
 
 lineno = 0
-# c = Constraint.new(10,
-#                    proc { lineno > previous(lineno) },
-#                    proc { lineno = previous(lineno) + 1 })
+c = Constraint.new(10,
+                   proc { lineno > previous(lineno) },
+                   proc { lineno = previous(lineno) + 1 })
+c.enable
 primec = Constraint.new(10,
                         proc { lineno.prime? },
                         proc { lineno = Prime.new(lineno - 1).succ })
@@ -20,8 +21,6 @@ while true do
   end
 
   $stdout.print("line #{lineno}: #{buf}")
-
-  lineno += 1
 
   if buf == "exit\n"
     exit
