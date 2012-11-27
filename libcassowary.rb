@@ -592,8 +592,10 @@ module Cassowary
 
     def note_added_variable(var, subject)
       if subject
-        columns[var] ||= Set.new
-        columns[var] << subject
+        columns[var] ||= []
+        unless columns[var].include? subject
+          columns[var] << subject
+        end
       end
     end
 
@@ -607,8 +609,10 @@ module Cassowary
     def add_row(var, expr)
       rows[var] = expr
       expr.each_variable_and_coefficient do |v, c|
-        columns[v] ||= Set.new
-        columns[v] << var
+        columns[var] ||= []
+        unless columns[var].include? var
+          columns[var] << var
+        end
       end
     end
 
