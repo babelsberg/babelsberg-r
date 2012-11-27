@@ -1,5 +1,3 @@
-require 'set'
-
 module Cassowary
   module Equalities
     def cn_equal(expr, strength = Strength::RequiredStrength, weight = 1.0)
@@ -148,7 +146,7 @@ module Cassowary
     end
 
     def -@
-      -1.0 * self
+      -1.0.as_linear_expression * self
     end
 
     def inspect
@@ -376,7 +374,7 @@ module Cassowary
       result = LinearExpression.new
       result.constant = constant + expr.constant
       terms.each_pair do |v, c|
-        retuls.terms[v] = c
+        result.terms[v] = c
       end
       expr.each_variable_and_coefficient do |v, c|
         result.add_variable(v, c)
@@ -398,7 +396,7 @@ module Cassowary
     end
 
     def inspect
-      terms.keys.sort.inject(constant.inspect) do |str, v|
+      terms.keys.inject(constant.inspect) do |str, v|
         "#{str}+#{terms[v].inspect}*#{v.inspect}"
       end
     end
@@ -636,12 +634,12 @@ module Cassowary
       # not, the original constraint was unsatisfiable.
       raise RequiredFailure unless azrow.constant.cl_approx_zero
 
-      if rows[av]
+      if e = rows[av]
         # Find another variable in this row and pivot, so that av
         # becomes parametric.  If there isn't another variable in the
         # row then the tableau contains the equation av=0 -- just
         # delete av's row.
-        if rows[av].constant?
+        if e.constant?
           remove_row(av)
           return nil
         else
@@ -720,7 +718,7 @@ module Cassowary
       # subject is nil.  Make one last check -- if all of the
       # variables in expr are dummy variables, then we can pick a
       # dummy variable as the subject.
-      return subject if subject.nil?
+      return subject unless subject.nil?
       expr.each_variable_and_coefficient do |v, c|
         return nil unless v.dummy?
         # if v is new to the solver tentatively make it the subject
@@ -780,6 +778,7 @@ module Cassowary
     def dual_optimize
       # We have set new values for the constants in the edit
       # constraints.  Re-optimize using the dual simplex algorithm.
+      entry_var = nil
       zrow = rows[objective]
       until infeasible_rows.empty?
         exit_var = infeasible_rows.shift
@@ -805,7 +804,9 @@ module Cassowary
 
     def find_edit_error_index(evars)
       evars.each do |v|
-        return index if index = edit_plus_error_vars.index(v)
+        if index = edit_plus_error_vars.index(v)
+          return index
+        end
       end
       raise InternalError, "didn't find a variable"
     end
@@ -1113,11 +1114,11 @@ module Cassowary
       case levels
       when Hash
         levels.each_pair do |k, v|
-          @levels[k - 1] = v
+          self[k] = v
         end
       when Array
         levels.each_with_index do |e, idx|
-          @levels[idx - 1] = e
+          self[idx] = e
         end
       else
         raise InternalError
@@ -1173,7 +1174,7 @@ module Cassowary
     end
 
     def <=>(other)
-      return nil unless other.is_a? SymbolicWeight
+      raise InternalError unless other.is_a? SymbolicWeight
       each_with_index do |e, idx|
         return -1 if e < other[idx]
         return 1 if e > other[idx]
@@ -1286,9 +1287,9 @@ module Cassowary
   end
 end
 
-__END__
+# __END__
 
-require "test/unit"
+# require "test/unit"
 
 class CassowaryTests < Test::Unit::TestCase
   include Cassowary
@@ -1320,4 +1321,8 @@ class CassowaryTests < Test::Unit::TestCase
     solver.remove_constraint c10again
     assert x.value.cl_approx(100.0)
   end
+
+
 end
+
+CassowaryTests.new.test_add_delete1
