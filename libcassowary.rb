@@ -579,7 +579,7 @@ module Cassowary
     end
 
     def begin_edit
-      self.new_edit_constants = [nil] * edit_vars.size
+      self.new_edit_constants = []
     end
 
     def end_edit
@@ -1113,39 +1113,40 @@ module Cassowary
     include Enumerable
     include Comparable
 
-    def initialize(levels = {})
-      @levels = [nil] * Strength::Levels
+    def initialize(levels = nil)
+      @levels = [0, 0, 0]
       case levels
       when Hash
         levels.each_pair do |k, v|
-          self[k] = v
+          atput(k, v)
         end
       when Array
         levels.each_with_index do |e, idx|
-          self[idx] = e
+          atput(idx, e)
         end
+      when NilClass
       else
         raise InternalError
       end
+    end
+
+    def at(idx)
+      @levels[idx]
+    end
+
+    def atput(idx, value)
+      @levels[idx] = value
     end
 
     def each(*args, &block)
       @levels.each(*args, &block)
     end
 
-    def [](idx)
-      @levels[idx]
-    end
-
-    def []=(idx, value)
-      @levels[idx] = value
-    end
-
     def *(n)
       raise InternalError unless n.is_a? Numeric
       result = SymbolicWeight.new
       each_with_index do |e, idx|
-        result[idx] = e * n
+        result.atput(idx, e * n)
       end
       result
     end
@@ -1154,7 +1155,7 @@ module Cassowary
       raise InternalError unless n.is_a? Numeric
       result = SymbolicWeight.new
       each_with_index do |e, idx|
-        result[idx] = e / n
+        result.atput(idx, e / n)
       end
       result
     end
@@ -1163,7 +1164,7 @@ module Cassowary
       raise InternalError unless n.is_a? SymbolicWeight
       result = SymbolicWeight.new
       each_with_index do |e, idx|
-        result[idx] = e + n[idx]
+        result.atput(idx, e + n.at(idx))
       end
       result
     end
@@ -1172,7 +1173,7 @@ module Cassowary
       raise InternalError unless n.is_a? SymbolicWeight
       result = SymbolicWeight.new
       each_with_index do |e, idx|
-        result[idx] = e - n[idx]
+        result.atput(idx, e - n.at(idx))
       end
       result
     end
@@ -1180,8 +1181,8 @@ module Cassowary
     def <=>(other)
       raise InternalError unless other.is_a? SymbolicWeight
       each_with_index do |e, idx|
-        return -1 if e < other[idx]
-        return 1 if e > other[idx]
+        return -1 if e < other.at(idx)
+        return 1 if e > other.at(idx)
       end
       0
     end
@@ -1189,7 +1190,7 @@ module Cassowary
     def cl_approx(s)
       raise InternalError unless s.is_a? SymbolicWeight
       each_with_index do |e, idx|
-        return false unless e.cl_approx(s[idx])
+        return false unless e.cl_approx(s.at idx)
       end
       true
     end
@@ -1216,7 +1217,7 @@ module Cassowary
       "[" + @levels.join(",") + "]"
     end
 
-    Zero = new(1 => 0.0, 2 => 0.0, 3 => 0.0)
+    Zero = new
   end
 
   class Strength
@@ -1242,9 +1243,9 @@ module Cassowary
     end
 
     RequiredStrength = new "required"
-    StrongStrength = new "strong", SymbolicWeight.new(1 => 1.0, 2 => 0.0, 3 => 0.0)
-    MediumStrength = new "medium", SymbolicWeight.new(1 => 0.0, 2 => 1.0, 3 => 0.0)
-    WeakStrength = new "weak", SymbolicWeight.new(1 => 0.0, 2 => 0.0, 3 => 1.0)
+    StrongStrength = new "strong", SymbolicWeight.new([1.0])
+    MediumStrength = new "medium", SymbolicWeight.new([0.0, 1.0])
+    WeakStrength = new "weak", SymbolicWeight.new([0.0, 0.0, 1.0])
   end
 
   class ::Float
@@ -1295,11 +1296,11 @@ end
 
 # require "test/unit"
 
-class CassowaryTests < Test::Unit::TestCase
+class CassowaryTests# < Test::Unit::TestCase
   include Cassowary
 
   def test_add_delete1
-    x = Variable.new(name: 'x')
+    x = Variable.new(name: 'x', value: 10)
     solver = SimplexSolver.new
     solver.add_constraint x.cn_equal(100.0, Strength::WeakStrength)
     c10 = x.cn_leq 10.0
@@ -1325,8 +1326,6 @@ class CassowaryTests < Test::Unit::TestCase
     solver.remove_constraint c10again
     assert x.value.cl_approx(100.0)
   end
-
-
 end
 
 CassowaryTests.new.test_add_delete1
