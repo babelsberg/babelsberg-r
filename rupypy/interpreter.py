@@ -160,8 +160,12 @@ class Interpreter(object):
 
     def LOAD_DEREF(self, space, bytecode, frame, pc, idx):
         frame.push(frame.cells[idx].get(frame, idx) or space.w_nil)
+        if not space.is_executing_constraints():
+            frame.cells[idx].advance_time(frame, idx)
 
     def STORE_DEREF(self, space, bytecode, frame, pc, idx):
+        if not space.is_executing_constraints():
+            frame.cells[idx].advance_time(frame, idx)
         frame.cells[idx].set(frame, idx, frame.peek())
 
     def LOAD_CLOSURE(self, space, bytecode, frame, pc, idx):

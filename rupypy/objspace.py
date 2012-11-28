@@ -613,20 +613,29 @@ class ObjectSpace(object):
             return self.w_true
 
     def ensure_constraints(self):
-        if self.executing_constraints:
+        if self.is_executing_constraints():
             return
-        self.executing_constraints = True
+        self.start_executing_constraints()
         # Execute from low to high priority
         for prio, priorityqueue in self.constraints:
             for w_constraint in priorityqueue:
                 if not self.is_true(self.send(w_constraint, self.newsymbol("satisfied?"))):
                     self.send(w_constraint, self.newsymbol("satisfy!"))
                 if not self.is_true(self.send(w_constraint, self.newsymbol("satisfied?"))):
-                    self.executing_constraints = False
+                    self.stop_executing_constraints()
                     raise self.error(
                         self.w_RuntimeError,
                         "inconsistent constraint %s" % self.str_w(self.send(
                             w_constraint, self.newsymbol("inspect")
                         ))
                     )
+        self.stop_executing_constraints()
+
+    def is_executing_constraints(self):
+        return self.executing_constraints
+
+    def start_executing_constraints(self):
+        self.executing_constraints = True
+
+    def stop_executing_constraints(self):
         self.executing_constraints = False
