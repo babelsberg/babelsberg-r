@@ -602,15 +602,14 @@ class ObjectSpace(object):
         raise NotImplementedError("should not reach here")
 
     def remove_constraint(self, w_constraint):
-        priority = w_constraint.get_priority()
-        if len(self.constraints) < priority:
-            return self.w_nil
-        priorityqueue = self.constraints[priority]
-        if w_constraint in priorityqueue:
-            priorityqueue.remove(w_constraint)
-            return self.w_true
-        else:
-            return self.w_true
+        for prio, priorityqueue in self.constraints:
+            if prio == w_constraint.get_priority():
+                try:
+                    priorityqueue.remove(w_constraint)
+                    return self.w_true
+                except ValueError:
+                    return self.w_false
+        return self.w_false
 
     def ensure_constraints(self):
         if self.is_executing_constraints():
