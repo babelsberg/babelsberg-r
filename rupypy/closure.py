@@ -7,31 +7,18 @@ class BaseCell(W_Root):
 
 class LocalCell(BaseCell):
     def get(self, frame, pos):
-        stackpos = frame.localsstack_w[pos]
-        if stackpos is not None:
-            return frame.localsstack_w[pos][0]
-        else:
-            return None
+        return frame.localsstack_w[pos]
 
-    def get_prev(self, frame, pos):
-        stackpos = frame.localsstack_w[pos]
-        if stackpos is not None:
-            return frame.localsstack_w[pos][1]
-        else:
-            return None
+    get_prev = get
 
     def set(self, frame, pos, w_value):
-        if frame.localsstack_w[pos] is not None:
-            frame.localsstack_w[pos][0] = w_value
-        else:
-            frame.localsstack_w[pos] = [w_value, None]
+        frame.localsstack_w[pos] = w_value
 
     def advance_time(self, frame, pos):
-        if frame.localsstack_w[pos] is not None:
-            frame.localsstack_w[pos][1] = frame.localsstack_w[pos][0]
+        pass
 
     def upgrade_to_closure(self, frame, pos):
-        frame.cells[pos] = result = ClosureCell(self.get(frame, pos), self.get_prev(frame, pos))
+        frame.cells[pos] = result = ClosureCell(self.get(frame, pos), None)
         return result
 
 
