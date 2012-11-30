@@ -78,7 +78,7 @@ class ObjectSpace(object):
         self.bootstrap = True
         self.exit_handlers_w = []
 
-        self.executing_constraints = False
+        self.stop_executing_constraints()
         self.constraints = []
 
         self.w_true = W_TrueObject(self)
