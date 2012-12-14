@@ -32,16 +32,15 @@ class W_ConstraintObject(W_Object):
             for w_obj in instances_w:
                 # cell is closure cell, so not stored in frame
                 cell.set(None, None, w_obj)
-                if space.istrue(space.invoke_block(self.w_test_block, [])):
+                if space.is_true(space.invoke_block(self.w_test_block, [])):
                     return self.w_true
-            cell.set(w_value)
-        raise self.error(
-            self.w_RuntimeError,
-            "unsatisfiable constraint %s" % self.str_w(self.send(
-                    w_constraint, self.newsymbol("inspect")
+            cell.set(None, None, w_value)
+        raise space.error(
+            space.w_RuntimeError,
+            "unsatisfiable constraint %s" % space.str_w(space.send(
+                    self, space.newsymbol("inspect")
             ))
         )
-        # return space.send(self.w_correct_proc, space.newsymbol("[]"))
 
     classdef.app_method("""
     def instances_for(object)
