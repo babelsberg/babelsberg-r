@@ -1,5 +1,5 @@
 from rupypy.objects.objectobject import W_BaseObject
-
+from rupypy.closure import ClosureCell
 
 class W_BlockObject(W_BaseObject):
     def __init__(self, bytecode, w_self, w_scope, lexical_scope, cells, block, parent_interp):
@@ -22,3 +22,10 @@ class W_BlockObject(W_BaseObject):
             block or self.block,
             parent_interp or self.parent_interp
         )
+
+    def get_closure_variables(self):
+        cells = []
+        for cell in self.cells:
+            if isinstance(cell, ClosureCell):
+                cells.append((cell.get(None, None), cell))
+        return cells
