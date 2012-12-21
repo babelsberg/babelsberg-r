@@ -1,5 +1,4 @@
 from pypy.rlib import rgc
-from pypy.rlib.objectmodel import we_are_translated
 
 from rupypy.module import Module, ModuleDef
 from rupypy.objects.objectobject import W_BaseObject
@@ -23,10 +22,7 @@ class ObjectSpace(Module):
     @moduledef.function("each_object")
     def method_each_object(self, space, w_mod, block):
         match_w = []
-        if we_are_translated():
-            roots = [gcref for gcref in rgc.get_rpy_roots() if gcref]
-        else:
-            roots = [rgc._GcRef(space)]
+        roots = [gcref for gcref in rgc.get_rpy_roots() if gcref]
         pending = roots[:]
         while pending:
             gcref = pending.pop()
