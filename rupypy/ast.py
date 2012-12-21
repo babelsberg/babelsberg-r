@@ -4,6 +4,7 @@ from pypy.rlib.objectmodel import we_are_translated
 
 from rupypy import consts
 from rupypy.astcompiler import CompilerContext, BlockSymbolTable
+from rupypy.utils.regexp import RegexpError
 
 
 class BaseNode(object):
@@ -451,6 +452,27 @@ class Alias(BaseStatement):
             None,
             self.lineno,
         ).compile(ctx)
+        if not self.dont_pop:
+            ctx.emit(consts.DISCARD_TOP)
+
+
+class Undef(BaseStatement):
+    def __init__(self, undef_list, lineno):
+        BaseStatement.__init__(self, lineno)
+        self.undef_list = undef_list
+
+    def compile(self, ctx):
+        first = True
+        for undef in self.undef_list:
+            if not first:
+                ctx.emit(consts.DISCARD_TOP)
+            Send(
+                Scope(self.lineno),
+                "undef_method",
+                [undef],
+                None,
+                self.lineno
+            ).compile(ctx)
         if not self.dont_pop:
             ctx.emit(consts.DISCARD_TOP)
 
@@ -1076,11 +1098,17 @@ class ConstantString(ConstantNode):
 
 
 class ConstantRegexp(ConstantNode):
-    def __init__(self, regexp):
+    def __init__(self, regexp, flags, lineno):
+        ConstantNode.__init__(self, lineno)
         self.regexp = regexp
+        self.flags = flags
 
     def create_const(self, ctx):
-        return ctx.create_const(ctx.space.newregexp(self.regexp))
+        try:
+            w_regexp = ctx.space.newregexp(self.regexp, self.flags)
+        except RegexpError as e:
+            raise ctx.space.error(ctx.space.w_SyntaxError, "line %d: %s" % (self.lineno, e))
+        return ctx.create_const(w_regexp)
 
 
 class ConstantBool(ConstantNode):
@@ -1111,11 +1139,13 @@ class DynamicString(Node):
 
 
 class DynamicRegexp(Node):
-    def __init__(self, dstring):
+    def __init__(self, dstring, flags):
         self.dstring = dstring
+        self.flags = flags
 
     def compile(self, ctx):
         self.dstring.compile(ctx)
+        ctx.emit(consts.LOAD_CONST, ctx.create_int_const(self.flags))
         ctx.emit(consts.BUILD_REGEXP)
 
 

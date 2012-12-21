@@ -303,7 +303,7 @@ class Interpreter(object):
         w_code = frame.pop()
         assert isinstance(w_code, W_CodeObject)
         block = W_BlockObject(
-            w_code, frame.w_self, frame.w_scope, frame.lexical_scope, cells, frame.block, self
+            w_code, frame.w_self, frame.w_scope, frame.lexical_scope, cells, frame.block, self, frame.regexp_match_cell,
         )
         frame.push(block)
 
@@ -350,8 +350,9 @@ class Interpreter(object):
         frame.push(space.w_nil)
 
     def BUILD_REGEXP(self, space, bytecode, frame, pc):
+        w_flags = frame.pop()
         w_string = frame.pop()
-        frame.push(space.newregexp(space.str_w(w_string)))
+        frame.push(space.newregexp(space.str_w(w_string), space.int_w(w_flags)))
 
     def COPY_STRING(self, space, bytecode, frame, pc):
         w_s = frame.pop()

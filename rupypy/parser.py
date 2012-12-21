@@ -6,6 +6,7 @@ from rply.token import BaseBox, SourcePosition
 
 from rupypy import ast
 from rupypy.astcompiler import SymbolTable, BlockSymbolTable, SharedScopeSymbolTable
+from rupypy.utils import regexp
 
 
 class Parser(object):
@@ -462,12 +463,7 @@ class Parser(object):
 
     @pg.production("stmt : UNDEF undef_list")
     def stmt_undef(self, p):
-        """
-        kUNDEF undef_list {
-                    $$ = $2;
-                }
-        """
-        raise NotImplementedError(p)
+        return BoxAST(ast.Undef(p[1].getastlist(), p[0].getsourcepos().lineno))
 
     @pg.production("stmt : stmt IF_MOD expr_value")
     def stmt_ifmod(self, p):
@@ -569,6 +565,10 @@ class Parser(object):
         """
         raise NotImplementedError(p)
 
+    @pg.production("stmt : primary_value COLON2 CONSTANT OP_ASGN command_call")
+    def stmt_primary_value_colon_constant_op_asgn_command_call(self, p):
+        self.error("can't make alias for the number variables")
+
     @pg.production("stmt : primary_value COLON2 IDENTIFIER OP_ASGN command_call")
     def stmt_constant_op_asgn_command_call(self, p):
         """
@@ -664,18 +664,6 @@ class Parser(object):
     def command_call_block_command(self, p):
         return p[0]
 
-    @pg.production("command_call : RETURN call_args")
-    def command_call_return(self, p):
-        return self.new_return(p[1])
-
-    @pg.production("command_call : BREAK call_args")
-    def command_call_break(self, p):
-        return self.new_break(p[1])
-
-    @pg.production("command_call : NEXT call_args")
-    def command_call_next(self, p):
-        return self.new_next(p[1])
-
     @pg.production("block_command : block_call")
     def block_command_block_call(self, p):
         return p[0]
@@ -736,6 +724,18 @@ class Parser(object):
     @pg.production("command : YIELD command_args")
     def command_yield(self, p):
         return BoxAST(ast.Yield(p[1].getcallargs(), p[0].getsourcepos().lineno))
+
+    @pg.production("command : RETURN call_args")
+    def command_call_return(self, p):
+        return self.new_return(p[1])
+
+    @pg.production("command : BREAK call_args")
+    def command_call_break(self, p):
+        return self.new_break(p[1])
+
+    @pg.production("command : NEXT call_args")
+    def command_call_next(self, p):
+        return self.new_next(p[1])
 
     @pg.production("mlhs : mlhs_basic")
     def mlhs(self, p):
@@ -837,7 +837,8 @@ class Parser(object):
     def mlhs_post_post_item(self, p):
         return self.append_to_list(p[0], p[2])
 
-    @pg.production("mlhs_node : variable")
+    @pg.production("mlhs_node : keyword_variable")
+    @pg.production("mlhs_node : user_variable")
     def mlhs_node_variable(self, p):
         return self.assignable(p[0])
 
@@ -899,7 +900,8 @@ class Parser(object):
         """
         raise NotImplementedError(p)
 
-    @pg.production("lhs : variable")
+    @pg.production("lhs : keyword_variable")
+    @pg.production("lhs : user_variable")
     def lhs_variable(self, p):
         return self.assignable(p[0])
 
@@ -1003,12 +1005,7 @@ class Parser(object):
 
     @pg.production("undef_list : fitem")
     def undef_list_fitem(self, p):
-        """
-        fitem {
-                    $$ = support.newUndef($1.getPosition(), $1);
-                }
-        """
-        raise NotImplementedError(p)
+        return self.new_list(p[0])
 
     @pg.production("undef_list : undef_list LITERAL_COMMA fitem")
     def undef_list_undef_list(self, p):
@@ -1336,6 +1333,18 @@ class Parser(object):
     def opt_call_args(self, p):
         return p[0]
 
+    @pg.production("opt_call_args : args LITERAL_COMMA")
+    def opt_call_args_args_comma(self, p):
+        return p[0]
+
+    @pg.production("opt_call_args : args LITERAL_COMMA assocs LITERAL_COMMA")
+    def opt_call_args_args_comma_assocs_comma(self, p):
+        return self.append_call_arg(p[0], self.new_hash(p[2]))
+
+    @pg.production("opt_call_args : assocs LITERAL_COMMA")
+    def opt_call_args_assocs_comma(self, p):
+        return self.new_call_args(self.new_hash(p[0]))
+
     @pg.production("call_args : command")
     def call_args_command(self, p):
         return self.new_call_args(p[0])
@@ -1374,10 +1383,6 @@ class Parser(object):
     @pg.production("opt_block_arg : LITERAL_COMMA block_arg")
     def opt_block_arg(self, p):
         return p[1]
-
-    @pg.production("opt_block_arg : LITERAL_COMMA")
-    def opt_block_arg_comma(self, p):
-        return None
 
     @pg.production("opt_block_arg : none_block_pass")
     def opt_block_arg_none(self, p):
@@ -2318,14 +2323,23 @@ class Parser(object):
 
     @pg.production("regexp : REGEXP_BEG xstring_contents REGEXP_END")
     def regexp(self, p):
+        str_flags = p[2].getstr()
+        flags = 0
+        for f in str_flags:
+            flags |= {
+                "m": regexp.DOT_ALL,
+                "i": regexp.IGNORE_CASE,
+                "o": regexp.ONCE,
+                "x": regexp.EXTENDED,
+            }[f]
         if p[1] is not None:
             n = p[1].getast()
             if isinstance(n, ast.ConstantString):
-                node = ast.ConstantRegexp(n.strvalue)
+                node = ast.ConstantRegexp(n.strvalue, flags, p[0].getsourcepos().lineno)
             else:
-                node = ast.DynamicRegexp(n)
+                node = ast.DynamicRegexp(n, flags)
         else:
-            node = ast.ConstantRegexp("")
+            node = ast.ConstantRegexp("", flags, p[0].getsourcepos().lineno)
         return BoxAST(node)
 
     @pg.production("words : WORDS_BEG LITERAL_SPACE STRING_END")
@@ -2484,59 +2498,60 @@ class Parser(object):
     def numeric_minus_float(self, p):
         return BoxAST(ast.ConstantFloat(-float(p[1].getstr())))
 
-    @pg.production("variable : IDENTIFIER")
+    @pg.production("user_variable : IDENTIFIER")
     def variable_identifier(self, p):
         return BoxAST(ast.Variable(p[0].getstr(), p[0].getsourcepos().lineno))
 
-    @pg.production("variable : IVAR")
+    @pg.production("user_variable : IVAR")
     def variable_ivar(self, p):
         return self.new_instance_var(p[0])
 
-    @pg.production("variable : GVAR")
+    @pg.production("user_variable : GVAR")
     def variable_gvar(self, p):
         return self.new_global(p[0])
 
-    @pg.production("variable : CONSTANT")
+    @pg.production("user_variable : CONSTANT")
     def variable_constant(self, p):
         return BoxAST(ast.Constant(
             p[0].getstr(),
             p[0].getsourcepos().lineno
         ))
 
-    @pg.production("variable : CVAR")
+    @pg.production("user_variable : CVAR")
     def variable_cvar(self, p):
         return self.new_class_var(p[0])
 
-    @pg.production("variable : NIL")
+    @pg.production("keyword_variable : NIL")
     def variable_nil(self, p):
         return BoxAST(ast.Nil())
 
-    @pg.production("variable : SELF")
+    @pg.production("keyword_variable : SELF")
     def variable_self(self, p):
         return BoxAST(ast.Self(p[0].getsourcepos().lineno))
 
-    @pg.production("variable : TRUE")
+    @pg.production("keyword_variable : TRUE")
     def variable_true(self, p):
         return BoxAST(ast.ConstantBool(True))
 
-    @pg.production("variable : FALSE")
+    @pg.production("keyword_variable : FALSE")
     def variable_false(self, p):
         return BoxAST(ast.ConstantBool(False))
 
-    @pg.production("variable : __FILE__")
+    @pg.production("keyword_variable : __FILE__")
     def variable__file__(self, p):
         return BoxAST(ast.File())
 
-    @pg.production("variable : __LINE__")
+    @pg.production("keyword_variable : __LINE__")
     def variable__line__(self, p):
         return BoxAST(ast.Line(p[0].getsourcepos().lineno))
 
-    @pg.production("variable : __ENCODING__")
+    @pg.production("keyword_variable : __ENCODING__")
     def variable__encoding__(self, p):
         raise NotImplementedError(p)
         return BoxAST(ast.Encoding())
 
-    @pg.production("var_ref : variable")
+    @pg.production("var_ref : keyword_variable")
+    @pg.production("var_ref : user_variable")
     def var_ref(self, p):
         node = p[0].getast()
         if isinstance(node, ast.Variable):
@@ -2548,7 +2563,8 @@ class Parser(object):
         else:
             return p[0]
 
-    @pg.production("var_lhs : variable")
+    @pg.production("var_lhs : user_variable")
+    @pg.production("var_lhs : keyword_variable")
     def var_lhs(self, p):
         return self.assignable(p[0])
 
@@ -2576,10 +2592,13 @@ class Parser(object):
     @pg.production("f_arglist : LPAREN2 f_args rparen")
     def f_arglist_parens(self, p):
         self.lexer.state = self.lexer.EXPR_BEG
+        self.lexer.command_start = True
         return p[1]
 
     @pg.production("f_arglist : f_args term")
     def f_arglist(self, p):
+        self.lexer.state = self.lexer.EXPR_BEG
+        self.lexer.command_start = True
         return p[0]
 
     @pg.production("f_args : f_arg LITERAL_COMMA f_optarg LITERAL_COMMA f_rest_arg opt_f_block_arg")

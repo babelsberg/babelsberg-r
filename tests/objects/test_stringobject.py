@@ -1,3 +1,5 @@
+from pypy.rlib.rbigint import rbigint
+
 from ..base import BaseRuPyPyTest
 
 
@@ -196,6 +198,10 @@ class TestStringObject(BaseRuPyPyTest):
         assert space.int_w(w_res) == 0
         w_res = space.execute("return '   123'.to_i")
         assert space.int_w(w_res) == 123
+
+        w_res = space.execute("return '234124123123123121231231'.to_i")
+        assert space.bigint_w(w_res) == rbigint.fromlong(234124123123123121231231)
+
         with self.raises(space, "ArgumentError"):
             space.execute('"".to_i(1)')
         with self.raises(space, "ArgumentError"):
@@ -248,6 +254,16 @@ class TestStringObject(BaseRuPyPyTest):
         assert space.str_w(w_res) == "hhxo"
         w_res = space.execute("return 'hello'.tr_s!('','').nil?")
         assert self.unwrap(space, w_res) is True
+
+    def test_match_operator(self, space):
+        w_res = space.execute("return 'abc' =~ 1")
+        assert w_res is space.w_nil
+        w_res = space.execute("return 'abc' =~ /abc/")
+        assert space.int_w(w_res) == 0
+
+    def test_match_method(self, space):
+        w_res = space.execute("return 'abc'.match('bc').begin 0")
+        assert space.int_w(w_res) == 1
 
 
 class TestStringMod(object):

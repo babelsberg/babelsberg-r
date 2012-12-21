@@ -3,6 +3,7 @@
 from pypy.rlib.rbigint import rbigint
 
 from rupypy import ast
+from rupypy.utils import regexp
 
 from .base import BaseRuPyPyTest
 
@@ -79,7 +80,7 @@ class TestParser(BaseRuPyPyTest):
             ast.Statement(ast.Send(ast.ConstantInt(2), "!~", [ast.ConstantInt(3)], None, 1))
         ]))
         assert space.parse("1 =~ /v/") == ast.Main(ast.Block([
-            ast.Statement(ast.Send(ast.ConstantInt(1), "=~", [ast.ConstantRegexp("v")], None, 1))
+            ast.Statement(ast.Send(ast.ConstantInt(1), "=~", [ast.ConstantRegexp("v", 0, 1)], None, 1))
         ]))
         assert space.parse("2 & 3 | 5") == ast.Main(ast.Block([
             ast.Statement(ast.Send(ast.Send(ast.ConstantInt(2), "&", [ast.ConstantInt(3)], None, 1), "|", [ast.ConstantInt(5)], None, 1))
@@ -847,6 +848,9 @@ class TestParser(BaseRuPyPyTest):
         ]))
         assert space.parse('""') == ast.Main(ast.Block([
             ast.Statement(ast.ConstantString(""))
+        ]))
+        assert space.parse("'\\'<>'") == ast.Main(ast.Block([
+            ast.Statement(ast.ConstantString("'<>"))
         ]))
 
     def test_escape_character(self, space):
@@ -1863,10 +1867,10 @@ HERE
 
     def test_regexp(self, space):
         re = lambda re: ast.Main(ast.Block([
-            ast.Statement(ast.ConstantRegexp(re))
+            ast.Statement(ast.ConstantRegexp(re, 0, 1))
         ]))
         dyn_re = lambda re: ast.Main(ast.Block([
-            ast.Statement(ast.DynamicRegexp(re))
+            ast.Statement(ast.DynamicRegexp(re, 0))
         ]))
         assert space.parse("//") == re("")
         assert space.parse(r"/a/") == re("a")
@@ -1875,6 +1879,16 @@ HERE
         assert space.parse('%r{#{2}}') == dyn_re(ast.DynamicString([ast.Block([ast.Statement(ast.ConstantInt(2))])]))
         assert space.parse('/#{2}/') == dyn_re(ast.DynamicString([ast.Block([ast.Statement(ast.ConstantInt(2))])]))
         assert space.parse("%r!a!") == re("a")
+
+    def test_regexp_flags(self, space):
+        re = lambda re, flags: ast.Main(ast.Block([
+            ast.Statement(ast.ConstantRegexp(re, flags, 1))
+        ]))
+        assert space.parse('/a/o') == re('a', regexp.ONCE)
+
+    def test_unclosed_regexp(self, space):
+        with self.raises(space, "SyntaxError"):
+            space.parse("%r{abc")
 
     def test_or(self, space):
         assert space.parse("3 || 4") == ast.Main(ast.Block([
@@ -2090,7 +2104,7 @@ HERE
         """)
         assert r == ast.Main(ast.Block([
             ast.Statement(ast.Case(ast.ConstantInt(0), [
-                ast.When([ast.ConstantRegexp("a")], ast.Nil(), 3)
+                ast.When([ast.ConstantRegexp("a", 0, 3)], ast.Nil(), 3)
             ], ast.Nil()))
         ]))
 
@@ -2138,7 +2152,7 @@ HERE
 
     def test_and_regexp(self, space):
         assert space.parse("3 && /a/") == ast.Main(ast.Block([
-            ast.Statement(ast.And(ast.ConstantInt(3), ast.ConstantRegexp("a")))
+            ast.Statement(ast.And(ast.ConstantInt(3), ast.ConstantRegexp("a", 0, 1)))
         ]))
 
     def test_hash(self, space):
@@ -2314,6 +2328,18 @@ HERE
         ]))
         assert space.parse("break 3, 4") == ast.Main(ast.Block([
             ast.Break(ast.Array([ast.ConstantInt(3), ast.ConstantInt(4)]))
+        ]))
+
+    def test_undef(self, space):
+        r = space.parse("""
+        class X
+            undef to_s
+        end
+        """)
+        assert r == ast.Main(ast.Block([
+            ast.Statement(ast.Class(ast.Scope(2), "X", None, ast.Block([
+                ast.Undef([ast.ConstantSymbol("to_s")], 3)
+            ])))
         ]))
 
     def test_custom_lineno(self, space):

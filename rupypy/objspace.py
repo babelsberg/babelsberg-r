@@ -10,6 +10,7 @@ from rply.errors import ParsingError
 
 from rupypy.astcompiler import CompilerContext, SymbolTable
 from rupypy.celldict import GlobalsDict
+from rupypy.closure import ClosureCell
 from rupypy.error import RubyError, print_traceback
 from rupypy.executioncontext import ExecutionContext
 from rupypy.frame import Frame
@@ -24,6 +25,7 @@ from rupypy.modules.math import Math
 from rupypy.modules.kernel import Kernel
 from rupypy.modules.objectspace import ObjectSpace as ObjectSpaceModule
 from rupypy.modules.process import Process
+from rupypy.modules.signal import Signal
 from rupypy.modules.topaz import Topaz
 from rupypy.objects.arrayobject import W_ArrayObject
 from rupypy.objects.bignumobject import W_BignumObject
@@ -42,6 +44,7 @@ from rupypy.objects.fileobject import W_FileObject, W_IOObject
 from rupypy.objects.floatobject import W_FloatObject
 from rupypy.objects.functionobject import W_UserFunction
 from rupypy.objects.hashobject import W_HashObject, W_HashIterator
+from rupypy.objects.integerobject import W_IntegerObject
 from rupypy.objects.intobject import W_FixnumObject
 from rupypy.objects.methodobject import W_MethodObject, W_UnboundMethodObject
 from rupypy.objects.integerobject import W_IntegerObject
@@ -147,6 +150,8 @@ class ObjectSpace(object):
             self.getclassfor(W_FileObject),
             self.getclassfor(W_Dir),
             self.getclassfor(W_EncodingObject),
+            self.getclassfor(W_IntegerObject),
+            self.getclassfor(W_RegexpObject),
             self.getclassfor(W_RandomObject),
             self.getclassfor(W_ThreadObject),
             self.getclassfor(W_TimeObject),
@@ -160,6 +165,7 @@ class ObjectSpace(object):
             self.getmoduleobject(Enumerable.moduledef),
             self.getmoduleobject(Math.moduledef),
             self.getmoduleobject(Process.moduledef),
+            self.getmoduleobject(Signal.moduledef),
             self.getmoduleobject(ObjectSpaceModule.moduledef),
         ]:
             self.set_const(
@@ -247,13 +253,15 @@ class ObjectSpace(object):
         return self._executioncontext
 
     def create_frame(self, bc, w_self=None, w_scope=None, lexical_scope=None,
-        block=None, parent_interp=None):
+        block=None, parent_interp=None, regexp_match_cell=None):
 
         if w_self is None:
             w_self = self.w_top_self
         if w_scope is None:
             w_scope = self.w_object
-        return Frame(jit.promote(bc), w_self, w_scope, lexical_scope, block, parent_interp)
+        if regexp_match_cell is None:
+            regexp_match_cell = ClosureCell(None)
+        return Frame(jit.promote(bc), w_self, w_scope, lexical_scope, block, parent_interp, regexp_match_cell)
 
     def execute_frame(self, frame, bc):
         return Interpreter().interpret(self, frame, bc)
@@ -304,8 +312,8 @@ class ObjectSpace(object):
     def newrange(self, w_start, w_end, exclusive):
         return W_RangeObject(self, w_start, w_end, exclusive)
 
-    def newregexp(self, regexp):
-        return W_RegexpObject(self, regexp)
+    def newregexp(self, regexp, flags):
+        return W_RegexpObject(self, regexp, flags)
 
     def newmodule(self, name):
         return W_ModuleObject(self, name)
@@ -331,9 +339,12 @@ class ObjectSpace(object):
     def newproc(self, block, is_lambda=False):
         return W_ProcObject(self, block, is_lambda)
 
+    @jit.unroll_safe
     def newbinding_fromframe(self, frame):
         names = frame.bytecode.cellvars + frame.bytecode.freevars
-        cells = [c.upgrade_to_closure(frame, idx) for idx, c in enumerate(frame.cells)]
+        cells = [None] * len(frame.cells)
+        for i in xrange(len(frame.cells)):
+            cells[i] = frame.cells[i].upgrade_to_closure(frame, i)
         return W_BindingObject(self, names, cells, frame.w_self, frame.w_scope)
 
     def int_w(self, w_obj):
@@ -469,7 +480,7 @@ class ObjectSpace(object):
         frame = self.create_frame(
             bc, w_self=block.w_self, w_scope=block.w_scope,
             lexical_scope=block.lexical_scope, block=block.block,
-            parent_interp=block.parent_interp,
+            parent_interp=block.parent_interp, regexp_match_cell=block.regexp_match_cell,
         )
         if (len(args_w) == 1 and
             isinstance(args_w[0], W_ArrayObject) and len(bc.arg_pos) >= 2):

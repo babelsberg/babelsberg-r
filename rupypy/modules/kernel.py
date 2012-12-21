@@ -11,7 +11,7 @@ from rupypy.objects.stringobject import W_StringObject
 
 
 class Kernel(Module):
-    moduledef = ModuleDef("Kernel")
+    moduledef = ModuleDef("Kernel", filepath=__file__)
 
     @moduledef.method("class")
     def function_class(self, space):
@@ -42,9 +42,7 @@ class Kernel(Module):
     def puts *args
         $stdout.puts(*args)
     end
-    """)
 
-    moduledef.app_method("""
     def print *args
         $stdout.print(*args)
     end
@@ -280,3 +278,10 @@ class Kernel(Module):
             if w_variable is cell.get(frame, idx):
                 return cell.get_prev(frame, idx) or w_variable
         return space.w_nil
+
+    @moduledef.method("eval")
+    def method_eval(self, space, w_source):
+        frame = space.getexecutioncontext().gettoprubyframe()
+        w_binding = space.newbinding_fromframe(frame)
+        return space.send(w_binding, space.newsymbol("eval"), [w_source])
+
