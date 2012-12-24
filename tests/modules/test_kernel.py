@@ -1,6 +1,6 @@
 import os
 
-import py
+import pytest
 
 from ..base import BaseRuPyPyTest
 
@@ -295,7 +295,32 @@ class TestExec(BaseRuPyPyTest):
         out = self.fork_and_wait(space, capfd, "exec ['/bin/sh', 'argv0'], '-c', 'echo $0'")
         assert out == "argv0\n"
 
-    @py.test.mark.xfail
+    @pytest.mark.xfail
     def test_exec_with_path_search(self, space, capfd):
         out = self.fork_and_wait(space, capfd, "exec 'echo', '$0'")
         assert out == "$0\n"
+
+
+class TestSetTraceFunc(BaseRuPyPyTest):
+    def test_class(self, space):
+        w_res = space.execute("""
+        output = []
+        set_trace_func proc { |event, file, line, id, binding, classname|
+            output << [event, file, line, id, classname]
+        }
+
+        class << self
+        end
+
+        set_trace_func nil
+
+        return output
+        """)
+        assert self.unwrap(space, w_res) == [
+            ["c-return", "-e", 3, "set_trace_func", "Kernel"],
+            ["line", "-e", 7, None, None],
+            ["class", "-e", 7, None, None],
+            ["end", "-e", 7, None, None],
+            ["line", "-e", 10, None, None],
+            ["c-call", "-e", 10, "set_trace_func", "Kernel"]
+        ]

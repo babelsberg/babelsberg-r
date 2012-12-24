@@ -1,4 +1,5 @@
 from rupypy.gateway import WrapperGenerator
+from rupypy.scope import StaticScope
 from rupypy.utils.cache import Cache
 
 
@@ -117,14 +118,18 @@ class ClassCache(Cache):
         yield w_class
         for name, (method, argspec) in classdef.methods.iteritems():
             func = WrapperGenerator(name, method, argspec, classdef.cls).generate_wrapper()
-            w_class.define_method(self.space, name, W_BuiltinFunction(name, func))
+            w_class.define_method(self.space, name, W_BuiltinFunction(name, w_class, func))
 
         for source in classdef.app_methods:
-            self.space.execute(source, w_self=w_class, w_scope=w_class, filepath=classdef.filepath)
+            self.space.execute(source,
+                w_self=w_class,
+                lexical_scope=StaticScope(w_class, None),
+                filepath=classdef.filepath
+            )
 
         for name, (method, argspec) in classdef.singleton_methods.iteritems():
             func = WrapperGenerator(name, method, argspec, W_ClassObject).generate_wrapper()
-            w_class.attach_method(self.space, name, W_BuiltinFunction(name, func))
+            w_class.attach_method(self.space, name, W_BuiltinFunction(name, w_class, func))
 
         for mod in reversed(classdef.includes):
             w_mod = self.space.getmoduleobject(mod.moduledef)
@@ -143,12 +148,16 @@ class ModuleCache(Cache):
         w_mod = self.space.newmodule(moduledef.name)
         for name, (method, argspec) in moduledef.methods.iteritems():
             func = WrapperGenerator(name, method, argspec, W_BaseObject).generate_wrapper()
-            w_mod.define_method(self.space, name, W_BuiltinFunction(name, func))
+            w_mod.define_method(self.space, name, W_BuiltinFunction(name, w_mod, func))
         for source in moduledef.app_methods:
-            self.space.execute(source, w_self=w_mod, w_scope=w_mod, filepath=moduledef.filepath)
+            self.space.execute(source,
+                w_self=w_mod,
+                lexical_scope=StaticScope(w_mod, None),
+                filepath=moduledef.filepath
+            )
         for name, (method, argspec) in moduledef.singleton_methods.iteritems():
             func = WrapperGenerator(name, method, argspec, W_ModuleObject).generate_wrapper()
-            w_mod.attach_method(self.space, name, W_BuiltinFunction(name, func))
+            w_mod.attach_method(self.space, name, W_BuiltinFunction(name, w_mod, func))
 
         if moduledef.setup_module_func is not None:
             moduledef.setup_module_func(self.space, w_mod)

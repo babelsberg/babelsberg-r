@@ -159,6 +159,32 @@ class TestStringObject(BaseRuPyPyTest):
         assert self.unwrap(space, w_res) == ["a", "b-c"]
         w_res = space.execute("return 'a b c'.split(' ', -1)")
         assert self.unwrap(space, w_res) == ["a", "b", "c"]
+        with self.raises(space, "TypeError", "wrong argument type Fixnum (expected Regexp)"):
+            space.execute("'a b c'.split(12)")
+
+    def test_split_regexp(self, space):
+        w_res = space.execute("return \"now's  the time\".split(/ /)")
+        assert self.unwrap(space, w_res) == ["now's", "", "the", "time"]
+        w_res = space.execute('return "1, 2.34,56, 7".split(%r{,\s*})')
+        assert self.unwrap(space, w_res) == ["1", "2.34", "56", "7"]
+        w_res = space.execute('return "1, 2.34,56, 7".split(%r{,\s*}, 0)')
+        assert self.unwrap(space, w_res) == ["1", "2.34", "56", "7"]
+        w_res = space.execute('return "1, 2.34,56, 7".split(%r{,\s*}, -1)')
+        assert self.unwrap(space, w_res) == ["1", "2.34", "56", "7", ""]
+        w_res = space.execute('return "1, 2.34,56, 7".split(%r{,\s*}, -2)')
+        assert self.unwrap(space, w_res) == ["1", "2.34", "56", "7", ""]
+        w_res = space.execute('return "1, 2.34,56, 7".split(%r{,\s*}, 4)')
+        assert self.unwrap(space, w_res) == ["1", "2.34", "56", "7"]
+        w_res = space.execute('return "1, 2.34,56, 7".split(%r{,\s*}, 5)')
+        assert self.unwrap(space, w_res) == ["1", "2.34", "56", "7", ""]
+        w_res = space.execute('return "1, 2.34,56, 7".split(%r{,\s*}, 6)')
+        assert self.unwrap(space, w_res) == ["1", "2.34", "56", "7", ""]
+        w_res = space.execute('return "hello".split(//)')
+        assert self.unwrap(space, w_res) == ["h", "e", "l", "l", "o"]
+        w_res = space.execute('return "hello".split(//, 3)')
+        assert self.unwrap(space, w_res) == ["h", "e", "llo"]
+        w_res = space.execute('return "hello".split(/((.)(.))/, 3)')
+        assert self.unwrap(space, w_res) == ["", "he", "h", "e", "", "ll", "l", "l", "o"]
 
     def test_dup(self, space):
         w_res = space.execute("""
@@ -260,6 +286,11 @@ class TestStringObject(BaseRuPyPyTest):
         assert w_res is space.w_nil
         w_res = space.execute("return 'abc' =~ /abc/")
         assert space.int_w(w_res) == 0
+        w_res = space.execute("""
+        '' =~ /()/
+        return $1
+        """)
+        assert space.str_w(w_res) == ""
 
     def test_match_method(self, space):
         w_res = space.execute("return 'abc'.match('bc').begin 0")

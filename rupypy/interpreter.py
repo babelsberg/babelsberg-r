@@ -17,13 +17,13 @@ from rupypy.objects.stringobject import W_StringObject
 from rupypy.scope import StaticScope
 
 
-def get_printable_location(pc, bytecode, block_bytecode):
+def get_printable_location(pc, bytecode, block_bytecode, w_trace_proc):
     return "%s at %s" % (bytecode.name, consts.BYTECODE_NAMES[ord(bytecode.code[pc])])
 
 
 class Interpreter(object):
     jitdriver = jit.JitDriver(
-        greens=["pc", "bytecode", "block_bytecode"],
+        greens=["pc", "bytecode", "block_bytecode", "w_trace_proc"],
         reds=["self", "frame"],
         virtualizables=["frame"],
         get_printable_location=get_printable_location,
@@ -43,8 +43,13 @@ class Interpreter(object):
                     self.jitdriver.jit_merge_point(
                         self=self, bytecode=bytecode, frame=frame, pc=pc,
                         block_bytecode=self.get_block_bytecode(frame.block),
+                        w_trace_proc=space.getexecutioncontext().gettraceproc(),
                     )
+                    prev_instr = frame.last_instr
                     frame.last_instr = pc
+                    if (space.getexecutioncontext().hastraceproc() and
+                        bytecode.lineno_table[pc] != bytecode.lineno_table[prev_instr]):
+                        space.getexecutioncontext().invoke_trace_proc(space, "line", None, None, frame=frame)
                     # Why do we wrap the PC in an object? The JIT has store
                     # sinking, but when it encounters a guard it usually performs
                     # all pending stores, *execpt* if the value is a virtual, then
@@ -141,6 +146,7 @@ class Interpreter(object):
             self.jitdriver.can_enter_jit(
                 self=self, bytecode=bytecode, frame=frame, pc=target_pc,
                 block_bytecode=self.get_block_bytecode(frame.block),
+                w_trace_proc=space.getexecutioncontext().gettraceproc()
             )
         return target_pc
 
@@ -150,7 +156,10 @@ class Interpreter(object):
         frame.push(w_self)
 
     def LOAD_SCOPE(self, space, bytecode, frame, pc):
-        frame.push(jit.promote(frame.w_scope))
+        if frame.lexical_scope is not None:
+            frame.push(frame.lexical_scope.w_mod)
+        else:
+            frame.push(space.w_object)
 
     def LOAD_CODE(self, space, bytecode, frame, pc):
         frame.push(bytecode)
@@ -257,6 +266,14 @@ class Interpreter(object):
         space.set_class_var(w_module, name, w_value)
         frame.push(w_value)
 
+    def DEFINED_CLASS_VAR(self, space, bytecode, frame, pc, idx):
+        w_name = bytecode.consts_w[idx]
+        w_obj = frame.pop()
+        if space.is_true(space.send(w_obj, space.newsymbol("class_variable_defined?"), [w_name])):
+            frame.push(space.newstr_fromstr("class variable"))
+        else:
+            frame.push(space.w_nil)
+
     def LOAD_GLOBAL(self, space, bytecode, frame, pc, idx):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_value = space.globals.get(space, name) or space.w_nil
@@ -266,6 +283,13 @@ class Interpreter(object):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_value = frame.peek()
         space.globals.set(space, name, w_value)
+
+    def DEFINED_GLOBAL(self, space, bytecode, frame, pc, idx):
+        name = space.symbol_w(bytecode.consts_w[idx])
+        if space.globals.get(space, name) is not None:
+            frame.push(space.newstr_fromstr("global-variable"))
+        else:
+            frame.push(space.w_nil)
 
     @jit.unroll_safe
     def BUILD_ARRAY(self, space, bytecode, frame, pc, n_items):
@@ -303,7 +327,8 @@ class Interpreter(object):
         w_code = frame.pop()
         assert isinstance(w_code, W_CodeObject)
         block = W_BlockObject(
-            w_code, frame.w_self, frame.w_scope, frame.lexical_scope, cells, frame.block, self, frame.regexp_match_cell,
+            w_code, frame.w_self, frame.lexical_scope, cells, frame.block,
+            frame.parent_interp or self, frame.regexp_match_cell
         )
         frame.push(block)
 
@@ -343,7 +368,7 @@ class Interpreter(object):
             raise space.error(space.w_TypeError, "%s is not a module" % name)
 
         assert isinstance(w_bytecode, W_CodeObject)
-        sub_frame = space.create_frame(w_bytecode, w_mod, w_mod, StaticScope(w_mod, frame.lexical_scope))
+        sub_frame = space.create_frame(w_bytecode, w_mod, StaticScope(w_mod, frame.lexical_scope))
         with space.getexecutioncontext().visit_frame(sub_frame):
             space.execute_frame(sub_frame, w_bytecode)
 
@@ -359,20 +384,25 @@ class Interpreter(object):
         assert isinstance(w_s, W_StringObject)
         frame.push(w_s.copy(space))
 
-    def COERCE_ARRAY(self, space, bytecode, frame, pc):
+    def COERCE_ARRAY(self, space, bytecode, frame, pc, nil_is_empty):
         w_obj = frame.pop()
         if w_obj is space.w_nil:
-            frame.push(space.newarray([]))
+            if nil_is_empty:
+                frame.push(space.newarray([]))
+            else:
+                frame.push(space.newarray([space.w_nil]))
         elif isinstance(w_obj, W_ArrayObject):
             frame.push(w_obj)
         else:
             if space.respond_to(w_obj, space.newsymbol("to_a")):
-                w_obj = space.send(w_obj, space.newsymbol("to_a"))
+                w_res = space.send(w_obj, space.newsymbol("to_a"))
             elif space.respond_to(w_obj, space.newsymbol("to_ary")):
-                w_obj = space.send(w_obj, space.newsymbol("to_ary"))
-            if not isinstance(w_obj, W_ArrayObject):
-                w_obj = space.newarray([w_obj])
-            frame.push(w_obj)
+                w_res = space.send(w_obj, space.newsymbol("to_ary"))
+            else:
+                w_res = space.newarray([w_obj])
+            if not isinstance(w_res, W_ArrayObject):
+                w_res = space.newarray([w_obj])
+            frame.push(w_res)
 
     def COERCE_BLOCK(self, space, bytecode, frame, pc):
         w_block = frame.pop()
@@ -437,11 +467,17 @@ class Interpreter(object):
         w_bytecode = frame.pop()
         w_cls = frame.pop()
         assert isinstance(w_bytecode, W_CodeObject)
-        sub_frame = space.create_frame(w_bytecode, w_cls, w_cls, StaticScope(w_cls, frame.lexical_scope), block=frame.block)
+        space.getexecutioncontext().invoke_trace_proc(space, "class", None, None, frame=frame)
+        sub_frame = space.create_frame(w_bytecode, w_cls, StaticScope(w_cls, frame.lexical_scope), block=frame.block)
         with space.getexecutioncontext().visit_frame(sub_frame):
             w_res = space.execute_frame(sub_frame, w_bytecode)
 
+        space.getexecutioncontext().invoke_trace_proc(space, "end", None, None, frame=frame)
         frame.push(w_res)
+
+    def LOAD_SINGLETON_CLASS(self, space, bytecode, frame, pc):
+        w_obj = frame.pop()
+        frame.push(space.getsingletonclass(w_obj))
 
     @jit.unroll_safe
     def SEND(self, space, bytecode, frame, pc, meth_idx, num_args):
@@ -489,14 +525,22 @@ class Interpreter(object):
     def SEND_SUPER(self, space, bytecode, frame, pc, meth_idx, num_args):
         args_w = frame.popitemsreverse(num_args)
         w_receiver = frame.pop()
-        w_res = space.send_super(frame.w_scope, w_receiver, bytecode.consts_w[meth_idx], args_w)
+        w_res = space.send_super(frame.lexical_scope.w_mod, w_receiver, bytecode.consts_w[meth_idx], args_w)
         frame.push(w_res)
 
     def SEND_SUPER_SPLAT(self, space, bytecode, frame, pc, meth_idx):
         args_w = space.listview(frame.pop())
         w_receiver = frame.pop()
-        w_res = space.send_super(frame.w_scope, w_receiver, bytecode.consts_w[meth_idx], args_w)
+        w_res = space.send_super(frame.lexical_scope.w_mod, w_receiver, bytecode.consts_w[meth_idx], args_w)
         frame.push(w_res)
+
+    def DEFINED_SUPER(self, space, bytecode, frame, pc, meth_idx):
+        w_obj = frame.pop()
+        name = space.symbol_w(bytecode.consts_w[meth_idx])
+        if space.getclass(w_obj).find_method_super(space, name) is not None:
+            frame.push(space.newstr_fromstr("super"))
+        else:
+            frame.push(space.w_nil)
 
     def SETUP_LOOP(self, space, bytecode, frame, pc, target_pc):
         frame.lastblock = LoopBlock(target_pc, frame.lastblock, frame.stackpos)
@@ -598,6 +642,12 @@ class Interpreter(object):
         w_res = space.invoke_block(frame.block, space.listview(w_args))
         frame.push(w_res)
 
+    def DEFINED_YIELD(self, space, bytecode, frame, pc):
+        if frame.block is not None:
+            frame.push(space.newstr_fromstr("yield"))
+        else:
+            frame.push(space.w_nil)
+
     def CONTINUE_LOOP(self, space, bytecode, frame, pc, target_pc):
         frame.pop()
         return frame.unrollstack_and_jump(space, ContinueLoop(target_pc))
@@ -625,16 +675,18 @@ class Return(Exception):
         self.w_value = w_value
 
 
-class RaiseReturn(Exception):
+class RaiseFlow(Exception):
     def __init__(self, parent_interp, w_value):
         self.parent_interp = parent_interp
         self.w_value = w_value
 
 
-class RaiseBreak(Exception):
-    def __init__(self, parent_interp, w_value):
-        self.parent_interp = parent_interp
-        self.w_value = w_value
+class RaiseReturn(RaiseFlow):
+    pass
+
+
+class RaiseBreak(RaiseFlow):
+    pass
 
 
 class SuspendedUnroller(W_Root):

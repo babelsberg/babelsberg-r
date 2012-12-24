@@ -13,12 +13,11 @@ class Test(object):
         self.needs_rubyspec = needs_rubyspec
 
     def install_deps(self):
-        local("pip install {}".format(" ".join(self.deps)))
+        local("pip install --use-mirrors {}".format(" ".join(self.deps)))
 
     def download_pypy(self):
         local("wget https://bitbucket.org/pypy/pypy/get/default.tar.bz2 -O `pwd`/../pypy.tar.bz2")
-        local("bunzip2 `pwd`/../pypy.tar.bz2")
-        local("tar -xf `pwd`/../pypy.tar -C `pwd`/../")
+        local("tar -xf `pwd`/../pypy.tar.bz2 -C `pwd`/../")
         [path_name] = glob.glob("../pypy-pypy*")
         path_name = os.path.abspath(path_name)
         with open("pypy_marker", "w") as f:
@@ -76,20 +75,34 @@ def run_specs(binary, prefix=""):
     # run the full rubyspec directory (including the tagging feature)
     rubyspec_tests = [
         "language/and_spec.rb",
+        "language/array_spec.rb",
+        "language/match_spec.rb",
+        "language/module_spec.rb",
         "language/not_spec.rb",
+        "language/numbers_spec.rb",
         "language/order_spec.rb",
+        "language/splat_spec.rb",
+        "language/undef_spec.rb",
         "language/unless_spec.rb",
         "language/yield_spec.rb",
 
         "language/regexp/grouping_spec.rb",
         "language/regexp/repetition_spec.rb",
 
+        "core/array/array_spec.rb",
+        "core/array/empty_spec.rb",
+
         "core/basicobject/ancestors_spec.rb",
         "core/basicobject/class_spec.rb",
         "core/basicobject/new_spec.rb",
         "core/basicobject/superclass_spec.rb",
 
+        "core/class/superclass_spec.rb",
+
         "core/comparable/between_spec.rb",
+
+        "core/exception/message_spec.rb",
+        "core/exception/standard_error_spec.rb",
 
         "core/false/and_spec.rb",
         "core/false/inspect_spec.rb",
@@ -114,6 +127,8 @@ def run_specs(binary, prefix=""):
         "core/nil/to_i_spec.rb",
         "core/nil/to_s_spec.rb",
         "core/nil/xor_spec.rb",
+
+        "core/process/pid_spec.rb",
 
         "core/regexp/casefold_spec.rb",
         "core/regexp/source_spec.rb",

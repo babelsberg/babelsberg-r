@@ -5,6 +5,7 @@ from pypy.rlib.objectmodel import newlist_hint, compute_hash
 from pypy.rlib.rarithmetic import intmask, ovfcheck
 from pypy.rlib.rbigint import rbigint
 from pypy.rlib.rerased import new_static_erasing_pair
+from pypy.rlib.rsre import rsre_core
 
 from rupypy.module import ClassDef
 from rupypy.modules.comparable import Comparable
@@ -261,7 +262,11 @@ class W_StringObject(W_Object):
         return space.newstr_fromstr('"%s"' % self.str_w(space))
 
     @classdef.method("+")
-    def method_plus(self, space, w_other):
+    def method_plus(self, space, w_obj):
+        if space.is_kind_of(w_obj, space.w_string):
+            w_other = w_obj
+        else:
+            w_other = space.convert_type(w_obj, space.w_string, "to_str")
         assert isinstance(w_other, W_StringObject)
         total_size = self.length() + w_other.length()
         s = space.newstr_fromchars(newlist_hint(total_size))
@@ -362,16 +367,59 @@ class W_StringObject(W_Object):
             chars += padstr[:pad_len % len(padstr) + 1]
             return space.newstr_fromchars(chars)
 
+    def search_context(self, space, ctx):
+        try:
+            return rsre_core.search_context(ctx)
+        except rsre_core.Error, e:
+            raise space.error(space.w_RuntimeError, e.msg)
+
     @classdef.method("split", limit="int")
-    def method_split(self, space, w_sep=None, limit=-1):
-        if w_sep is None:
-            sep = None
-        elif isinstance(w_sep, W_StringObject):
-            sep = space.str_w(w_sep)
+    def method_split(self, space, w_sep=None, limit=0):
+        if w_sep is None or space.is_kind_of(w_sep, space.w_string):
+            sep = space.str_w(w_sep) if w_sep else None
+            return space.newarray([
+                space.newstr_fromstr(s) for s in space.str_w(self).split(sep, limit - 1)
+            ])
+        elif space.is_kind_of(w_sep, space.w_regexp):
+            results_w = []
+            n = 0
+            last = 0
+            string = space.str_w(self)
+            ctx = w_sep.make_ctx(string)
+            w_match = w_sep.get_match_result(space, ctx, found=True)
+
+            while limit <= 0 or n + 1 < limit:
+                if not self.search_context(space, ctx):
+                    break
+                elif ctx.match_start == ctx.match_end:
+                    if ctx.match_start == ctx.end:
+                        break
+                    results_w.append(space.newstr_fromstr(string[last]))
+                    last = ctx.match_end + 1
+                else:
+                    results_w.append(space.newstr_fromstr(string[last:ctx.match_start]))
+                    for num in xrange(1, w_match.size(), 1):
+                        begin, end = w_match.get_span(num)
+                        begin += last
+                        end += last
+                        assert begin >= 0
+                        assert end >= 0
+                        results_w.append(space.newstr_fromstr(string[begin:end]))
+                    last = ctx.match_end
+                n += 1
+                ctx.reset(last)
+
+            if len(string) > last:
+                results_w.append(space.newstr_fromstr(string[last:]))
+            if limit < 0 or len(results_w) < limit:
+                results_w.append(space.newstr_fromstr(""))
+            return space.newarray(results_w)
+
         else:
-            raise NotImplementedError("Regexp separators for String#split")
-        results = space.str_w(self).split(sep, limit - 1)
-        return space.newarray([space.newstr_fromstr(s) for s in results])
+            raise space.error(
+                space.w_TypeError,
+                "wrong argument type %s (expected Regexp)" % space.getclass(w_sep).name
+            )
 
     classdef.app_method("""
     def downcase
@@ -470,18 +518,16 @@ class W_StringObject(W_Object):
         self.replace(space, new_string)
         return self if new_string else space.w_nil
 
+    @classdef.method("=~")
+    def method_match_operator(self, space, w_obj):
+        if space.is_kind_of(w_obj, space.w_string):
+            raise space.error(space.w_TypeError, "type mismatch: String given")
+        else:
+            return space.send(w_obj, space.newsymbol("=~"), [self])
+
     classdef.app_method("""
     def empty?
         self.length == 0
-    end
-
-    def =~(obj)
-        case obj
-        when String
-            raise TypeError, "type mismatch: String given"
-        else
-            return obj =~ self
-        end
     end
 
     def match(pattern)

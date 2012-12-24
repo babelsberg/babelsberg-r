@@ -34,6 +34,11 @@ class TestParser(BaseRuPyPyTest):
         assert space.parse("0xbe_ef") == ast.Main(ast.Block([
             ast.Statement(ast.ConstantInt(48879))
         ]))
+        assert space.parse("0377") == ast.Main(ast.Block([
+            ast.Statement(ast.ConstantInt(255))
+        ]))
+        with self.raises(space, "SyntaxError"):
+            space.parse("0378")
 
     def test_float(self, space):
         assert space.parse("0.2") == ast.Main(ast.Block([
@@ -1177,6 +1182,14 @@ HERE
             ast.Statement(ast.Send(ast.Send(ast.Self(2), "f", [ast.Nil()], ast.SendBlock([], None, ast.Nil()), 2), "foo", [ast.Nil()], None, 3))
         ]))
 
+        r = space.parse("""
+        run [] do |n|
+        end
+        """)
+        assert r == ast.Main(ast.Block([
+            ast.Statement(ast.Send(ast.Self(2), "run", [ast.Array([])], ast.SendBlock([ast.Argument("n")], None, ast.Nil()), 2))
+        ]))
+
         with self.raises(space, "SyntaxError"):
             space.parse("""
             Mod::Const do end
@@ -1251,6 +1264,7 @@ HERE
         assert space.parse(":@@abc") == sym("@@abc")
         assert space.parse(":$abc") == sym("$abc")
         assert space.parse(':"@abc"') == sym("@abc")
+        assert space.parse(':""') == sym("")
         assert space.parse(':"#{2}"') == ast.Main(ast.Block([
             ast.Statement(ast.Symbol(ast.DynamicString([ast.Block([ast.Statement(ast.ConstantInt(2))])]), 1))
         ]))

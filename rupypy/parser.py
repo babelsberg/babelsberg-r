@@ -2113,7 +2113,7 @@ class Parser(object):
 
     @pg.production("do_block : DO_BLOCK push_block_scope opt_block_param compstmt END")
     def do_block(self, p):
-        box = self.new_send_block(p[1], p[3])
+        box = self.new_send_block(p[2], p[3])
         self.save_and_pop_scope(box.getast())
         return box
 
@@ -2476,7 +2476,10 @@ class Parser(object):
 
     @pg.production("dsym : SYMBEG xstring_contents STRING_END")
     def dsym(self, p):
-        node = p[1].getast()
+        box = p[1]
+        if box is None:
+            return BoxAST(ast.ConstantSymbol(""))
+        node = box.getast()
         if isinstance(node, ast.ConstantString):
             return BoxAST(ast.ConstantSymbol(node.strvalue))
         else:

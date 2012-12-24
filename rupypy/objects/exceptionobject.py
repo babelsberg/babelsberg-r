@@ -48,7 +48,7 @@ class W_ExceptionObject(W_Object):
 
     @classdef.method("message")
     def method_message(self, space):
-        return space.newstr_fromstr(self.msg)
+        return space.send(self, space.newsymbol("to_s"))
 
     @classdef.method("backtrace")
     def method_backtrace(self, space):
@@ -180,4 +180,19 @@ class W_StopIteration(W_IndexError):
 
 class W_LocalJumpError(W_StandardError):
     classdef = ClassDef("LocalJumpError", W_StandardError.classdef, filepath=__file__)
+    method_allocate = new_exception_allocate(classdef)
+
+
+class W_IOError(W_StandardError):
+    classdef = ClassDef("IOError", W_StandardError.classdef, filepath=__file__)
+    method_allocate = new_exception_allocate(classdef)
+
+
+class W_RegexpError(W_StandardError):
+    classdef = ClassDef("RegexpError", W_StandardError.classdef, filepath=__file__)
+    method_allocate = new_exception_allocate(classdef)
+
+
+class W_ThreadError(W_StandardError):
+    classdef = ClassDef("ThreadError", W_StandardError.classdef, filepath=__file__)
     method_allocate = new_exception_allocate(classdef)

@@ -12,6 +12,10 @@ class TestExceptionObject(BaseRuPyPyTest):
         NameError
         StandardError
         LocalJumpError
+        IOError
+        IndexError
+        RegexpError
+        ThreadError
         """)
 
     def test_new(self, space):
@@ -55,6 +59,17 @@ class TestExceptionObject(BaseRuPyPyTest):
         end
         """)
         assert self.unwrap(space, w_res) == "foo"
+
+    def test_message_calls_to_s(self, space):
+        w_res = space.execute("""
+        class X < Exception
+            def to_s
+                "hi, a message!"
+            end
+        end
+        return X.new.message
+        """)
+        assert space.str_w(w_res) == "hi, a message!"
 
     def test_backtrace(self, space):
         w_res = space.execute("""

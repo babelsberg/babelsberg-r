@@ -39,7 +39,8 @@ from rupypy.objects.exceptionobject import (W_ExceptionObject, W_NoMethodError,
     W_ZeroDivisionError, W_SyntaxError, W_LoadError, W_TypeError,
     W_ArgumentError, W_RuntimeError, W_StandardError, W_SystemExit,
     W_SystemCallError, W_NameError, W_IndexError, W_StopIteration,
-    W_NotImplementedError, W_RangeError, W_LocalJumpError)
+    W_NotImplementedError, W_RangeError, W_LocalJumpError, W_IOError,
+    W_RegexpError, W_ThreadError)
 from rupypy.objects.fileobject import W_FileObject, W_IOObject
 from rupypy.objects.floatobject import W_FloatObject
 from rupypy.objects.functionobject import W_UserFunction
@@ -47,7 +48,6 @@ from rupypy.objects.hashobject import W_HashObject, W_HashIterator
 from rupypy.objects.integerobject import W_IntegerObject
 from rupypy.objects.intobject import W_FixnumObject
 from rupypy.objects.methodobject import W_MethodObject, W_UnboundMethodObject
-from rupypy.objects.integerobject import W_IntegerObject
 from rupypy.objects.moduleobject import W_ModuleObject
 from rupypy.objects.constraintobject import W_ConstraintObject
 from rupypy.objects.nilobject import W_NilObject
@@ -107,6 +107,7 @@ class ObjectSpace(object):
         self.w_integer = self.getclassfor(W_IntegerObject)
         self.w_module = self.getclassfor(W_ModuleObject)
         self.w_string = self.getclassfor(W_StringObject)
+        self.w_regexp = self.getclassfor(W_RegexpObject)
         self.w_hash = self.getclassfor(W_HashObject)
         self.w_NoMethodError = self.getclassfor(W_NoMethodError)
         self.w_ArgumentError = self.getclassfor(W_ArgumentError)
@@ -132,12 +133,13 @@ class ObjectSpace(object):
             self.w_basicobject, self.w_object, self.w_array, self.w_proc,
             self.w_numeric, self.w_fixnum, self.w_float, self.w_string,
             self.w_symbol, self.w_class, self.w_module, self.w_hash,
+            self.w_regexp,
 
             self.w_NoMethodError, self.w_ArgumentError, self.w_TypeError,
             self.w_ZeroDivisionError, self.w_SystemExit, self.w_RangeError,
             self.w_RuntimeError, self.w_SystemCallError, self.w_LoadError,
             self.w_StopIteration, self.w_SyntaxError, self.w_NameError,
-            self.w_StandardError, self.w_LocalJumpError,
+            self.w_StandardError, self.w_LocalJumpError, self.w_IndexError,
 
             self.w_kernel, self.w_topaz,
 
@@ -151,7 +153,6 @@ class ObjectSpace(object):
             self.getclassfor(W_Dir),
             self.getclassfor(W_EncodingObject),
             self.getclassfor(W_IntegerObject),
-            self.getclassfor(W_RegexpObject),
             self.getclassfor(W_RandomObject),
             self.getclassfor(W_ThreadObject),
             self.getclassfor(W_TimeObject),
@@ -160,6 +161,9 @@ class ObjectSpace(object):
 
             self.getclassfor(W_ExceptionObject),
             self.getclassfor(W_StandardError),
+            self.getclassfor(W_IOError),
+            self.getclassfor(W_RegexpError),
+            self.getclassfor(W_ThreadError),
 
             self.getmoduleobject(Comparable.moduledef),
             self.getmoduleobject(Enumerable.moduledef),
@@ -238,10 +242,10 @@ class ObjectSpace(object):
             astnode.compile(ctx)
         return ctx.create_bytecode([], [], None, None)
 
-    def execute(self, source, w_self=None, w_scope=None, filepath="-e",
+    def execute(self, source, w_self=None, lexical_scope=None, filepath="-e",
                 initial_lineno=1):
         bc = self.compile(source, filepath, initial_lineno=initial_lineno)
-        frame = self.create_frame(bc, w_self=w_self, w_scope=w_scope)
+        frame = self.create_frame(bc, w_self=w_self, lexical_scope=lexical_scope)
         with self.getexecutioncontext().visit_frame(frame):
             return self.execute_frame(frame, bc)
 
@@ -252,16 +256,14 @@ class ObjectSpace(object):
             self._executioncontext = ExecutionContext()
         return self._executioncontext
 
-    def create_frame(self, bc, w_self=None, w_scope=None, lexical_scope=None,
-        block=None, parent_interp=None, regexp_match_cell=None):
+    def create_frame(self, bc, w_self=None, lexical_scope=None, block=None,
+                     parent_interp=None, regexp_match_cell=None):
 
         if w_self is None:
             w_self = self.w_top_self
-        if w_scope is None:
-            w_scope = self.w_object
         if regexp_match_cell is None:
             regexp_match_cell = ClosureCell(None)
-        return Frame(jit.promote(bc), w_self, w_scope, lexical_scope, block, parent_interp, regexp_match_cell)
+        return Frame(jit.promote(bc), w_self, lexical_scope, block, parent_interp, regexp_match_cell)
 
     def execute_frame(self, frame, bc):
         return Interpreter().interpret(self, frame, bc)
@@ -345,7 +347,7 @@ class ObjectSpace(object):
         cells = [None] * len(frame.cells)
         for i in xrange(len(frame.cells)):
             cells[i] = frame.cells[i].upgrade_to_closure(frame, i)
-        return W_BindingObject(self, names, cells, frame.w_self, frame.w_scope)
+        return W_BindingObject(self, names, cells, frame.w_self, frame.lexical_scope)
 
     def int_w(self, w_obj):
         return w_obj.int_w(self)
@@ -478,9 +480,9 @@ class ObjectSpace(object):
     def invoke_block(self, block, args_w):
         bc = block.bytecode
         frame = self.create_frame(
-            bc, w_self=block.w_self, w_scope=block.w_scope,
-            lexical_scope=block.lexical_scope, block=block.block,
-            parent_interp=block.parent_interp, regexp_match_cell=block.regexp_match_cell,
+            bc, w_self=block.w_self, lexical_scope=block.lexical_scope,
+            block=block.block, parent_interp=block.parent_interp,
+            regexp_match_cell=block.regexp_match_cell,
         )
         if (len(args_w) == 1 and
             isinstance(args_w[0], W_ArrayObject) and len(bc.arg_pos) >= 2):
