@@ -78,6 +78,7 @@ def run_specs(binary, prefix=""):
         "language/array_spec.rb",
         "language/match_spec.rb",
         "language/module_spec.rb",
+        "language/next_spec.rb",
         "language/not_spec.rb",
         "language/numbers_spec.rb",
         "language/order_spec.rb",
@@ -89,8 +90,11 @@ def run_specs(binary, prefix=""):
         "language/regexp/grouping_spec.rb",
         "language/regexp/repetition_spec.rb",
 
+        "core/array/allocate_spec.rb",
         "core/array/array_spec.rb",
         "core/array/empty_spec.rb",
+        "core/array/length_spec.rb",
+        "core/array/size_spec.rb",
 
         "core/basicobject/ancestors_spec.rb",
         "core/basicobject/class_spec.rb",
@@ -118,6 +122,8 @@ def run_specs(binary, prefix=""):
         "core/fixnum/zero_spec.rb",
 
         "core/hash/empty_spec.rb",
+        "core/hash/length_spec.rb",
+        "core/hash/size_spec.rb",
 
         "core/nil/and_spec.rb",
         "core/nil/inspect_spec.rb",
@@ -139,7 +145,7 @@ def run_specs(binary, prefix=""):
         "core/true/to_s_spec.rb",
         "core/true/xor_spec.rb",
     ]
-    local("{prefix}../mspec/bin/mspec -t {binary} {spec_files}".format(
+    local("{prefix}../mspec/bin/mspec -t {binary} --format=dotted {spec_files}".format(
         prefix=prefix,
         binary=binary,
         spec_files=" ".join(os.path.join("../rubyspec", p) for p in rubyspec_tests),

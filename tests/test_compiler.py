@@ -1782,7 +1782,8 @@ class TestCompiler(object):
         super
         """, """
         LOAD_SELF
-        SEND_SUPER 0 0
+        LOAD_BLOCK
+        SEND_SUPER_BLOCK 0 1
 
         RETURN
         """)
@@ -1807,7 +1808,8 @@ class TestCompiler(object):
         LOAD_DEREF 0
         LOAD_DEREF 1
         LOAD_DEREF 2
-        SEND_SUPER 0 3
+        LOAD_BLOCK
+        SEND_SUPER_BLOCK 0 4
         RETURN
         """)
         assert space.str_w(bc.consts_w[1].consts_w[0]) == "f"
@@ -1819,8 +1821,69 @@ class TestCompiler(object):
         LOAD_CONST 0
         LOAD_CONST 1
         LOAD_CONST 2
-        SEND_SUPER 3 3
+        LOAD_BLOCK
+        SEND_SUPER_BLOCK 3 4
 
+        RETURN
+        """)
+
+        self.assert_compiles(space, """
+        super(&:to_a)
+        """, """
+        LOAD_SELF
+        LOAD_CONST 0
+        COERCE_BLOCK
+        SEND_SUPER_BLOCK 1 1
+
+        RETURN
+        """)
+        self.assert_compiles(space, """
+        super(*1, &:to_a)
+        """, """
+        LOAD_SELF
+        LOAD_CONST 0
+        COERCE_ARRAY 1
+        LOAD_CONST 1
+        COERCE_BLOCK
+        SEND_SUPER_BLOCK_SPLAT 2
+
+        RETURN
+        """)
+
+        self.assert_compiles(space, """
+        super { 3 }
+        """, """
+        LOAD_SELF
+        LOAD_CONST 0
+        BUILD_BLOCK 0
+        SEND_SUPER_BLOCK 1 1
+
+        RETURN
+        """)
+
+        bc = self.assert_compiles(space, """
+        def f(a, *b)
+            super
+        end
+        """, """
+        LOAD_SCOPE
+        LOAD_CONST 0
+        LOAD_CONST 0
+        LOAD_CONST 1
+        BUILD_FUNCTION
+        DEFINE_FUNCTION
+
+        RETURN
+        """)
+        self.assert_compiled(bc.consts_w[1], """
+        LOAD_SELF
+        LOAD_DEREF 0
+        BUILD_ARRAY 1
+        LOAD_DEREF 1
+        COERCE_ARRAY 1
+        SEND 0 1
+        LOAD_BLOCK
+        SEND_SUPER_BLOCK_SPLAT 1
         RETURN
         """)
 

@@ -96,6 +96,19 @@ class TestBaseObject(BaseRuPyPyTest):
         """)
         assert self.unwrap(space, w_res) == [False, False]
 
+    def test_dup(self, space):
+        w_res = space.execute("""
+        class A
+            attr_accessor :a
+        end
+
+        a = A.new
+        a.a = 3
+        b = a.dup
+        return b.a
+        """)
+        assert space.int_w(w_res) == 3
+
 
 class TestObjectObject(BaseRuPyPyTest):
     def test_class(self, space):
@@ -238,6 +251,14 @@ class TestObjectObject(BaseRuPyPyTest):
         return [b.instance_of?(A), b.instance_of?(B), b.instance_of?(C)]
         """)
         assert self.unwrap(space, w_res) == [False, True, False]
+
+    def test_cmp(self, space):
+        w_res = space.execute("""
+        a = Object.new
+        b = Object.new
+        return a <=> a, a <=> b
+        """)
+        assert self.unwrap(space, w_res) == [0, None]
 
 
 class TestMapDict(BaseRuPyPyTest):

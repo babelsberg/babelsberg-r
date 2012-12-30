@@ -75,6 +75,13 @@ class W_BaseObject(W_Root):
     def method_eq(self, space, w_other):
         return space.newbool(self is w_other)
 
+    @classdef.method("<=>")
+    def method_cmp(self, space, w_other):
+        if w_other is self:
+            return space.newint(0)
+        else:
+            return space.w_nil
+
     @classdef.method("!")
     def method_not(self, space):
         return space.newbool(not space.is_true(self))
@@ -203,3 +210,7 @@ class W_Object(W_RootObject):
         if idx == -1:
             idx = self.map.add_attr(space, self, name)
         self.storage[idx] = w_value
+
+    def copy_instance_vars(self, space, w_other):
+        assert isinstance(w_other, W_Object)
+        w_other.map.copy_attrs(space, w_other, self)

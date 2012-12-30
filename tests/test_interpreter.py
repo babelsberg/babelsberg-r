@@ -1081,6 +1081,44 @@ class TestInterpreter(BaseRuPyPyTest):
         """)
         assert self.unwrap(space, w_res) == [1, 2]
 
+    def test_super_block(self, space):
+        w_res = space.execute("""
+        class A
+            def f a
+                a + yield
+            end
+        end
+
+        class B < A
+            def f
+                super(2) { 5 }
+            end
+        end
+
+        return B.new.f
+        """)
+        assert space.int_w(w_res) == 7
+        w_res = space.execute("""
+        class C < A
+            def f
+                super(*[2]) { 12 }
+            end
+        end
+
+        return C.new.f
+        """)
+        assert space.int_w(w_res) == 14
+        w_res = space.execute("""
+        class D < A
+            def f a
+                super
+            end
+        end
+
+        return D.new.f(3) { 12 }
+        """)
+        assert space.int_w(w_res) == 15
+
     def test_next_loop(self, space):
         w_res = space.execute("""
         res = []
@@ -1446,6 +1484,30 @@ class TestBlocks(BaseRuPyPyTest):
         return res
         """)
         assert self.unwrap(space, w_res) == [1, 3]
+
+    def test_break_nested_block(self, space):
+        w_res = space.execute("""
+        def f
+            yield
+        end
+
+        return f {
+            a = []
+            3.times do |i|
+                begin
+                    a << :begin
+                    next if i == 0
+                    break if i == 2
+                    a << :begin_end
+                ensure
+                    a << :ensure
+                end
+                a << :after
+            end
+            a
+        }
+        """)
+        assert self.unwrap(space, w_res) == ["begin", "ensure", "begin", "begin_end", "ensure", "after", "begin", "ensure"]
 
     def test_break_block_frame_exited(self, space):
         w_res = space.execute("""

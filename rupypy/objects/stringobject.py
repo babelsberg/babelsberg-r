@@ -82,8 +82,8 @@ class ConstantStringStrategy(StringStrategy):
     def hash(self, storage):
         return compute_hash(self.unerase(storage))
 
-    def copy(self, space, storage):
-        return W_StringObject(space, storage, self)
+    def copy(self, storage):
+        return storage
 
     def to_mutable(self, space, s):
         s.strategy = strategy = space.fromcache(MutableStringStrategy)
@@ -127,8 +127,8 @@ class MutableStringStrategy(StringStrategy):
         x ^= length
         return intmask(x)
 
-    def copy(self, space, storage):
-        return W_StringObject(space, storage, self)
+    def copy(self, storage):
+        return self.erase(self.unerase(storage)[:])
 
     def to_mutable(self, space, s):
         pass
@@ -151,6 +151,30 @@ class MutableStringStrategy(StringStrategy):
             changed |= (c != new_c)
             storage[i] = new_c
         return changed
+
+    def chomp(self, storage, newline=None):
+        storage = self.unerase(storage)
+        if len(storage) == 0:
+            return
+        elif newline is not None and len(storage) >= len(newline):
+            for i in xrange(len(newline) - 1, -1, -1):
+                if newline[i] != storage[len(storage) - len(newline) + i]:
+                    return
+            start = len(storage) - len(newline)
+            assert start >= 0
+            del storage[start:]
+        elif newline is None:
+            ch = storage[-1]
+            i = len(storage) - 1
+            while i >= 0 and ch in "\n\r":
+                i -= 1
+                ch = storage[i]
+            if i < len(storage) - 1:
+                i += 1
+                if i > 0:
+                    del storage[i:]
+                else:
+                    del storage[:]
 
 
 class W_StringObject(W_Object):
@@ -204,7 +228,7 @@ class W_StringObject(W_Object):
         return self.strategy.length(self.str_storage)
 
     def copy(self, space):
-        return self.strategy.copy(space, self.str_storage)
+        return W_StringObject(space, self.strategy.copy(self.str_storage), self.strategy)
 
     def replace(self, space, chars):
         strategy = space.fromcache(MutableStringStrategy)
@@ -251,6 +275,17 @@ class W_StringObject(W_Object):
                 new_string.append(repl)
 
         return new_string if change_made else None
+
+    @classdef.singleton_method("allocate")
+    def singleton_method_allocate(self, space):
+        return space.newstr_fromstr("")
+
+    @classdef.method("initialize_copy")
+    def method_initialize_copy(self, space, w_other):
+        assert isinstance(w_other, W_StringObject)
+        self.strategy = w_other.strategy
+        self.str_storage = w_other.strategy.copy(w_other.str_storage)
+        return self
 
     @classdef.method("to_str")
     @classdef.method("to_s")
@@ -337,10 +372,6 @@ class W_StringObject(W_Object):
     def method_freeze(self, space):
         pass
 
-    @classdef.method("dup")
-    def method_dup(self, space):
-        return self.copy(space)
-
     @classdef.method("to_sym")
     @classdef.method("intern")
     def method_to_sym(self, space):
@@ -372,6 +403,24 @@ class W_StringObject(W_Object):
             return rsre_core.search_context(ctx)
         except rsre_core.Error, e:
             raise space.error(space.w_RuntimeError, e.msg)
+
+    @classdef.method("index", offset="int")
+    def method_index(self, space, w_sub, offset=0):
+        if offset < 0 or offset >= self.length():
+            return space.w_nil
+        elif space.is_kind_of(w_sub, space.w_string):
+            return space.newint(space.str_w(self).find(space.str_w(w_sub), offset))
+        elif space.is_kind_of(w_sub, space.w_regexp):
+            ctx = w_sub.make_ctx(space.str_w(self), offset=offset)
+            if self.search_context(space, ctx):
+                return space.newint(ctx.match_start)
+            else:
+                return space.newint(-1)
+        else:
+            raise space.error(
+                space.w_TypeError,
+                "type mismatch: %s given" % space.getclass(w_sub).name
+            )
 
     @classdef.method("split", limit="int")
     def method_split(self, space, w_sep=None, limit=0):
@@ -543,3 +592,35 @@ class W_StringObject(W_Object):
             args_w = [w_arg]
         elements_w = StringFormatter(space.str_w(self), args_w).format(space)
         return space.newstr_fromstrs(elements_w)
+
+    @classdef.method("getbyte", pos="int")
+    def method_getbyte(self, space, pos):
+        if pos >= self.length() or pos < -self.length():
+            return space.w_nil
+        if pos < 0:
+            pos += self.length()
+        ch = self.strategy.getitem(self.str_storage, pos)
+        return space.newint(ord(ch))
+
+    @classdef.method("include?", substr="str")
+    def method_includep(self, space, substr):
+        return space.newbool(substr in space.str_w(self))
+
+    @classdef.method("chomp!")
+    def method_chomp_i(self, space, w_newline=None):
+        if w_newline is None:
+            newline = space.globals.get(space, "$/")
+        if w_newline is space.w_nil:
+            return self
+        newline = space.str_w(space.convert_type(w_newline, space.w_string, "to_str"))
+        if newline in "\n\r":
+            newline = None
+        self.strategy.to_mutable(space, self)
+        self.strategy.chomp(self.str_storage, newline)
+        return self
+
+    classdef.app_method("""
+    def chomp(sep=$/)
+        self.dup.chomp!(sep)
+    end
+    """)

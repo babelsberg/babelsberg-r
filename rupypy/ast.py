@@ -683,15 +683,16 @@ class BaseSend(Node):
             else:
                 for arg in self.args:
                     arg.compile(ctx)
-            if self.block_arg is not None:
-                self.block_arg.compile(ctx)
+            block = self.get_block()
+            if block is not None:
+                block.compile(ctx)
 
             symbol = self.method_name_const(ctx)
-            if self.is_splat() and self.block_arg is not None:
+            if self.is_splat() and block is not None:
                 ctx.emit(self.send_block_splat, symbol)
             elif self.is_splat():
                 ctx.emit(self.send_splat, symbol)
-            elif self.block_arg is not None:
+            elif block is not None:
                 ctx.emit(self.send_block, symbol, len(self.args) + 1)
             else:
                 ctx.emit(self.send, symbol, len(self.args))
@@ -701,6 +702,9 @@ class BaseSend(Node):
             if isinstance(arg, Splat):
                 return True
         return False
+
+    def get_block(self):
+        return self.block_arg
 
     def compile_receiver(self, ctx):
         self.receiver.compile(ctx)
@@ -733,12 +737,16 @@ class Send(BaseSend):
 
 
 class Super(BaseSend):
-    send = consts.SEND_SUPER
+    send_block = consts.SEND_SUPER_BLOCK
     send_splat = consts.SEND_SUPER_SPLAT
+    send_block_splat = consts.SEND_SUPER_BLOCK_SPLAT
     defined = consts.DEFINED_SUPER
 
     def __init__(self, args, block_arg, lineno):
         BaseSend.__init__(self, Self(lineno), args, block_arg, lineno)
+
+    def get_block(self):
+        return BaseSend.get_block(self) or LoadBlock()
 
     def method_name_const(self, ctx):
         if ctx.code_name == "<main>":
@@ -818,24 +826,9 @@ class BlockArgument(Node):
         ctx.emit(consts.COERCE_BLOCK)
 
 
-class AutoSuper(Node):
+class LoadBlock(BaseNode):
     def compile(self, ctx):
-        ctx.emit(consts.LOAD_SELF)
-        for name in ctx.symtable.arguments:
-            ctx.emit(consts.LOAD_DEREF, ctx.symtable.get_cell_num(name))
-
-        ctx.emit(consts.SEND_SUPER, self.method_name_const(ctx), len(ctx.symtable.arguments))
-
-    def compile_defined(self, ctx):
-        ctx.emit(consts.LOAD_SELF)
-        ctx.emit(consts.DEFINED_SUPER, self.method_name_const(ctx))
-
-    def method_name_const(self, ctx):
-        if ctx.code_name == "<main>":
-            name = ctx.create_const(ctx.space.w_nil)
-        else:
-            name = ctx.create_symbol_const(ctx.code_name)
-        return name
+        ctx.emit(consts.LOAD_BLOCK)
 
 
 class Subscript(Node):

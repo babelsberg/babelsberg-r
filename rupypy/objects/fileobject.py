@@ -8,6 +8,11 @@ from rupypy.objects.objectobject import W_Object
 from rupypy.objects.stringobject import W_StringObject
 
 
+FNM_NOESCAPE = 0x01
+FNM_PATHNAME = 0x02
+FNM_DOTMATCH = 0x04
+
+
 class W_IOObject(W_Object):
     classdef = ClassDef("IO", W_Object.classdef, filepath=__file__)
 
@@ -34,6 +39,7 @@ class W_IOObject(W_Object):
         w_stdout = space.send(w_cls, space.newsymbol("new"), [space.newint(1)])
         space.globals.set(space, "$stdout", w_stdout)
         space.globals.set(space, "$>", w_stdout)
+        space.globals.set(space, "$/", space.newstr_fromstr("\n"))
         space.set_const(space.w_object, "STDOUT", w_stdout)
 
         w_stderr = space.send(w_cls, space.newsymbol("new"), [space.newint(2)])
@@ -146,6 +152,48 @@ class W_IOObject(W_Object):
                 os.write(self.fd, "\n")
         return space.w_nil
 
+    classdef.app_method("""
+    def each_line(sep=$/, limit=nil)
+        if sep.is_a?(Fixnum) && limit.nil?
+            limit = sep
+            sep = $/
+        end
+
+        if sep.nil?
+            yield(limit ? read(limit) : read)
+            return self
+        end
+
+        rest = ""
+        nxt = read(8192)
+        need_read = false
+        while nxt || rest
+            if nxt and need_read
+                rest = rest ? rest + nxt : nxt
+                nxt = read(8192)
+                need_read = false
+            end
+
+            line, rest = *rest.split(sep, 2)
+
+            if limit && line.size > limit
+                left = 0
+                right = limit
+                while right < line.size
+                    yield line[left...right]
+                    left, right = right, right + limit
+                end
+                rest = line[right - limit..-1] + sep + (rest || "")
+            elsif rest || nxt.nil?
+                yield line
+            else
+                need_read = true
+            end
+        end
+        self
+    end
+    """)
+
 
 class W_FileObject(W_IOObject):
     classdef = ClassDef("File", W_IOObject.classdef, filepath=__file__)
@@ -161,6 +209,9 @@ class W_FileObject(W_IOObject):
         space.set_const(w_cls, "SEPARATOR", space.newstr_fromstr("/"))
         space.set_const(w_cls, "ALT_SEPARATOR", w_alt_seperator)
         space.set_const(w_cls, "FNM_SYSCASE", w_fnm_syscase)
+        space.set_const(w_cls, "FNM_NOESCAPE", space.newint(FNM_NOESCAPE))
+        space.set_const(w_cls, "FNM_PATHNAME", space.newint(FNM_PATHNAME))
+        space.set_const(w_cls, "FNM_DOTMATCH", space.newint(FNM_DOTMATCH))
         space.set_const(w_cls, "RDONLY", space.newint(os.O_RDONLY))
         space.set_const(w_cls, "WRONLY", space.newint(os.O_WRONLY))
         space.set_const(w_cls, "RDWR", space.newint(os.O_RDWR))
@@ -205,7 +256,7 @@ class W_FileObject(W_IOObject):
             elif mode_str == "w":
                 mode = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
             elif mode_str == "a":
-                mode = os.O_WRONLY | os.O_CREAT | os.O_TRUNC
+                mode = os.O_WRONLY | os.O_CREAT | os.O_APPEND
             else:
                 raise space.error(space.w_ArgumentError,
                     "invalid access mode %s" % mode_str

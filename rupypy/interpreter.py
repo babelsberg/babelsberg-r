@@ -66,6 +66,8 @@ class Interpreter(object):
                         pc = self.handle_raise_break(space, pc, frame, bytecode, e)
             except RaiseReturn as e:
                 if e.parent_interp is self:
+                    if frame.parent_interp:
+                        raise RaiseReturn(frame.parent_interp, e.w_value)
                     return e.w_value
                 raise
             except Return as e:
@@ -160,6 +162,9 @@ class Interpreter(object):
             frame.push(frame.lexical_scope.w_mod)
         else:
             frame.push(space.w_object)
+
+    def LOAD_BLOCK(self, space, bytecode, frame, pc):
+        frame.push(frame.block or space.w_nil)
 
     def LOAD_CODE(self, space, bytecode, frame, pc):
         frame.push(bytecode)
@@ -328,7 +333,7 @@ class Interpreter(object):
         assert isinstance(w_code, W_CodeObject)
         block = W_BlockObject(
             w_code, frame.w_self, frame.lexical_scope, cells, frame.block,
-            frame.parent_interp or self, frame.regexp_match_cell
+            self, frame.regexp_match_cell
         )
         frame.push(block)
 
@@ -522,16 +527,32 @@ class Interpreter(object):
         else:
             frame.push(space.w_nil)
 
-    def SEND_SUPER(self, space, bytecode, frame, pc, meth_idx, num_args):
-        args_w = frame.popitemsreverse(num_args)
+    def SEND_SUPER_BLOCK(self, space, bytecode, frame, pc, meth_idx, num_args):
+        w_block = frame.pop()
+        args_w = frame.popitemsreverse(num_args - 1)
         w_receiver = frame.pop()
-        w_res = space.send_super(frame.lexical_scope.w_mod, w_receiver, bytecode.consts_w[meth_idx], args_w)
+        if w_block is space.w_nil:
+            w_block = None
+        else:
+            assert isinstance(w_block, W_BlockObject)
+        w_res = space.send_super(frame.lexical_scope.w_mod, w_receiver, bytecode.consts_w[meth_idx], args_w, block=w_block)
         frame.push(w_res)
 
     def SEND_SUPER_SPLAT(self, space, bytecode, frame, pc, meth_idx):
         args_w = space.listview(frame.pop())
         w_receiver = frame.pop()
         w_res = space.send_super(frame.lexical_scope.w_mod, w_receiver, bytecode.consts_w[meth_idx], args_w)
+        frame.push(w_res)
+
+    def SEND_SUPER_BLOCK_SPLAT(self, space, bytecode, frame, pc, meth_idx):
+        w_block = frame.pop()
+        args_w = space.listview(frame.pop())
+        w_receiver = frame.pop()
+        if w_block is space.w_nil:
+            w_block = None
+        else:
+            assert isinstance(w_block, W_BlockObject)
+        w_res = space.send_super(frame.lexical_scope.w_mod, w_receiver, bytecode.consts_w[meth_idx], args_w, block=w_block)
         frame.push(w_res)
 
     def DEFINED_SUPER(self, space, bytecode, frame, pc, meth_idx):
