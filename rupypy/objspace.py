@@ -49,7 +49,7 @@ from rupypy.objects.integerobject import W_IntegerObject
 from rupypy.objects.intobject import W_FixnumObject
 from rupypy.objects.methodobject import W_MethodObject, W_UnboundMethodObject
 from rupypy.objects.moduleobject import W_ModuleObject
-from rupypy.objects.constraintobject import W_ConstraintObject
+from rupypy.objects.constraintobject import W_ConstraintObject, W_SexprObject
 from rupypy.objects.nilobject import W_NilObject
 from rupypy.objects.numericobject import W_NumericObject
 from rupypy.objects.objectobject import W_Object, W_BaseObject
@@ -305,6 +305,9 @@ class ObjectSpace(object):
 
     def newstr_fromstrs(self, strs_w):
         return W_StringObject.newstr_fromstrs(self, strs_w)
+
+    def newsexpr(self, items_w):
+        return W_SexprObject(self, items_w)
 
     def newarray(self, items_w):
         return W_ArrayObject(self, items_w)

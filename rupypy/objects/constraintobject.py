@@ -1,5 +1,32 @@
 from rupypy.module import ClassDef
 from rupypy.objects.objectobject import W_Object
+from rupypy.objects.arrayobject import W_ArrayObject
+
+
+class W_SexprObject(W_ArrayObject):
+    classdef = ClassDef("Sexpr", W_ArrayObject.classdef, filepath=__file__)
+
+    @classdef.singleton_method("new")
+    def method_new(self, space, args_w):
+        raise space.error(space.w_TypeError, "Sexpr cannot be initialized from user code")
+
+    @classdef.singleton_method("allocate")
+    def method_allocate(self, space):
+        raise space.error(space.w_TypeError, "no allocator for Sexpr")
+
+    classdef.app_method("""
+    def to_s()
+        result = "("
+        self.each_with_index do |obj, i|
+            if i > 0
+                result << ", "
+            end
+            result << obj.to_s
+        end
+        result << ")"
+    end
+    """)
+
 
 class W_ConstraintObject(W_Object):
     classdef = ClassDef("Constraint", W_Object.classdef, filepath=__file__)

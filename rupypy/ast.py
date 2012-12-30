@@ -748,7 +748,7 @@ class Send(BaseSend):
         if self.block_arg is not None:
             n_items += 1
             self.block_arg.compile_fexpr(ctx)
-        ctx.emit(consts.BUILD_ARRAY, n_items)
+        ctx.emit(consts.BUILD_SEXPR, n_items)
 
     def compile(self, ctx):
         if self.method.startswith("constrain:"):
@@ -1023,7 +1023,7 @@ class InstanceVariable(Node):
     def compile_fexpr(self, ctx):
         self.compile_receiver(ctx)
         ConstantString(self.name).compile(ctx)
-        ctx.emit(consts.BUILD_ARRAY, 2)
+        ctx.emit(consts.BUILD_SEXPR, 2)
 
     def compile_receiver(self, ctx):
         ctx.emit(consts.LOAD_SELF)

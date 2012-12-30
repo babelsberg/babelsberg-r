@@ -153,7 +153,7 @@ class W_RootObject(W_BaseObject):
 
     @classdef.method("constrain:")
     def method_constrain(self, space, args_w):
-        return space.newarray(args_w)
+        return space.newsexpr(args_w)
 
     @classdef.method("hash")
     def method_hash(self, space):
