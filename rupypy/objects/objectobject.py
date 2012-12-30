@@ -151,6 +151,10 @@ class W_RootObject(W_BaseObject):
     def method_nilp(self, space):
         return space.w_false
 
+    @classdef.method("constrain:")
+    def method_constrain(self, space, args_w):
+        return space.newarray(args_w)
+
     @classdef.method("hash")
     def method_hash(self, space):
         return space.newint(compute_identity_hash(self))

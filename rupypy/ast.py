@@ -21,6 +21,12 @@ class BaseNode(object):
         else:
             raise NotImplementedError(type(self).__name__)
 
+    def compile_fexpr(self, ctx):
+        if we_are_translated():
+            raise NotImplementedError
+        else:
+            raise NotImplementedError(type(self).__name__)
+
 
 class Node(BaseNode):
     _attrs_ = ["lineno"]
@@ -732,9 +738,32 @@ class Send(BaseSend):
         BaseSend.__init__(self, receiver, args, block_arg, lineno)
         self.method = method
 
+    def compile_fexpr(self, ctx):
+        n_items = 2
+        self.receiver.compile_fexpr(ctx)
+        ConstantString(self.method).compile_fexpr(ctx)
+        for arg in self.args:
+            n_items += 1
+            arg.compile_fexpr(ctx)
+        if self.block_arg is not None:
+            n_items += 1
+            self.block_arg.compile_fexpr(ctx)
+        ctx.emit(consts.BUILD_ARRAY, n_items)
+
     def compile(self, ctx):
         if self.method.startswith("constrain:"):
-            import pdb; pdb.set_trace()
+            with ctx.set_lineno(self.lineno):
+                self.receiver.compile(ctx)
+                block = self.get_block()
+                if self.is_splat() or len(self.args) != 1 or block is not None:
+                    raise ctx.space.error(
+                        ctx.space.w_SyntaxError,
+                        "line %d: `constrain:' methods take only one argument" % (self.lineno)
+                    )
+                else:
+                    self.args[0].compile_fexpr(ctx)
+                    symbol = self.method_name_const(ctx)
+                    ctx.emit(self.send, symbol, 1)
         else:
             BaseSend.compile(self, ctx)
 
@@ -991,6 +1020,11 @@ class InstanceVariable(Node):
         self.compile_receiver(ctx)
         self.compile_load(ctx)
 
+    def compile_fexpr(self, ctx):
+        self.compile_receiver(ctx)
+        ConstantString(self.name).compile(ctx)
+        ctx.emit(consts.BUILD_ARRAY, 2)
+
     def compile_receiver(self, ctx):
         ctx.emit(consts.LOAD_SELF)
         return 1
@@ -1095,6 +1129,9 @@ class Range(Node):
 class ConstantNode(Node):
     def compile(self, ctx):
         ctx.emit(consts.LOAD_CONST, self.create_const(ctx))
+
+    def compile_fexpr(self, ctx):
+        self.compile(ctx)
 
     def compile_defined(self, ctx):
         ConstantString("expression").compile(ctx)
