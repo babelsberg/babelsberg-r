@@ -732,6 +732,12 @@ class Send(BaseSend):
         BaseSend.__init__(self, receiver, args, block_arg, lineno)
         self.method = method
 
+    def compile(self, ctx):
+        if self.method.startswith("constrain:"):
+            import pdb; pdb.set_trace()
+        else:
+            BaseSend.compile(self, ctx)
+
     def method_name_const(self, ctx):
         return ctx.create_symbol_const(self.method)
 
