@@ -1,21 +1,3 @@
-if defined? Topaz
-  class Numeric
-    def abs
-      self < 0 ? -self : self
-    end
-  end
-
-  class Array
-    def *(num)
-      result = []
-      for i in 0..num do
-        result += self
-      end
-      result
-    end
-  end
-end
-
 require "set"
 
 module Cassowary
@@ -1354,22 +1336,22 @@ class CassowaryTests# < Test::Unit::TestCase
     solver.add_constraint c20
     assert x.value.cl_approx(10.0)
 
-    # solver.remove_constraint c10
-    # assert x.value.cl_approx(20.0)
+    solver.remove_constraint c10
+    assert x.value.cl_approx(20.0)
 
-    # solver.remove_constraint c20
-    # assert x.value.cl_approx(100.0)
+    solver.remove_constraint c20
+    assert x.value.cl_approx(100.0)
 
-    # c10again = x.cn_leq 10.0
-    # solver.add_constraint c10
-    # solver.add_constraint c10again
-    # assert x.value.cl_approx(10.0)
+    c10again = x.cn_leq 10.0
+    solver.add_constraint c10
+    solver.add_constraint c10again
+    assert x.value.cl_approx(10.0)
 
-    # solver.remove_constraint c10
-    # assert x.value.cl_approx(10.0)
+    solver.remove_constraint c10
+    assert x.value.cl_approx(10.0)
 
-    # solver.remove_constraint c10again
-    # assert x.value.cl_approx(100.0)
+    solver.remove_constraint c10again
+    assert x.value.cl_approx(100.0)
   end
 end
 
