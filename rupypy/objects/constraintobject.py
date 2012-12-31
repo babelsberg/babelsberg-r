@@ -53,21 +53,23 @@ class W_ConstraintObject(W_Object):
 
     @classdef.method("satisfy!")
     def method_satisfyb(self, space):
-        for w_value, cell in self.w_test_block.get_closure_variables():
-            instances_w = space.listview(space.send(self, space.newsymbol("instances_for"), [w_value]))
-            for w_obj in instances_w:
-                # cell is closure cell, so not stored in frame, indices are meaningless
-                cell.set(0, 0, w_obj)
-                if space.is_true(space.invoke_block(self.w_test_block, [])):
-                    return self.w_true
-            # cell is closure cell, so not stored in frame, indices are meaningless
-            cell.set(0, 0, w_value)
-        raise space.error(
-            space.w_RuntimeError,
-            "unsatisfiable constraint %s" % space.str_w(space.send(
-                    self, space.newsymbol("inspect")
-            ))
-        )
+        pass
+        # XXX: Old code below for limited-domain solver
+        # for w_value, cell in self.w_test_block.get_closure_variables():
+        #     instances_w = space.listview(space.send(self, space.newsymbol("instances_for"), [w_value]))
+        #     for w_obj in instances_w:
+        #         # cell is closure cell, so not stored in frame, indices are meaningless
+        #         cell.set(0, 0, w_obj)
+        #         if space.is_true(space.invoke_block(self.w_test_block, [])):
+        #             return self.w_true
+        #     # cell is closure cell, so not stored in frame, indices are meaningless
+        #     cell.set(0, 0, w_value)
+        # raise space.error(
+        #     space.w_RuntimeError,
+        #     "unsatisfiable constraint %s" % space.str_w(space.send(
+        #             self, space.newsymbol("inspect")
+        #     ))
+        # )
 
     classdef.app_method("""
     def instances_for(object)
