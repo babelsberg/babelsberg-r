@@ -31,15 +31,16 @@
 #   task.run
 # end
 
-# class User
-#   def initialize(birthyear, age)
-#     @birthyear = birthyear
-#     @age = age
-#     constrain(?@age == 2013 - @birthyear)
-#   end
-# end
+class User
+  attr_accessor :birthyear, :age
 
-# u = User.new(2012, 11)
-@age = 24
-@birthyear = 1988
-puts(constrain: @age == 2013 - @birthyear)
+  def initialize(birthyear, age)
+    constrain: @birthyear == birthyear
+    constrain: @age == 2013 - @birthyear
+  end
+end
+
+u = User.new(2012, 11)
+if 2013 - u.birthyear != u.age
+  raise "Constraint solver didn't fix it for me!"
+end

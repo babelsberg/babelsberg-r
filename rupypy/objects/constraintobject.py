@@ -15,15 +15,15 @@ class W_SexprObject(W_ArrayObject):
         raise space.error(space.w_TypeError, "no allocator for Sexpr")
 
     classdef.app_method("""
-    def to_s()
-        result = "("
-        self.each_with_index do |obj, i|
-            if i > 0
-                result << ", "
-            end
-            result << obj.to_s
+    def to_s
+      result = "("
+      self.each_with_index do |obj, i|
+        if i > 0
+          result << ", "
         end
-        result << ")"
+        result << obj.to_s
+      end
+      result << ")"
     end
     """)
 
