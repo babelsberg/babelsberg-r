@@ -991,6 +991,10 @@ class Variable(Node):
     def compile_defined(self, ctx):
         ConstantString("local-variable").compile(ctx)
 
+    def compile_fexpr(self, ctx):
+        ConstantString(self.name).compile(ctx)
+        ctx.emit(consts.BUILD_SEXPR, 1)
+
 
 class Global(Node):
     def __init__(self, name):
