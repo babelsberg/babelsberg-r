@@ -53,7 +53,6 @@ class W_ConstraintObject(W_Object):
 
     @classdef.method("satisfy!")
     def method_satisfyb(self, space):
-        import pdb; pdb.set_trace()
         for w_value, cell in self.w_test_block.get_closure_variables():
             instances_w = space.listview(space.send(self, space.newsymbol("instances_for"), [w_value]))
             for w_obj in instances_w:
