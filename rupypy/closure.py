@@ -21,10 +21,17 @@ class LocalCell(BaseCell):
         frame.cells[pos] = result = ClosureCell(self.get(frame, pos), None)
         return result
 
+    def get_constraint(self):
+        raise RuntimeError("Local cells should not have constraints")
+
+    def set_constraint(self, w_value):
+        raise RuntimeError("Local cells should not have constraints")
+
 
 class ClosureCell(BaseCell):
     def __init__(self, w_value, w_prev = None):
         self.w_value = [w_value, w_prev]
+        self.w_constraint = None
 
     def get(self, frame, pos):
         return self.w_value[0]
@@ -40,3 +47,9 @@ class ClosureCell(BaseCell):
 
     def upgrade_to_closure(self, frame, pos):
         return self
+
+    def get_constraint(self):
+        return self.w_constraint
+
+    def set_constraint(self, w_value):
+        self.w_constraint = w_value
