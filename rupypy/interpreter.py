@@ -304,11 +304,6 @@ class Interpreter(object):
             frame.push(space.w_nil)
 
     @jit.unroll_safe
-    def BUILD_SEXPR(self, space, bytecode, frame, pc, n_items):
-        items_w = frame.popitemsreverse(n_items)
-        frame.push(space.newsexpr(items_w))
-
-    @jit.unroll_safe
     def BUILD_ARRAY(self, space, bytecode, frame, pc, n_items):
         items_w = frame.popitemsreverse(n_items)
         frame.push(space.newarray(items_w))

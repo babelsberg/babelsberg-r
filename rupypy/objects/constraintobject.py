@@ -68,7 +68,7 @@ class W_ConstraintVariableObject(W_Object):
         if self.cell:
             self.cell.set_constraint(w_constraint)
         else:
-            raise NotImplementedError("constraints for ivars/cvars/gvars")        
+            raise NotImplementedError("constraints for ivars/cvars/gvars")
 
     @classdef.method("variable")
     def method_variable(self, space):
