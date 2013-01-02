@@ -201,6 +201,12 @@ module Cassowary
     def stay_constraint?
       false
     end
+
+    def solver
+      solver = SimplexSolver.new
+      solver.auto_solve = false
+      solver
+    end
   end
 end
 
@@ -583,8 +589,8 @@ module Cassowary
     Epsilon = 1.0e-8
 
     def add_bounds(var, lower = nil, upper = nil)
-      add_constraint lower.cn_leq(var) if lower
-      add_constraint var.cn_leq(upper) if upper
+      add_constraint(lower <= var) if lower
+      add_constraint(var <= upper) if upper
     end
 
     def add_constraint(constraint)
@@ -1319,40 +1325,55 @@ end
 
 # require "test/unit"
 
-class CassowaryTests# < Test::Unit::TestCase
-  include Cassowary
+# class CassowaryTests# < Test::Unit::TestCase
+#   include Cassowary
 
-  def assert(bool)
-    raise RuntimeError, "Assertion failed" unless bool
-  end
+#   def assert(bool)
+#     raise RuntimeError, "Assertion failed" unless bool
+#   end
 
-  def test_add_delete1
-    x = Variable.new(name: 'x', value: 10)
-    solver = SimplexSolver.new
-    solver.add_constraint x.cn_equal(100.0, Strength::WeakStrength)
-    c10 = x.cn_leq 10.0
-    c20 = x.cn_leq 20.0
-    solver.add_constraint c10
-    solver.add_constraint c20
-    assert x.value.cl_approx(10.0)
+#   def test_add_delete1
+#     x = Variable.new(name: 'x', value: 10)
+#     solver = SimplexSolver.new
+#     solver.add_constraint x.==(100.0, Strength::WeakStrength)
+#     c10 = x <= 10.0
+#     c20 = x <= 20.0
+#     solver.add_constraint c10
+#     solver.add_constraint c20
+#     assert x.value.cl_approx(10.0)
 
-    solver.remove_constraint c10
-    assert x.value.cl_approx(20.0)
+#     solver.remove_constraint c10
+#     assert x.value.cl_approx(20.0)
 
-    solver.remove_constraint c20
-    assert x.value.cl_approx(100.0)
+#     solver.remove_constraint c20
+#     assert x.value.cl_approx(100.0)
 
-    c10again = x.cn_leq 10.0
-    solver.add_constraint c10
-    solver.add_constraint c10again
-    assert x.value.cl_approx(10.0)
+#     c10again = x <= 10.0
+#     solver.add_constraint c10
+#     solver.add_constraint c10again
+#     assert x.value.cl_approx(10.0)
 
-    solver.remove_constraint c10
-    assert x.value.cl_approx(10.0)
+#     solver.remove_constraint c10
+#     assert x.value.cl_approx(10.0)
 
-    solver.remove_constraint c10again
-    assert x.value.cl_approx(100.0)
+#     solver.remove_constraint c10again
+#     assert x.value.cl_approx(100.0)
+#   end
+# end
+
+# CassowaryTests.new.test_add_delete1
+
+# RuPyPy constraint integration
+module Cassowary
+  class Variable < AbstractVariable
+    attr_accessor :outer
+
+    def value=(v)
+      @value = v
+      outer.set! if outer
+      v
+    end
   end
 end
 
-CassowaryTests.new.test_add_delete1
+puts "Loaded Cassowary"
