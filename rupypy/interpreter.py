@@ -108,9 +108,9 @@ class Interpreter(object):
         if num_args >= 3:
             raise NotImplementedError
 
-        if name.startswith("LOAD_"):
-            # time to enforce the constraints
-            space.ensure_constraints()
+        # if name.startswith("LOAD_"):
+        #     # time to enforce the constraints
+        #     space.ensure_constraints()
         method = getattr(self, name)
         try:
             res = method(space, bytecode, frame, pc, *args)
@@ -175,12 +175,12 @@ class Interpreter(object):
 
     def LOAD_DEREF(self, space, bytecode, frame, pc, idx):
         frame.push(frame.cells[idx].get(frame, idx) or space.w_nil)
-        if not space.is_executing_constraints():
-            frame.cells[idx].advance_time(frame, idx)
+        # if not space.is_executing_constraints():
+        #     frame.cells[idx].advance_time(frame, idx)
 
     def STORE_DEREF(self, space, bytecode, frame, pc, idx):
-        if not space.is_executing_constraints():
-            frame.cells[idx].advance_time(frame, idx)
+        # if not space.is_executing_constraints():
+        #     frame.cells[idx].advance_time(frame, idx)
         frame.cells[idx].set(frame, idx, frame.peek())
 
     def LOAD_DEREF_CONSTRAINT(self, space, bytecode, frame, pc, idx):
