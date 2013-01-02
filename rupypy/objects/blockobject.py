@@ -28,5 +28,6 @@ class W_BlockObject(W_BaseObject):
         cells = []
         for cell in self.cells:
             if isinstance(cell, ClosureCell):
-                cells.append((cell.get(None, None), cell))
+                # cell is closure cell, so not stored in frame, indices are meaningless
+                cells.append((cell.get(0, 0), cell))
         return cells

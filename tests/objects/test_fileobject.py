@@ -121,6 +121,15 @@ class TestFile(BaseRuPyPyTest):
     def test_fnm_syscase(self, space):
         space.execute("File::FNM_SYSCASE")
 
+    def test_fnm_dotmatch(self, space):
+        space.execute("File::FNM_DOTMATCH")
+
+    def test_fnm_pathname(self, space):
+        space.execute("File::FNM_PATHNAME")
+
+    def test_fnm_noescape(self, space):
+        space.execute("File::FNM_NOESCAPE")
+
     def test_new_simple(self, space, tmpdir):
         contents = "foo\nbar\nbaz\n"
         f = tmpdir.join("file.txt")
@@ -131,6 +140,46 @@ class TestFile(BaseRuPyPyTest):
 
         w_res = space.execute("return File.new('%s%snonexist', 'w')" % (tmpdir.dirname, os.sep))
         assert isinstance(w_res, W_FileObject)
+
+        w_res = space.execute("""
+        path = '%s%snonexist2'
+        f = File.new(path, 'w')
+        f.puts "first"
+        f = File.new(path, 'a')
+        f.puts "second"
+        f = File.new(path, 'r')
+        return f.read
+        """ % (tmpdir.dirname, os.sep))
+        assert space.str_w(w_res) == "first\nsecond\n"
+
+    def test_each_line(self, space, tmpdir):
+        contents = "01\n02\n03\n04\n"
+        f = tmpdir.join("file.txt")
+        f.write(contents)
+        w_res = space.execute("""
+        r = []
+        File.new('%s').each_line { |l| r << l }
+        return r
+        """ % f)
+        assert self.unwrap(space, w_res) == ["01", "02", "03", "04", ""]
+        w_res = space.execute("""
+        r = []
+        File.new('%s').each_line('3') { |l| r << l }
+        return r
+        """ % f)
+        assert self.unwrap(space, w_res) == ["01\n02\n0", "\n04\n"]
+        w_res = space.execute("""
+        r = []
+        File.new('%s').each_line(1) { |l| r << l }
+        return r
+        """ % f)
+        assert self.unwrap(space, w_res) == ["0", "1", "0", "2", "0", "3", "0", "4", ""]
+        w_res = space.execute("""
+        r = []
+        File.new('%s').each_line('3', 4) { |l| r << l }
+        return r
+        """ % f)
+        assert self.unwrap(space, w_res) == ["01\n0", "2\n0", "\n04\n"]
 
     def test_join(self, space):
         w_res = space.execute("return File.join('/abc', 'bin')")

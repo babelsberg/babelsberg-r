@@ -137,17 +137,27 @@ class Parser(object):
         return BoxAST(ast.SendBlock(args, splat, block))
 
     def combine_send_block(self, send_box, block_box):
-        send = send_box.getast(ast.Send)
+        send = send_box.getast(ast.BaseSend)
         block = block_box.getast()
         if send.block_arg is not None:
             raise self.error("Both block arg and actual block given.")
-        return BoxAST(ast.Send(
-            send.receiver,
-            send.method,
-            send.args,
-            block,
-            send.lineno
-        ))
+        if isinstance(send, ast.Send):
+            node = ast.Send(
+                send.receiver,
+                send.method,
+                send.args,
+                block,
+                send.lineno
+            )
+        elif isinstance(send, ast.Super):
+            node = ast.Super(
+                send.args,
+                block,
+                send.lineno,
+            )
+        else:
+            raise SystemError
+        return BoxAST(node)
 
     def _array_or_node(self, box):
         args = box.getcallargs()
@@ -2189,7 +2199,16 @@ class Parser(object):
 
     @pg.production("method_call : SUPER")
     def method_call_super(self, p):
-        return BoxAST(ast.AutoSuper(p[0].getsourcepos().lineno))
+        lineno = p[0].getsourcepos().lineno
+        args = []
+        for n, tp in self.lexer.symtable.arguments:
+            if tp == self.lexer.symtable.BLOCK_ARG:
+                continue
+            node = ast.Variable(n, lineno)
+            if tp == self.lexer.symtable.SPLAT_ARG:
+                node = ast.Splat(node)
+            args.append(node)
+        return BoxAST(ast.Super(args, None, lineno))
 
     @pg.production("method_call : primary_value LITERAL_LBRACKET opt_call_args rbracket")
     def method_call_primary_value_lbracket_opt_call_args_rbracket(self, p):
@@ -2807,12 +2826,12 @@ class Parser(object):
 
     @pg.production("f_rest_arg : restarg_mark IDENTIFIER")
     def f_rest_arg_restarg_mark_identifer(self, p):
-        self.lexer.symtable.declare_argument(p[1].getstr())
+        self.lexer.symtable.declare_argument(p[1].getstr(), self.lexer.symtable.SPLAT_ARG)
         return p[1]
 
     @pg.production("f_rest_arg : restarg_mark")
     def f_rest_arg_restarg_mark(self, p):
-        self.lexer.symtable.declare_argument("*")
+        self.lexer.symtable.declare_argument("*", self.lexer.symtable.SPLAT_ARG)
         return self.new_token(p[0], "IDENTIFIER", "*")
 
     @pg.production("blkarg_mark : AMPER")
@@ -2822,7 +2841,7 @@ class Parser(object):
 
     @pg.production("f_block_arg : blkarg_mark IDENTIFIER")
     def f_block_arg(self, p):
-        self.lexer.symtable.declare_argument(p[1].getstr())
+        self.lexer.symtable.declare_argument(p[1].getstr(), self.lexer.symtable.BLOCK_ARG)
         return p[1]
 
     @pg.production("opt_f_block_arg : LITERAL_COMMA f_block_arg")

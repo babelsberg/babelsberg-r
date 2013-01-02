@@ -362,6 +362,8 @@ class Lexer(object):
                 break
             elif ch.isalnum() or ch == "_":
                 self.add(ch)
+            elif ch == ":" and "".join(self.current_value) == "constrain":
+                self.add(ch)
             else:
                 self.unread()
                 yield self.emit_identifier(command_state)
@@ -499,7 +501,7 @@ class Lexer(object):
         self.add(ch)
         self.state = self.EXPR_END
         ch = self.read()
-        if ch in "$>:?\\!\"~&`'+":
+        if ch in "$>:?\\!\"~&`'+/":
             self.add(ch)
             yield self.emit("GVAR")
         else:
@@ -983,6 +985,7 @@ class Lexer(object):
 
             ch2 = self.read()
             if ch2 == "]":
+                self.add(ch)
                 self.add(ch2)
                 ch3 = self.read()
                 if ch3 == "=":

@@ -1,9 +1,31 @@
 import copy
 
+from pypy.rlib.listsort import TimSort
+
 from rupypy.module import ClassDef
 from rupypy.modules.enumerable import Enumerable
 from rupypy.objects.objectobject import W_Object
 from rupypy.utils.packing.pack import RPacker
+
+
+class RubySorter(TimSort):
+    def __init__(self, space, list, listlength=None, sortblock=None):
+        TimSort.__init__(self, list, listlength=listlength)
+        self.space = space
+        self.sortblock = sortblock
+
+    def lt(self, a, b):
+        if self.sortblock is None:
+            w_cmp_res = self.space.send(a, self.space.newsymbol("<=>"), [b])
+        else:
+            w_cmp_res = self.space.invoke_block(self.sortblock, [a, b])
+        if w_cmp_res is self.space.w_nil:
+            raise self.space.error(
+                self.space.w_ArgumentError,
+                "comparison of %s with %s failed" % (self.space.getclass(a).name, self.space.getclass(b).name)
+            )
+        else:
+            return self.space.int_w(w_cmp_res) < 0
 
 
 class W_ArrayObject(W_Object):
@@ -21,6 +43,17 @@ class W_ArrayObject(W_Object):
 
     def listview(self, space):
         return self.items_w
+
+    @classdef.singleton_method("allocate")
+    def singleton_method_allocate(self, space):
+        return space.newarray([])
+
+    @classdef.method("initialize_copy")
+    def method_initialize_copy(self, space, w_other):
+        assert isinstance(w_other, W_ArrayObject)
+        del self.items_w[:]
+        self.items_w.extend(w_other.items_w)
+        return self
 
     classdef.app_method("""
     def to_s()
@@ -172,10 +205,6 @@ class W_ArrayObject(W_Object):
             for w_o in self.items_w
         ]))
 
-    @classdef.method("dup")
-    def method_dup(self, space):
-        return space.newarray(self.items_w[:])
-
     classdef.app_method("""
     def at idx
         self[idx]
@@ -301,7 +330,16 @@ class W_ArrayObject(W_Object):
         del self.items_w[:]
         return self
 
+    @classdef.method("sort!")
+    def method_sort(self, space, block):
+        RubySorter(space, self.items_w, sortblock=block).sort()
+        return self
+
     classdef.app_method("""
+    def sort(&block)
+        dup.sort!(&block)
+    end
+
     def ==(other)
         if self.equal?(other)
             return true
@@ -345,5 +383,26 @@ class W_ArrayObject(W_Object):
             res = Topaz.intmask((1000003 * res) ^ x.hash)
         end
         return res
+    end
+
+    def *(arg)
+        return join(arg) if arg.respond_to? :to_str
+
+        # MRI error cases
+        argcls = arg.class
+        begin
+            arg = arg.to_int
+        rescue Exception
+            raise TypeError, "can't convert #{argcls} into Fixnum"
+        end
+        raise TypeError, "can't convert #{argcls} to Fixnum (argcls#to_int gives arg.class)" if arg.class != Fixnum
+        raise ArgumentError, "Count cannot be negative" if arg < 0
+
+        return [] if arg == 0
+        result = self.dup
+        for i in 1...arg do
+            result.concat(self)
+        end
+        result
     end
     """)

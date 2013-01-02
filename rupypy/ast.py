@@ -21,6 +21,12 @@ class BaseNode(object):
         else:
             raise NotImplementedError(type(self).__name__)
 
+    def compile_constraint(self, ctx):
+        if we_are_translated():
+            raise NotImplementedError
+        else:
+            raise NotImplementedError(type(self).__name__)
+
 
 class Node(BaseNode):
     _attrs_ = ["lineno"]
@@ -683,15 +689,16 @@ class BaseSend(Node):
             else:
                 for arg in self.args:
                     arg.compile(ctx)
-            if self.block_arg is not None:
-                self.block_arg.compile(ctx)
+            block = self.get_block()
+            if block is not None:
+                block.compile(ctx)
 
             symbol = self.method_name_const(ctx)
-            if self.is_splat() and self.block_arg is not None:
+            if self.is_splat() and block is not None:
                 ctx.emit(self.send_block_splat, symbol)
             elif self.is_splat():
                 ctx.emit(self.send_splat, symbol)
-            elif self.block_arg is not None:
+            elif block is not None:
                 ctx.emit(self.send_block, symbol, len(self.args) + 1)
             else:
                 ctx.emit(self.send, symbol, len(self.args))
@@ -701,6 +708,9 @@ class BaseSend(Node):
             if isinstance(arg, Splat):
                 return True
         return False
+
+    def get_block(self):
+        return self.block_arg
 
     def compile_receiver(self, ctx):
         self.receiver.compile(ctx)
@@ -728,17 +738,50 @@ class Send(BaseSend):
         BaseSend.__init__(self, receiver, args, block_arg, lineno)
         self.method = method
 
+    def compile_constraint(self, ctx):
+        n_items = 2
+        self.receiver.compile_constraint(ctx)
+        ConstantString(self.method).compile_constraint(ctx)
+        for arg in self.args:
+            n_items += 1
+            arg.compile_constraint(ctx)
+        if self.block_arg is not None:
+            n_items += 1
+            self.block_arg.compile_constraint(ctx)
+        ctx.emit(consts.BUILD_SEXPR, n_items)
+
+    def compile(self, ctx):
+        if self.method.startswith("constrain:"):
+            with ctx.set_lineno(self.lineno):
+                self.receiver.compile(ctx)
+                block = self.get_block()
+                if self.is_splat() or len(self.args) != 1 or block is not None:
+                    raise ctx.space.error(
+                        ctx.space.w_SyntaxError,
+                        "line %d: `constrain:' methods take only one argument" % (self.lineno)
+                    )
+                else:
+                    self.args[0].compile_constraint(ctx)
+                    symbol = self.method_name_const(ctx)
+                    ctx.emit(self.send, symbol, 1)
+        else:
+            BaseSend.compile(self, ctx)
+
     def method_name_const(self, ctx):
         return ctx.create_symbol_const(self.method)
 
 
 class Super(BaseSend):
-    send = consts.SEND_SUPER
+    send_block = consts.SEND_SUPER_BLOCK
     send_splat = consts.SEND_SUPER_SPLAT
+    send_block_splat = consts.SEND_SUPER_BLOCK_SPLAT
     defined = consts.DEFINED_SUPER
 
     def __init__(self, args, block_arg, lineno):
         BaseSend.__init__(self, Self(lineno), args, block_arg, lineno)
+
+    def get_block(self):
+        return BaseSend.get_block(self) or LoadBlock()
 
     def method_name_const(self, ctx):
         if ctx.code_name == "<main>":
@@ -818,24 +861,9 @@ class BlockArgument(Node):
         ctx.emit(consts.COERCE_BLOCK)
 
 
-class AutoSuper(Node):
+class LoadBlock(BaseNode):
     def compile(self, ctx):
-        ctx.emit(consts.LOAD_SELF)
-        for name in ctx.symtable.arguments:
-            ctx.emit(consts.LOAD_DEREF, ctx.symtable.get_cell_num(name))
-
-        ctx.emit(consts.SEND_SUPER, self.method_name_const(ctx), len(ctx.symtable.arguments))
-
-    def compile_defined(self, ctx):
-        ctx.emit(consts.LOAD_SELF)
-        ctx.emit(consts.DEFINED_SUPER, self.method_name_const(ctx))
-
-    def method_name_const(self, ctx):
-        if ctx.code_name == "<main>":
-            name = ctx.create_const(ctx.space.w_nil)
-        else:
-            name = ctx.create_symbol_const(ctx.code_name)
-        return name
+        ctx.emit(consts.LOAD_BLOCK)
 
 
 class Subscript(Node):
@@ -963,6 +991,9 @@ class Variable(Node):
     def compile_defined(self, ctx):
         ConstantString("local-variable").compile(ctx)
 
+    def compile_constraint(self, ctx):
+        ctx.emit(consts.LOAD_CONSTRAINT_DEREF, 1)
+
 
 class Global(Node):
     def __init__(self, name):
@@ -991,6 +1022,11 @@ class InstanceVariable(Node):
     def compile(self, ctx):
         self.compile_receiver(ctx)
         self.compile_load(ctx)
+
+    def compile_constraint(self, ctx):
+        self.compile_receiver(ctx)
+        ConstantString(self.name).compile(ctx)
+        ctx.emit(consts.BUILD_SEXPR, 2)
 
     def compile_receiver(self, ctx):
         ctx.emit(consts.LOAD_SELF)
@@ -1096,6 +1132,9 @@ class Range(Node):
 class ConstantNode(Node):
     def compile(self, ctx):
         ctx.emit(consts.LOAD_CONST, self.create_const(ctx))
+
+    def compile_constraint(self, ctx):
+        self.compile(ctx)
 
     def compile_defined(self, ctx):
         ConstantString("expression").compile(ctx)

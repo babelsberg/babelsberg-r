@@ -96,6 +96,56 @@ class TestBaseObject(BaseRuPyPyTest):
         """)
         assert self.unwrap(space, w_res) == [False, False]
 
+    def test_dup(self, space):
+        w_res = space.execute("""
+        class A
+            attr_accessor :a, :b
+            def initialize_dup(o)
+                $dup_ran = true
+            end
+        end
+
+        module B
+        end
+
+        a = A.new
+        a.singleton_class.class_eval do
+            def a
+               10
+            end
+        end
+        a.a = a.b = 3
+        a.singleton_class.class_eval("include B")
+        b = a.dup
+        return a.a, b.a, b.b, $dup_ran, a.singleton_class.ancestors == b.singleton_class.ancestors
+        """)
+        assert self.unwrap(space, w_res) == [10, 3, 3, True, False]
+
+    def test_clone(self, space):
+        w_res = space.execute("""
+        class A
+            attr_accessor :a, :b
+            def initialize_clone(o)
+                $copy_ran = true
+            end
+        end
+
+        module B
+        end
+
+        a = A.new
+        a.singleton_class.class_eval do
+            def a
+               10
+            end
+        end
+        a.a = a.b = 3
+        a.singleton_class.class_eval("include B")
+        b = a.clone
+        return a.a, b.a, b.b, $copy_ran, a.singleton_class.ancestors == b.singleton_class.ancestors
+        """)
+        assert self.unwrap(space, w_res) == [10, 10, 3, True, True]
+
 
 class TestObjectObject(BaseRuPyPyTest):
     def test_class(self, space):
@@ -238,6 +288,14 @@ class TestObjectObject(BaseRuPyPyTest):
         return [b.instance_of?(A), b.instance_of?(B), b.instance_of?(C)]
         """)
         assert self.unwrap(space, w_res) == [False, True, False]
+
+    def test_cmp(self, space):
+        w_res = space.execute("""
+        a = Object.new
+        b = Object.new
+        return a <=> a, a <=> b
+        """)
+        assert self.unwrap(space, w_res) == [0, None]
 
 
 class TestMapDict(BaseRuPyPyTest):

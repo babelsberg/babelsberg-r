@@ -49,7 +49,7 @@ from rupypy.objects.integerobject import W_IntegerObject
 from rupypy.objects.intobject import W_FixnumObject
 from rupypy.objects.methodobject import W_MethodObject, W_UnboundMethodObject
 from rupypy.objects.moduleobject import W_ModuleObject
-from rupypy.objects.constraintobject import W_ConstraintObject
+from rupypy.objects.constraintobject import W_ConstraintObject, W_SexprObject
 from rupypy.objects.nilobject import W_NilObject
 from rupypy.objects.numericobject import W_NumericObject
 from rupypy.objects.objectobject import W_Object, W_BaseObject
@@ -115,6 +115,7 @@ class ObjectSpace(object):
         self.w_NameError = self.getclassfor(W_NameError)
         self.w_NotImplementedError = self.getclassfor(W_NotImplementedError)
         self.w_IndexError = self.getclassfor(W_IndexError)
+        self.w_IOError = self.getclassfor(W_IOError)
         self.w_LoadError = self.getclassfor(W_LoadError)
         self.w_RangeError = self.getclassfor(W_RangeError)
         self.w_RuntimeError = self.getclassfor(W_RuntimeError)
@@ -140,6 +141,7 @@ class ObjectSpace(object):
             self.w_RuntimeError, self.w_SystemCallError, self.w_LoadError,
             self.w_StopIteration, self.w_SyntaxError, self.w_NameError,
             self.w_StandardError, self.w_LocalJumpError, self.w_IndexError,
+            self.w_IOError,
 
             self.w_kernel, self.w_topaz,
 
@@ -161,7 +163,6 @@ class ObjectSpace(object):
 
             self.getclassfor(W_ExceptionObject),
             self.getclassfor(W_StandardError),
-            self.getclassfor(W_IOError),
             self.getclassfor(W_RegexpError),
             self.getclassfor(W_ThreadError),
 
@@ -304,6 +305,9 @@ class ObjectSpace(object):
 
     def newstr_fromstrs(self, strs_w):
         return W_StringObject.newstr_fromstrs(self, strs_w)
+
+    def newsexpr(self, items_w):
+        return W_SexprObject(self, items_w)
 
     def newarray(self, items_w):
         return W_ArrayObject(self, items_w)
@@ -589,6 +593,12 @@ class ObjectSpace(object):
             )
         else:
             return w_res
+
+    def any_to_s(self, w_obj):
+        return "#<%s:0x%x>" % (
+                self.str_w(self.send(self.getclass(w_obj), self.newsymbol("name"))),
+                self.int_w(self.send(w_obj, self.newsymbol("__id__")))
+        )
 
     def add_constraint(self, w_constraint):
         priority = w_constraint.get_priority()

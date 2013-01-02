@@ -82,8 +82,8 @@ class ConstantStringStrategy(StringStrategy):
     def hash(self, storage):
         return compute_hash(self.unerase(storage))
 
-    def copy(self, space, storage):
-        return W_StringObject(space, storage, self)
+    def copy(self, storage):
+        return storage
 
     def to_mutable(self, space, s):
         s.strategy = strategy = space.fromcache(MutableStringStrategy)
@@ -127,8 +127,8 @@ class MutableStringStrategy(StringStrategy):
         x ^= length
         return intmask(x)
 
-    def copy(self, space, storage):
-        return W_StringObject(space, storage, self)
+    def copy(self, storage):
+        return self.erase(self.unerase(storage)[:])
 
     def to_mutable(self, space, s):
         pass
@@ -151,6 +151,30 @@ class MutableStringStrategy(StringStrategy):
             changed |= (c != new_c)
             storage[i] = new_c
         return changed
+
+    def chomp(self, storage, newline=None):
+        storage = self.unerase(storage)
+        if len(storage) == 0:
+            return
+        elif newline is not None and len(storage) >= len(newline):
+            for i in xrange(len(newline) - 1, -1, -1):
+                if newline[i] != storage[len(storage) - len(newline) + i]:
+                    return
+            start = len(storage) - len(newline)
+            assert start >= 0
+            del storage[start:]
+        elif newline is None:
+            ch = storage[-1]
+            i = len(storage) - 1
+            while i >= 0 and ch in "\n\r":
+                i -= 1
+                ch = storage[i]
+            if i < len(storage) - 1:
+                i += 1
+                if i > 0:
+                    del storage[i:]
+                else:
+                    del storage[:]
 
 
 class W_StringObject(W_Object):
@@ -204,7 +228,7 @@ class W_StringObject(W_Object):
         return self.strategy.length(self.str_storage)
 
     def copy(self, space):
-        return self.strategy.copy(space, self.str_storage)
+        return W_StringObject(space, self.strategy.copy(self.str_storage), self.strategy)
 
     def replace(self, space, chars):
         strategy = space.fromcache(MutableStringStrategy)
@@ -251,6 +275,17 @@ class W_StringObject(W_Object):
                 new_string.append(repl)
 
         return new_string if change_made else None
+
+    @classdef.singleton_method("allocate")
+    def singleton_method_allocate(self, space):
+        return space.newstr_fromstr("")
+
+    @classdef.method("initialize_copy")
+    def method_initialize_copy(self, space, w_other):
+        assert isinstance(w_other, W_StringObject)
+        self.strategy = w_other.strategy
+        self.str_storage = w_other.strategy.copy(w_other.str_storage)
+        return self
 
     @classdef.method("to_str")
     @classdef.method("to_s")
@@ -333,14 +368,6 @@ class W_StringObject(W_Object):
     end
     """)
 
-    @classdef.method("freeze")
-    def method_freeze(self, space):
-        pass
-
-    @classdef.method("dup")
-    def method_dup(self, space):
-        return self.copy(space)
-
     @classdef.method("to_sym")
     @classdef.method("intern")
     def method_to_sym(self, space):
@@ -372,6 +399,24 @@ class W_StringObject(W_Object):
             return rsre_core.search_context(ctx)
         except rsre_core.Error, e:
             raise space.error(space.w_RuntimeError, e.msg)
+
+    @classdef.method("index", offset="int")
+    def method_index(self, space, w_sub, offset=0):
+        if offset < 0 or offset >= self.length():
+            return space.w_nil
+        elif space.is_kind_of(w_sub, space.w_string):
+            return space.newint(space.str_w(self).find(space.str_w(w_sub), offset))
+        elif space.is_kind_of(w_sub, space.w_regexp):
+            ctx = w_sub.make_ctx(space.str_w(self), offset=offset)
+            if self.search_context(space, ctx):
+                return space.newint(ctx.match_start)
+            else:
+                return space.newint(-1)
+        else:
+            raise space.error(
+                space.w_TypeError,
+                "type mismatch: %s given" % space.getclass(w_sub).name
+            )
 
     @classdef.method("split", limit="int")
     def method_split(self, space, w_sep=None, limit=0):
@@ -543,3 +588,154 @@ class W_StringObject(W_Object):
             args_w = [w_arg]
         elements_w = StringFormatter(space.str_w(self), args_w).format(space)
         return space.newstr_fromstrs(elements_w)
+
+    @classdef.method("getbyte", pos="int")
+    def method_getbyte(self, space, pos):
+        if pos >= self.length() or pos < -self.length():
+            return space.w_nil
+        if pos < 0:
+            pos += self.length()
+        ch = self.strategy.getitem(self.str_storage, pos)
+        return space.newint(ord(ch))
+
+    @classdef.method("include?", substr="str")
+    def method_includep(self, space, substr):
+        return space.newbool(substr in space.str_w(self))
+
+    @classdef.method("gsub")
+    def method_gsub(self, space, w_pattern, w_replacement=None, block=None):
+        if w_replacement is None and block is None:
+            raise NotImplementedError("gsub enumerator")
+
+        w_hash = None
+        replacement = None
+        if w_replacement:
+            w_hash = space.convert_type(w_replacement, space.w_hash, "to_hash", raise_error=False)
+            if w_hash is space.w_nil:
+                w_hash = None
+                replacement = space.str_w(
+                    space.convert_type(w_replacement, space.w_string, "to_str")
+                )
+
+        if space.is_kind_of(w_pattern, space.w_regexp):
+            return self.gsub_regexp(space, w_pattern, replacement, w_hash, block)
+        elif space.is_kind_of(w_pattern, space.w_string):
+            return self.gsub_string(space, w_pattern, replacement, w_hash, block)
+        else:
+            raise space.error(
+                space.w_TypeError,
+                "wrong argument type %s (expected Regexp)" % space.getclass(w_replacement).name
+            )
+
+    def gsub_regexp(self, space, w_pattern, replacement, w_hash, block):
+        result = []
+        pos = 0
+        string = space.str_w(self)
+        ctx = w_pattern.make_ctx(string)
+
+        w_matchdata = w_pattern.get_match_result(space, ctx, found=True)
+        replacement_parts = None
+        if replacement is not None and "\\" in replacement:
+            replacement_parts = [s for s in replacement.split("\\") if s]
+
+        while pos < len(string) and self.search_context(space, ctx):
+            result += string[pos:ctx.match_start]
+            if replacement_parts is not None:
+                result += (self.gsub_regexp_subst_string(
+                        space, replacement_parts, w_matchdata, pos
+                ))
+            elif replacement is not None:
+                result += replacement
+            elif block:
+                result += self.gsub_regexp_block(space, block, w_matchdata)
+            elif w_hash:
+                result += self.gsub_regexp_hash(space, w_hash, w_matchdata)
+            pos = ctx.match_end
+            ctx.reset(pos)
+        result += string[pos:]
+        return space.newstr_fromchars(result)
+
+    def gsub_regexp_subst_string(self, space, parts_w, w_match, pos=0):
+        result = []
+        string = space.str_w(self)
+        result += parts_w[0]
+        for s in parts_w[1:]:
+            if s[0].isdigit():
+                group = int(s[0])
+                if group < w_match.size():
+                    begin, end = w_match.get_span(group)
+                    begin += pos
+                    end += pos
+                    assert begin >= 0
+                    assert end >= 0
+                    result += string[begin:end]
+                result += s[1:]
+            else:
+                result += s
+        return result
+
+    def gsub_regexp_block(self, space, block, w_match):
+        w_arg = space.send(w_match, space.newsymbol("[]"), [space.newint(0)])
+        return self.gsub_yield_block(space, block, w_arg)
+
+    def gsub_regexp_hash(self, space, w_hash, w_match):
+        w_arg = space.send(w_match, space.newsymbol("[]"), [space.newint(0)])
+        return self.gsub_lookup_hash(space, w_hash, w_arg)
+
+    def gsub_string(self, space, w_pattern, replacement, w_hash, block):
+        result = []
+        pos = 0
+        string = space.str_w(self)
+        pattern = space.str_w(w_pattern)
+        while pos + len(pattern) < len(string):
+            idx = string.find(pattern, pos)
+            if idx >= 0:
+                result += string[pos:idx]
+                if replacement is not None:
+                    result += replacement
+                elif block:
+                    result += self.gsub_yield_block(space, block, w_pattern)
+                elif w_hash:
+                    result += self.gsub_lookup_hash(space, w_hash, w_pattern)
+                pos = idx + len(pattern)
+            else:
+                break
+        result += string[pos:]
+        return space.newstr_fromchars(result)
+
+    def gsub_yield_block(self, space, block, w_matchstr):
+        w_value = space.invoke_block(block, [w_matchstr])
+        return self.gsub_replacement_to_s(space, w_value)
+
+    def gsub_lookup_hash(self, space, w_hash, w_matchstr):
+        w_value = space.send(w_hash, space.newsymbol("[]"), [w_matchstr])
+        return self.gsub_replacement_to_s(space, w_value)
+
+    def gsub_replacement_to_s(self, space, w_replacement):
+        if space.is_kind_of(w_replacement, space.w_string):
+            return space.str_w(w_replacement)
+        else:
+            w_replacement = space.send(w_replacement, space.newsymbol("to_s"))
+            if space.is_kind_of(w_replacement, space.w_string):
+                return space.str_w(w_replacement)
+            else:
+                return space.any_to_s(w_replacement)
+
+    @classdef.method("chomp!")
+    def method_chomp_i(self, space, w_newline=None):
+        if w_newline is None:
+            newline = space.globals.get(space, "$/")
+        if w_newline is space.w_nil:
+            return self
+        newline = space.str_w(space.convert_type(w_newline, space.w_string, "to_str"))
+        if newline in "\n\r":
+            newline = None
+        self.strategy.to_mutable(space, self)
+        self.strategy.chomp(self.str_storage, newline)
+        return self
+
+    classdef.app_method("""
+    def chomp(sep=$/)
+        self.dup.chomp!(sep)
+    end
+    """)

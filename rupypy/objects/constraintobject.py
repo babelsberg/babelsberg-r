@@ -1,5 +1,32 @@
 from rupypy.module import ClassDef
 from rupypy.objects.objectobject import W_Object
+from rupypy.objects.arrayobject import W_ArrayObject
+
+
+class W_SexprObject(W_ArrayObject):
+    classdef = ClassDef("Sexpr", W_ArrayObject.classdef, filepath=__file__)
+
+    @classdef.singleton_method("new")
+    def method_new(self, space, args_w):
+        raise space.error(space.w_TypeError, "Sexpr cannot be initialized from user code")
+
+    @classdef.singleton_method("allocate")
+    def method_allocate(self, space):
+        raise space.error(space.w_TypeError, "no allocator for Sexpr")
+
+    classdef.app_method("""
+    def to_s
+      result = "("
+      self.each_with_index do |obj, i|
+        if i > 0
+          result << ", "
+        end
+        result << obj.to_s
+      end
+      result << ")"
+    end
+    """)
+
 
 class W_ConstraintObject(W_Object):
     classdef = ClassDef("Constraint", W_Object.classdef, filepath=__file__)
@@ -26,21 +53,23 @@ class W_ConstraintObject(W_Object):
 
     @classdef.method("satisfy!")
     def method_satisfyb(self, space):
-        import pdb; pdb.set_trace()
-        for w_value, cell in self.w_test_block.get_closure_variables():
-            instances_w = space.listview(space.send(self, space.newsymbol("instances_for"), [w_value]))
-            for w_obj in instances_w:
-                # cell is closure cell, so not stored in frame
-                cell.set(None, None, w_obj)
-                if space.is_true(space.invoke_block(self.w_test_block, [])):
-                    return self.w_true
-            cell.set(None, None, w_value)
-        raise space.error(
-            space.w_RuntimeError,
-            "unsatisfiable constraint %s" % space.str_w(space.send(
-                    self, space.newsymbol("inspect")
-            ))
-        )
+        pass
+        # XXX: Old code below for limited-domain solver
+        # for w_value, cell in self.w_test_block.get_closure_variables():
+        #     instances_w = space.listview(space.send(self, space.newsymbol("instances_for"), [w_value]))
+        #     for w_obj in instances_w:
+        #         # cell is closure cell, so not stored in frame, indices are meaningless
+        #         cell.set(0, 0, w_obj)
+        #         if space.is_true(space.invoke_block(self.w_test_block, [])):
+        #             return self.w_true
+        #     # cell is closure cell, so not stored in frame, indices are meaningless
+        #     cell.set(0, 0, w_value)
+        # raise space.error(
+        #     space.w_RuntimeError,
+        #     "unsatisfiable constraint %s" % space.str_w(space.send(
+        #             self, space.newsymbol("inspect")
+        #     ))
+        # )
 
     classdef.app_method("""
     def instances_for(object)
