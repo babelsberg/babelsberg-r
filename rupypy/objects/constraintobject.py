@@ -1,29 +1,112 @@
 from rupypy.module import ClassDef
 from rupypy.objects.objectobject import W_Object
-from rupypy.objects.arrayobject import W_ArrayObject
+from rupypy.utils.cache import Cache
 
 
-class W_SexprObject(W_ArrayObject):
-    classdef = ClassDef("Sexpr", W_ArrayObject.classdef, filepath=__file__)
+class W_ConstraintVariableObject(W_Object):
+    classdef = ClassDef("ConstraintVariable", W_Object.classdef, filepath=__file__)
 
-    @classdef.singleton_method("new")
-    def method_new(self, space, args_w):
-        raise space.error(space.w_TypeError, "Sexpr cannot be initialized from user code")
+    def __init__(self, space, cell=None, owner=None, ivar=None,
+                 cvar=None, gvar=None):
+        W_Object.__init__(self, space)
+        self.cell = cell
+        self.owner = owner
+        self.ivar = ivar
+        self.cvar = cvar
+        self.gvar = gvar
+        assert cell or (owner and (ivar or cvar or gvar))
+        self.value = self.get(space)
 
-    @classdef.singleton_method("allocate")
-    def method_allocate(self, space):
-        raise space.error(space.w_TypeError, "no allocator for Sexpr")
+    def get(self, space):
+        if self.cell:
+            return self.cell.get(None, 0) or space.w_nil
+        elif self.ivar is not None:
+            return self.owner.find_instance_var(space, self.ivar) or space.w_nil
+        elif self.cvar is not None:
+            return self.owner.find_class_var(space, self.cvar) or space.w_nil
+        elif self.gvar is not None:
+            return space.gvars.get(space, self.gvar) or space.w_nil
+        else:
+            raise NotImplementedError("inconsistent constraint variable")
+
+    def set(self, space, w_value):
+        if self.cell:
+            self.cell.set(None, 0, w_value)
+        elif self.ivar is not None:
+            self.owner.set_instance_var(space, self.ivar, w_value)
+        elif self.cvar is not None:
+            self.owner.set_class_var(space, self.cvar, w_value)
+        elif self.gvar is not None:
+            space.gvars.set(space, self.gvar, w_value)
+        else:
+            raise NotImplementedError("inconsistent constraint variable")
+
+    @classdef.method("value")
+    def method_value(self, space):
+        return self.get(space)
+
+    @classdef.method("name")
+    def method_name(self, space):
+        if self.cell:
+            return space.newstr_fromstr(
+                "local-%s" % space.getclass(self.value).name
+            )
+        elif self.ivar is not None:
+            self.owner.set_instance_var(space, self.ivar, w_value)
+        elif self.cvar is not None:
+            self.owner.set_class_var(space, self.cvar, w_value)
+        elif self.gvar is not None:
+            space.gvars.set(space, self.gvar, w_value)
+
+    def get_variable(self, space):
+        if self.cell:
+            return self.cell.get_constraint()
+        else:
+            raise NotImplementedError("constraints for ivars/cvars/gvars")
+
+    def set_variable(self, space, w_constraint):
+        if self.cell:
+            self.cell.set_constraint(w_constraint)
+        else:
+            raise NotImplementedError("constraints for ivars/cvars/gvars")        
+
+    @classdef.method("variable")
+    def method_variable(self, space):
+        w_constraint = self.get_variable(space)
+        if not w_constraint:
+            w_constraint = space.send(self, space.newsymbol("create_variable"))
+            self.set_variable(space, w_constraint)
+        return w_constraint
+
+    @classdef.method("set_impl")
+    def method_set_impl(self, space, w_value):
+        self.set(space, w_value)
 
     classdef.app_method("""
-    def to_s
-      result = "("
-      self.each_with_index do |obj, i|
-        if i > 0
-          result << ", "
-        end
-        result << obj.to_s
+    def set!
+      set_impl(variable.value)
+    end
+
+    def create_variable
+      case value
+      when Numeric
+        v = Cassowary::Variable.new(name: name, value: value)
+        v.outer = self
+        v
+      else
+        raise NotImplementedError, "no solver for #{value.class}s"
       end
-      result << ")"
+    end
+
+    def method_missing(method, *args, &block)
+      if variable.respond_to? method
+        args = args.map do |arg|
+          arg.kind_of?(self.class) ? arg.variable : arg
+        end
+        variable.send(method, *args, &block)
+      else
+        value.send(method, *args, &block)
+      end
     end
     """)
 

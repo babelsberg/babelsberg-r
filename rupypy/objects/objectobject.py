@@ -149,8 +149,28 @@ class W_RootObject(W_BaseObject):
         return space.w_false
 
     @classdef.method("constrain:")
-    def method_constrain(self, space, args_w):
-        return space.newsexpr(args_w)
+    def method_constrain(self, space, w_arg):
+        # TODO: solve constraints here, but add them to the global
+        # solver, instead of a fresh local one
+        # TODO: Make sure to disable auto-solving, we solve explicitely
+        if space.is_kind_of(w_arg, space.w_array):
+            constraints_w = space.listview(w_arg)
+            if not constraints_w:
+                raise space.error(
+                    space.w_ArgumentError,
+                    "no constraints in expression"
+                )
+            else:
+                w_solver = space.send(constraints_w[0], space.newsymbol("solver"))
+                for w_c in constraints_w:
+                    space.send(w_solver, space.newsymbol("add_constraint"), [w_c])
+                space.send(w_solver, space.newsymbol("solve"))
+            return w_arg
+        else:
+            w_solver = space.send(w_arg, space.newsymbol("solver"))
+            space.send(w_solver, space.newsymbol("add_constraint"), [w_arg])
+            space.send(w_solver, space.newsymbol("solve"))
+            return w_arg
 
     @classdef.method("hash")
     def method_hash(self, space):
