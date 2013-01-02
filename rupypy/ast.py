@@ -738,18 +738,6 @@ class Send(BaseSend):
         BaseSend.__init__(self, receiver, args, block_arg, lineno)
         self.method = method
 
-    def compile_constraint(self, ctx):
-        n_items = 2
-        self.receiver.compile_constraint(ctx)
-        ConstantString(self.method).compile_constraint(ctx)
-        for arg in self.args:
-            n_items += 1
-            arg.compile_constraint(ctx)
-        if self.block_arg is not None:
-            n_items += 1
-            self.block_arg.compile_constraint(ctx)
-        ctx.emit(consts.BUILD_SEXPR, n_items)
-
     def compile(self, ctx):
         if self.method.startswith("constrain:"):
             with ctx.set_lineno(self.lineno):
@@ -1007,7 +995,7 @@ class Global(Node):
     def compile(self, ctx):
         if ctx.in_constraint:
             self.compile_constraint(ctx)
-        else:        
+        else:
             ctx.emit(consts.LOAD_GLOBAL, ctx.create_symbol_const(self.name))
 
     def compile_receiver(self, ctx):
@@ -1152,9 +1140,6 @@ class Range(Node):
 class ConstantNode(Node):
     def compile(self, ctx):
         ctx.emit(consts.LOAD_CONST, self.create_const(ctx))
-
-    def compile_constraint(self, ctx):
-        self.compile(ctx)
 
     def compile_defined(self, ctx):
         ConstantString("expression").compile(ctx)
