@@ -83,6 +83,14 @@ class W_ConstraintVariableObject(W_Object):
         self.set(space, w_value)
 
     classdef.app_method("""
+    def self.variable_handlers
+      @variable_handlers ||= {}
+    end
+
+    def self.for_variables_of_type(klass, &block)
+      variable_handlers[klass] = block
+    end
+
     def set!
       set_impl(variable.value)
     end
