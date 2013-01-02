@@ -992,7 +992,8 @@ class Variable(Node):
         ConstantString("local-variable").compile(ctx)
 
     def compile_constraint(self, ctx):
-        ctx.emit(consts.LOAD_CONSTRAINT_DEREF, 1)
+        ctx.emit(consts.LOAD_DEREF_CONSTRAINT,
+                 ctx.symtable.get_cell_num(self.name))
 
 
 class Global(Node):
@@ -1014,6 +1015,9 @@ class Global(Node):
     def compile_defined(self, ctx):
         ctx.emit(consts.DEFINED_GLOBAL, ctx.create_symbol_const(self.name))
 
+    def compile_constraint(self, ctx):
+        ctx.emit(consts.LOAD_GLOBAL_CONSTRAINT, ctx.create_symbol_const(self.name))
+
 
 class InstanceVariable(Node):
     def __init__(self, name):
@@ -1025,8 +1029,8 @@ class InstanceVariable(Node):
 
     def compile_constraint(self, ctx):
         self.compile_receiver(ctx)
-        ConstantString(self.name).compile(ctx)
-        ctx.emit(consts.BUILD_SEXPR, 2)
+        ctx.emit(consts.LOAD_INSTANCE_VAR_CONSTRAINT,
+                 ctx.create_symbol_const(self.name))
 
     def compile_receiver(self, ctx):
         ctx.emit(consts.LOAD_SELF)
@@ -1052,6 +1056,12 @@ class ClassVariable(Node):
         with ctx.set_lineno(self.lineno):
             self.compile_receiver(ctx)
             self.compile_load(ctx)
+
+    def compile_constraint(self, ctx):
+        with ctx.set_lineno(self.lineno):
+            self.compile_receiver(ctx)
+            ctx.emit(consts.LOAD_CLASS_VAR_CONSTRAINT,
+                     ctx.create_symbol_const(self.name))
 
     def compile_receiver(self, ctx):
         ctx.emit(consts.LOAD_SCOPE)

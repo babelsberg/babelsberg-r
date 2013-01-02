@@ -182,6 +182,11 @@ class Interpreter(object):
             frame.cells[idx].advance_time(frame, idx)
         frame.cells[idx].set(frame, idx, frame.peek())
 
+    def LOAD_DEREF_CONSTRAINT(self, space, bytecode, frame, pc, idx):
+        w_obj = (frame.cells[idx].get(frame, idx) or space.w_nil)
+        w_con = space.send(space.w_constraint, space.newsymbol("new"), [w_obj])
+        frame.push(w_con)
+
     def LOAD_CLOSURE(self, space, bytecode, frame, pc, idx):
         frame.push(frame.cells[idx].upgrade_to_closure(frame, idx))
 

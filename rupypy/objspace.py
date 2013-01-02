@@ -127,6 +127,7 @@ class ObjectSpace(object):
         self.w_TypeError = self.getclassfor(W_TypeError)
         self.w_ZeroDivisionError = self.getclassfor(W_ZeroDivisionError)
         self.w_kernel = self.getmoduleobject(Kernel.moduledef)
+        self.w_constraint = self.getclassfor(W_ConstraintObject)
 
         self.w_topaz = self.getmoduleobject(Topaz.moduledef)
 
@@ -145,7 +146,8 @@ class ObjectSpace(object):
 
             self.w_kernel, self.w_topaz,
 
-            self.getclassfor(W_ConstraintObject),
+            self.w_constraint,
+
             self.getclassfor(W_NilObject),
             self.getclassfor(W_TrueObject),
             self.getclassfor(W_FalseObject),

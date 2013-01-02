@@ -12,16 +12,16 @@ module Cassowary
 end
 
 module Cassowary
-    module Equalities
-    def cn_equal(expr, strength = Strength::RequiredStrength, weight = 1.0)
+  module Equalities
+    def ==(expr, strength = Strength::RequiredStrength, weight = 1.0)
       cn_equality(LinearEquation, self - expr, strength, weight)
     end
 
-    def cn_geq(expr, strength = Strength::RequiredStrength, weight = 1.0)
+    def >=(expr, strength = Strength::RequiredStrength, weight = 1.0)
       cn_equality(LinearInequality, self - expr, strength, weight)
     end
 
-    def cn_leq(expr, strength = Strength::RequiredStrength, weight = 1.0)
+    def <=(expr, strength = Strength::RequiredStrength, weight = 1.0)
       expr = expr.as_linear_expression if expr.is_a?(Numeric)
       cn_equality(LinearInequality, expr - self, strength, weight)
     end
