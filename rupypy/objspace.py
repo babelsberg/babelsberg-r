@@ -49,7 +49,7 @@ from rupypy.objects.integerobject import W_IntegerObject
 from rupypy.objects.intobject import W_FixnumObject
 from rupypy.objects.methodobject import W_MethodObject, W_UnboundMethodObject
 from rupypy.objects.moduleobject import W_ModuleObject
-from rupypy.objects.constraintobject import W_ConstraintObject, W_SexprObject
+from rupypy.objects.constraintobject import W_ConstraintObject, W_ConstraintVariableObject
 from rupypy.objects.nilobject import W_NilObject
 from rupypy.objects.numericobject import W_NumericObject
 from rupypy.objects.objectobject import W_Object, W_BaseObject
@@ -127,7 +127,9 @@ class ObjectSpace(object):
         self.w_TypeError = self.getclassfor(W_TypeError)
         self.w_ZeroDivisionError = self.getclassfor(W_ZeroDivisionError)
         self.w_kernel = self.getmoduleobject(Kernel.moduledef)
+
         self.w_constraint = self.getclassfor(W_ConstraintObject)
+        self.w_constraintvariable = self.getclassfor(W_ConstraintVariableObject)
 
         self.w_topaz = self.getmoduleobject(Topaz.moduledef)
 
@@ -146,7 +148,7 @@ class ObjectSpace(object):
 
             self.w_kernel, self.w_topaz,
 
-            self.w_constraint,
+            self.w_constraint, self.w_constraintvariable,
 
             self.getclassfor(W_NilObject),
             self.getclassfor(W_TrueObject),
@@ -307,9 +309,6 @@ class ObjectSpace(object):
 
     def newstr_fromstrs(self, strs_w):
         return W_StringObject.newstr_fromstrs(self, strs_w)
-
-    def newsexpr(self, items_w):
-        return W_SexprObject(self, items_w)
 
     def newarray(self, items_w):
         return W_ArrayObject(self, items_w)

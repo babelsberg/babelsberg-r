@@ -9,6 +9,7 @@ from rupypy.objects.arrayobject import W_ArrayObject
 from rupypy.objects.blockobject import W_BlockObject
 from rupypy.objects.classobject import W_ClassObject
 from rupypy.objects.codeobject import W_CodeObject
+from rupypy.objects.constraintobject import W_ConstraintVariableObject
 from rupypy.objects.functionobject import W_FunctionObject
 from rupypy.objects.moduleobject import W_ModuleObject
 from rupypy.objects.objectobject import W_Root
@@ -183,9 +184,10 @@ class Interpreter(object):
         frame.cells[idx].set(frame, idx, frame.peek())
 
     def LOAD_DEREF_CONSTRAINT(self, space, bytecode, frame, pc, idx):
+        frame.cells[idx].upgrade_to_closure(frame, idx)
         w_obj = (frame.cells[idx].get(frame, idx) or space.w_nil)
-        w_con = space.send(space.w_constraint, space.newsymbol("new"), [w_obj])
-        frame.push(w_con)
+        w_var = W_ConstraintVariableObject(space, cell=frame.cells[idx])
+        frame.push(w_var)
 
     def LOAD_CLOSURE(self, space, bytecode, frame, pc, idx):
         frame.push(frame.cells[idx].upgrade_to_closure(frame, idx))
