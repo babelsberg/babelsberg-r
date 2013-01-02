@@ -96,14 +96,17 @@ class W_ConstraintVariableObject(W_Object):
     end
 
     def create_variable
-      case value
-      when Numeric
-        v = Cassowary::Variable.new(name: name, value: value)
-        v.solver.add_stay(v)
-        v.outer = self
-        v
+      block = nil
+      value.class.ancestors.each do |klass|
+        block = self.class.variable_handlers[klass]
+        break if block
+      end
+      if block
+        var = block[name, value]
+        var.instance_variable_set("@_constraintvariable", self)
+        var
       else
-        raise NotImplementedError, "no solver for #{value.class}s"
+        raise NotImplementedError, "no solver registered for #{value.class}s"
       end
     end
 
