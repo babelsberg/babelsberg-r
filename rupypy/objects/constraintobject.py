@@ -91,6 +91,7 @@ class W_ConstraintVariableObject(W_Object):
       case value
       when Numeric
         v = Cassowary::Variable.new(name: name, value: value)
+        v.solver.add_stay(v)
         v.outer = self
         v
       else
