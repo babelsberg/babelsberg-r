@@ -76,7 +76,9 @@ def run_specs(binary, prefix=""):
     rubyspec_tests = [
         "language/and_spec.rb",
         "language/array_spec.rb",
+        "language/class_variable_spec.rb",
         "language/match_spec.rb",
+        "language/metaclass_spec.rb",
         "language/module_spec.rb",
         "language/next_spec.rb",
         "language/not_spec.rb",
@@ -92,7 +94,9 @@ def run_specs(binary, prefix=""):
 
         "core/array/allocate_spec.rb",
         "core/array/array_spec.rb",
+        "core/array/at_spec.rb",
         "core/array/empty_spec.rb",
+        "core/array/frozen_spec.rb",
         "core/array/length_spec.rb",
         "core/array/size_spec.rb",
 
