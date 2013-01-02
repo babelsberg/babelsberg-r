@@ -4,6 +4,7 @@ import os
 
 from pypy.rlib import jit
 from pypy.rlib.objectmodel import specialize
+from pypy.rlib.streamio import open_file_as_stream
 from pypy.tool.cache import Cache
 
 from rply.errors import ParsingError
@@ -210,6 +211,18 @@ class ObjectSpace(object):
         self.globals.define_virtual('$"', lambda space: space.w_loaded_features)
 
         self.w_main_thread = W_ThreadObject(self)
+
+        # XXX: load cassowary
+        cassowary_rb = os.path.join(
+            os.path.dirname(__file__),
+            os.path.pardir,
+            "kernel/libcassowary.rb")
+        f = open_file_as_stream(cassowary_rb)
+        try:
+            contents = f.readall()
+        finally:
+            f.close()
+        self.execute(contents, filepath=cassowary_rb)
 
         # TODO: this should really go in a better place.
         self.execute("""
