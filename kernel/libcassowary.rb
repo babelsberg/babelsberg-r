@@ -68,10 +68,6 @@ module Cassowary
         "<CV#0x#{object_id.to_s(16)}>"
       end
     end
-
-    def solver
-      SimplexSolver.instance
-    end
   end
 end
 
