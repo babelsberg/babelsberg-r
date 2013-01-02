@@ -1255,6 +1255,15 @@ module Cassowary
       end
     end
 
+    def external_variables
+      vars = rows.keys.select do |var|
+        var.external?
+      end
+      vars += columns.keys.select do |var|
+        var.external?
+      end
+    end
+
     def substitute_out(old_var, expr)
       col = columns.delete(old_var)
       col.each do |v|
