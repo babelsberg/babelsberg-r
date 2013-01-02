@@ -761,7 +761,8 @@ class Send(BaseSend):
                         "line %d: `constrain:' methods take only one argument" % (self.lineno)
                     )
                 else:
-                    self.args[0].compile_constraint(ctx)
+                    with ctx.compile_constraint():
+                        self.args[0].compile(ctx)
                     symbol = self.method_name_const(ctx)
                     ctx.emit(self.send, symbol, 1)
         else:
@@ -977,7 +978,10 @@ class Variable(Node):
         self.name = name
 
     def compile(self, ctx):
-        ctx.emit(consts.LOAD_DEREF, ctx.symtable.get_cell_num(self.name))
+        if ctx.in_constraint:
+            self.compile_constraint(ctx)
+        else:
+            ctx.emit(consts.LOAD_DEREF, ctx.symtable.get_cell_num(self.name))
 
     def compile_receiver(self, ctx):
         return 0
@@ -1001,7 +1005,10 @@ class Global(Node):
         self.name = name
 
     def compile(self, ctx):
-        ctx.emit(consts.LOAD_GLOBAL, ctx.create_symbol_const(self.name))
+        if ctx.in_constraint:
+            self.compile_constraint(ctx)
+        else:        
+            ctx.emit(consts.LOAD_GLOBAL, ctx.create_symbol_const(self.name))
 
     def compile_receiver(self, ctx):
         return 0
@@ -1028,7 +1035,6 @@ class InstanceVariable(Node):
         self.compile_load(ctx)
 
     def compile_constraint(self, ctx):
-        self.compile_receiver(ctx)
         ctx.emit(consts.LOAD_INSTANCE_VAR_CONSTRAINT,
                  ctx.create_symbol_const(self.name))
 
@@ -1037,7 +1043,10 @@ class InstanceVariable(Node):
         return 1
 
     def compile_load(self, ctx):
-        ctx.emit(consts.LOAD_INSTANCE_VAR, ctx.create_symbol_const(self.name))
+        if ctx.in_constraint:
+            self.compile_constraint(ctx)
+        else:
+            ctx.emit(consts.LOAD_INSTANCE_VAR, ctx.create_symbol_const(self.name))
 
     def compile_store(self, ctx):
         ctx.emit(consts.STORE_INSTANCE_VAR, ctx.create_symbol_const(self.name))
@@ -1058,17 +1067,18 @@ class ClassVariable(Node):
             self.compile_load(ctx)
 
     def compile_constraint(self, ctx):
-        with ctx.set_lineno(self.lineno):
-            self.compile_receiver(ctx)
-            ctx.emit(consts.LOAD_CLASS_VAR_CONSTRAINT,
-                     ctx.create_symbol_const(self.name))
+        ctx.emit(consts.LOAD_CLASS_VAR_CONSTRAINT,
+                 ctx.create_symbol_const(self.name))
 
     def compile_receiver(self, ctx):
         ctx.emit(consts.LOAD_SCOPE)
         return 1
 
     def compile_load(self, ctx):
-        ctx.emit(consts.LOAD_CLASS_VAR, ctx.create_symbol_const(self.name))
+        if ctx.in_constraint:
+            self.compile_constraint(ctx)
+        else:
+            ctx.emit(consts.LOAD_CLASS_VAR, ctx.create_symbol_const(self.name))
 
     def compile_store(self, ctx):
         ctx.emit(consts.STORE_CLASS_VAR, ctx.create_symbol_const(self.name))

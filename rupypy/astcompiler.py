@@ -95,6 +95,7 @@ class CompilerContext(object):
         self.const_positions = {}
         self.current_lineno = -1
         self.last_lineno = -1
+        self.in_constraint = False
 
         self.current_block = self.first_block = self.new_block()
         self.frame_blocks = []
@@ -201,6 +202,9 @@ class CompilerContext(object):
 
     def set_lineno(self, lineno):
         return SetLinenoConextManager(self, lineno)
+
+    def compile_constraint(self):
+        return ConstraintContextManager(self)
 
     def enter_frame_block(self, block_type, block):
         return EnterFrameBlockContextManager(self, block_type, block)
@@ -351,3 +355,13 @@ class EnterFrameBlockContextManager(object):
         block_type, block = self.ctx.frame_blocks.pop()
         assert block_type == self.block_type
         assert block is self.block
+
+class ConstraintContextManager(object):
+    def __init__(self, ctx):
+        self.ctx = ctx
+
+    def __enter__(self):
+        self.ctx.in_constraint = True
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self.ctx.in_constraint = False
