@@ -99,6 +99,10 @@ class W_ConstraintVariableObject(W_Object):
       end
     end
 
+    def ==(other)
+      variable == (other.kind_of?(self.class) ? other.variable : other)
+    end
+
     def method_missing(method, *args, &block)
       if variable.respond_to? method
         args = args.map do |arg|
