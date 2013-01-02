@@ -217,10 +217,9 @@ module Cassowary
     attr_accessor :variable
 
     def initialize(hash = {})
-      hash = {:weight => 1.0}.merge(hash)
       self.variable = hash[:variable]
       self.strength = hash[:strength]
-      self.weight = hash[:weight]
+      self.weight = (hash[:weight] || 1.0)
     end
 
     def expression
