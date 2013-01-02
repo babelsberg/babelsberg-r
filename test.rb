@@ -487,9 +487,23 @@
 
 # puts a
 
+# a = Cassowary::Variable.new name: 'a', value: 1
+# b = Cassowary::Variable.new name: 'b', value: 1
+# s = Cassowary::SimplexSolver.new
+# s.add_constraint a + b == 1
+# puts a.value
+# puts b.value
+
 a = 1
 b = 1
-c  = foo(a + b == 1)
-c  = constrain:(a + b == 1)
-c2 = constrain:(a.area == 1)
-c.enable()
+c  = constrain:(a + b == 5)
+puts c
+puts a
+puts b
+# c2 = constrain:(a.area == 1)
+
+# ary1 = [1, 2, 3]
+# ary2 = []
+# c3 = constrain:(ary1 == ary2) # => ArrayConstraint.== -> idx equal constraints
+
+# c.enable()
