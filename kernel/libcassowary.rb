@@ -68,6 +68,10 @@ module Cassowary
         "<CV#0x#{object_id.to_s(16)}>"
       end
     end
+
+    def solver
+      SimplexSolver.instance
+    end
   end
 end
 
@@ -203,9 +207,7 @@ module Cassowary
     end
 
     def solver
-      solver = SimplexSolver.new
-      solver.auto_solve = false
-      solver
+      SimplexSolver.instance
     end
   end
 end
@@ -587,6 +589,14 @@ module Cassowary
     :error_vars, :auto_solve
 
     Epsilon = 1.0e-8
+
+    def self.instance
+      @instance ||= begin
+                      s = SimplexSolver.new
+                      s.auto_solve = false
+                      s
+                    end
+    end
 
     def add_bounds(var, lower = nil, upper = nil)
       add_constraint(lower <= var) if lower
