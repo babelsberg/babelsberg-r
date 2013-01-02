@@ -21,7 +21,7 @@ class BaseNode(object):
         else:
             raise NotImplementedError(type(self).__name__)
 
-    def compile_fexpr(self, ctx):
+    def compile_constraint(self, ctx):
         if we_are_translated():
             raise NotImplementedError
         else:
@@ -738,16 +738,16 @@ class Send(BaseSend):
         BaseSend.__init__(self, receiver, args, block_arg, lineno)
         self.method = method
 
-    def compile_fexpr(self, ctx):
+    def compile_constraint(self, ctx):
         n_items = 2
-        self.receiver.compile_fexpr(ctx)
-        ConstantString(self.method).compile_fexpr(ctx)
+        self.receiver.compile_constraint(ctx)
+        ConstantString(self.method).compile_constraint(ctx)
         for arg in self.args:
             n_items += 1
-            arg.compile_fexpr(ctx)
+            arg.compile_constraint(ctx)
         if self.block_arg is not None:
             n_items += 1
-            self.block_arg.compile_fexpr(ctx)
+            self.block_arg.compile_constraint(ctx)
         ctx.emit(consts.BUILD_SEXPR, n_items)
 
     def compile(self, ctx):
@@ -761,7 +761,7 @@ class Send(BaseSend):
                         "line %d: `constrain:' methods take only one argument" % (self.lineno)
                     )
                 else:
-                    self.args[0].compile_fexpr(ctx)
+                    self.args[0].compile_constraint(ctx)
                     symbol = self.method_name_const(ctx)
                     ctx.emit(self.send, symbol, 1)
         else:
@@ -991,9 +991,8 @@ class Variable(Node):
     def compile_defined(self, ctx):
         ConstantString("local-variable").compile(ctx)
 
-    def compile_fexpr(self, ctx):
-        ConstantString(self.name).compile(ctx)
-        ctx.emit(consts.BUILD_SEXPR, 1)
+    def compile_constraint(self, ctx):
+        ctx.emit(consts.LOAD_CONSTRAINT_DEREF, 1)
 
 
 class Global(Node):
@@ -1024,7 +1023,7 @@ class InstanceVariable(Node):
         self.compile_receiver(ctx)
         self.compile_load(ctx)
 
-    def compile_fexpr(self, ctx):
+    def compile_constraint(self, ctx):
         self.compile_receiver(ctx)
         ConstantString(self.name).compile(ctx)
         ctx.emit(consts.BUILD_SEXPR, 2)
@@ -1134,7 +1133,7 @@ class ConstantNode(Node):
     def compile(self, ctx):
         ctx.emit(consts.LOAD_CONST, self.create_const(ctx))
 
-    def compile_fexpr(self, ctx):
+    def compile_constraint(self, ctx):
         self.compile(ctx)
 
     def compile_defined(self, ctx):
