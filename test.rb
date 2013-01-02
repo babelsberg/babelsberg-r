@@ -500,6 +500,10 @@ c  = constrain:(a + b == 5)
 puts c
 puts a
 puts b
+c2  = constrain:(a == 3)
+puts c2
+puts a
+puts b
 # c2 = constrain:(a.area == 1)
 
 # ary1 = [1, 2, 3]
