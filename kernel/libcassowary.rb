@@ -1377,17 +1377,12 @@ end
 
 # CassowaryTests.new.test_add_delete1
 
-# RuPyPy constraint integration
-module Cassowary
-  class Variable < AbstractVariable
-    attr_accessor :outer
-
-    def value=(v)
-      @value = v
-      outer.set! if outer
-      v
-    end
+if defined? Topaz && defined? ConstraintVariable
+  ConstraintVariable.for_variables_of_type Numeric do |name, value|
+    v = Cassowary::Variable.new(name: name, value: value)
+    Cassowary::SimplexSolver.instance.add_stay(v)
+    v
   end
 end
 
-puts "Loaded Cassowary"
+puts "Cassowary constraint solver loaded."
