@@ -213,16 +213,16 @@ class ObjectSpace(object):
         self.w_main_thread = W_ThreadObject(self)
 
         # XXX: load cassowary
-        cassowary_rb = os.path.join(
-            os.path.dirname(__file__),
-            os.path.pardir,
-            "kernel/libcassowary.rb")
-        f = open_file_as_stream(cassowary_rb)
-        try:
-            contents = f.readall()
-        finally:
-            f.close()
-        self.execute(contents, filepath=cassowary_rb)
+        # cassowary_rb = os.path.join(
+        #     os.path.dirname(__file__),
+        #     os.path.pardir,
+        #     "kernel/libcassowary.rb")
+        # f = open_file_as_stream(cassowary_rb)
+        # try:
+        #     contents = f.readall()
+        # finally:
+        #     f.close()
+        # self.execute(contents, filepath=cassowary_rb)
 
         # TODO: this should really go in a better place.
         self.execute("""
