@@ -494,17 +494,18 @@
 # puts a.value
 # puts b.value
 
+
+require "libcassowary"
+
 a = 1
 b = 1
-c  = constrain:(a + b == 5)
-puts c
+constrain: a + b == 5
 puts a
 puts b
-c2  = constrain:(a == 3)
-puts c2
+constrain: a == 3
 puts a
 puts b
-# c2 = constrain:(a.area == 1)
+c2 = constrain:(a.area == 1)
 
 # ary1 = [1, 2, 3]
 # ary2 = []
