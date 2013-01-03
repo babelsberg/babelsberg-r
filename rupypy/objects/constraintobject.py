@@ -59,6 +59,7 @@ class W_ConstraintVariableObject(W_Object):
             return space.newstr_fromstr(self.gvar)
         else:
             raise NotImplementedError("inconsistent constraint variable")
+        return space.w_nil
 
     def get_variable(self, space):
         if self.cell:
