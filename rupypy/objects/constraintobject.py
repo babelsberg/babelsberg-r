@@ -37,7 +37,7 @@ class W_ConstraintVariableObject(W_Object):
         elif self.cvar is not None:
             self.w_owner.set_class_var(space, self.cvar, w_value)
         elif self.gvar is not None:
-            space.globas.set(space, self.gvar, w_value)
+            space.globals.set(space, self.gvar, w_value)
         else:
             raise NotImplementedError("inconsistent constraint variable")
 
