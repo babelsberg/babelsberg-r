@@ -6,44 +6,44 @@ from rupypy.utils.cache import Cache
 class W_ConstraintVariableObject(W_Object):
     classdef = ClassDef("ConstraintVariable", W_Object.classdef, filepath=__file__)
 
-    def __init__(self, space, cell=None, owner=None, ivar=None,
+    def __init__(self, space, cell=None, w_owner=None, ivar=None,
                  cvar=None, gvar=None):
         W_Object.__init__(self, space)
         self.cell = cell
-        self.owner = owner
+        self.w_owner = w_owner
         self.ivar = ivar
         self.cvar = cvar
         self.gvar = gvar
-        assert cell or (owner and (ivar or cvar or gvar))
-        self.value = self.get(space)
+        assert cell or (w_owner and (ivar or cvar )) or gvar
+        self.value = self.get_value(space)
 
-    def get(self, space):
+    def get_value(self, space):
         if self.cell:
             return self.cell.get(None, 0) or space.w_nil
         elif self.ivar is not None:
-            return self.owner.find_instance_var(space, self.ivar) or space.w_nil
+            return self.w_owner.find_instance_var(space, self.ivar) or space.w_nil
         elif self.cvar is not None:
-            return self.owner.find_class_var(space, self.cvar) or space.w_nil
+            return self.w_owner.find_class_var(space, self.cvar) or space.w_nil
         elif self.gvar is not None:
-            return space.gvars.get(space, self.gvar) or space.w_nil
+            return space.globals.get(space, self.gvar) or space.w_nil
         else:
             raise NotImplementedError("inconsistent constraint variable")
 
-    def set(self, space, w_value):
+    def set_value(self, space, w_value):
         if self.cell:
             self.cell.set(None, 0, w_value)
         elif self.ivar is not None:
-            self.owner.set_instance_var(space, self.ivar, w_value)
+            self.w_owner.set_instance_var(space, self.ivar, w_value)
         elif self.cvar is not None:
-            self.owner.set_class_var(space, self.cvar, w_value)
+            self.w_owner.set_class_var(space, self.cvar, w_value)
         elif self.gvar is not None:
-            space.gvars.set(space, self.gvar, w_value)
+            space.globas.set(space, self.gvar, w_value)
         else:
             raise NotImplementedError("inconsistent constraint variable")
 
     @classdef.method("value")
     def method_value(self, space):
-        return self.get(space)
+        return self.get_value(space)
 
     @classdef.method("name")
     def method_name(self, space):
@@ -52,11 +52,13 @@ class W_ConstraintVariableObject(W_Object):
                 "local-%s" % space.getclass(self.value).name
             )
         elif self.ivar is not None:
-            self.owner.set_instance_var(space, self.ivar, w_value)
+            return space.newstr_fromstr(self.ivar)
         elif self.cvar is not None:
-            self.owner.set_class_var(space, self.cvar, w_value)
+            return space.newstr_fromstr(self.cvar)
         elif self.gvar is not None:
-            space.gvars.set(space, self.gvar, w_value)
+            return space.newstr_fromstr(self.gvar)
+        else:
+            raise NotImplementedError("inconsistent constraint variable")
 
     def get_variable(self, space):
         if self.cell:
@@ -80,7 +82,8 @@ class W_ConstraintVariableObject(W_Object):
 
     @classdef.method("set_impl")
     def method_set_impl(self, space, w_value):
-        self.set(space, w_value)
+        self.set_value(space, w_value)
+        return w_value
 
     classdef.app_method("""
     def self.variable_handlers
@@ -106,7 +109,7 @@ class W_ConstraintVariableObject(W_Object):
         var.instance_variable_set("@_constraintvariable", self)
         var
       else
-        raise NotImplementedError, "no solver registered for #{value.class}s"
+        raise "no solver registered for #{value.class}s"
       end
     end
 
@@ -152,7 +155,7 @@ class W_ConstraintObject(W_Object):
 
     @classdef.method("satisfy!")
     def method_satisfyb(self, space):
-        pass
+        return space.w_nil
         # XXX: Old code below for limited-domain solver
         # for w_value, cell in self.w_test_block.get_closure_variables():
         #     instances_w = space.listview(space.send(self, space.newsymbol("instances_for"), [w_value]))
