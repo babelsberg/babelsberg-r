@@ -259,6 +259,12 @@ class Interpreter(object):
         else:
             frame.push(space.w_nil)
 
+    def LOAD_INSTANCE_VAR_CONSTRAINT(self, space, bytecode, frame, pc, idx):
+        name = space.symbol_w(bytecode.consts_w[idx])
+        w_obj = frame.pop()
+        w_var = W_ConstraintVariableObject(space, w_owner=w_obj, ivar=name)
+        frame.push(w_var)
+
     def LOAD_CLASS_VAR(self, space, bytecode, frame, pc, idx):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_module = frame.pop()
@@ -286,6 +292,12 @@ class Interpreter(object):
         else:
             frame.push(space.w_nil)
 
+    def LOAD_CLASS_VAR_CONSTRAINT(self, space, bytecode, frame, pc, idx):
+        name = space.symbol_w(bytecode.consts_w[idx])
+        w_obj = frame.pop()
+        w_var = W_ConstraintVariableObject(space, w_owner=w_obj, cvar=name)
+        frame.push(w_var)
+
     def LOAD_GLOBAL(self, space, bytecode, frame, pc, idx):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_value = space.globals.get(space, name) or space.w_nil
@@ -302,6 +314,11 @@ class Interpreter(object):
             frame.push(space.newstr_fromstr("global-variable"))
         else:
             frame.push(space.w_nil)
+
+    def LOAD_GLOBAL_CONSTRAINT(self, space, bytecode, frame, pc, idx):
+        name = space.symbol_w(bytecode.consts_w[idx])
+        w_var = W_ConstraintVariableObject(space, gvar=name)
+        frame.push(w_var)
 
     @jit.unroll_safe
     def BUILD_ARRAY(self, space, bytecode, frame, pc, n_items):
