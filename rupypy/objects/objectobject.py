@@ -153,16 +153,10 @@ class W_RootObject(W_BaseObject):
         w_solver = None
         if space.is_kind_of(w_arg, space.w_array):
             constraints_w = space.listview(w_arg)
-            if not constraints_w:
-                raise space.error(
-                    space.w_ArgumentError,
-                    "no constraints in expression"
-                )
-            else:
-                w_solver = space.send(constraints_w[0], space.newsymbol("solver"))
-                for w_c in constraints_w:
-                    space.send(w_solver, space.newsymbol("add_constraint"), [w_c])
-                space.send(w_solver, space.newsymbol("solve"))
+            w_solver = space.send(constraints_w[0], space.newsymbol("solver"))
+            for w_c in constraints_w:
+                space.send(w_solver, space.newsymbol("add_constraint"), [w_c])
+            space.send(w_solver, space.newsymbol("solve"))
         else:
             w_solver = space.send(w_arg, space.newsymbol("solver"))
             space.send(w_solver, space.newsymbol("add_constraint"), [w_arg])
