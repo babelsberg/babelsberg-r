@@ -47,18 +47,15 @@ class W_ConstraintVariableObject(W_Object):
 
     @classdef.method("name")
     def method_name(self, space):
+        clsname = space.getclass(self.value).name
         if self.cell:
-            return space.newstr_fromstr(
-                "local-%s" % space.getclass(self.value).name
-            )
+            return space.newstr_fromstr("local-%s" % clsname)
         elif self.ivar is not None:
-            return space.newstr_fromstr(self.ivar)
+            return space.newstr_fromstr("ivar-%s" % clsname)
         elif self.cvar is not None:
-            return space.newstr_fromstr(self.cvar)
+            return space.newstr_fromstr("cvar-%s" % clsname)
         elif self.gvar is not None:
-            return space.newstr_fromstr(self.gvar)
-        else:
-            raise NotImplementedError("inconsistent constraint variable")
+            return space.newstr_fromstr("global-%s" % clsname)
         return space.w_nil
 
     def get_variable(self, space):
