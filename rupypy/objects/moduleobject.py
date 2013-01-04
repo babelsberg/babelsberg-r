@@ -54,7 +54,9 @@ class W_ModuleObject(W_RootObject):
         self.methods_w = {}
         self.constants_w = {}
         self.class_variables = CellDict()
+        self.class_variable_constraints = CellDict()
         self.instance_variables = CellDict()
+        self.instance_variable_constraints = CellDict()
         self.included_modules = []
         self.descendants = []
 
@@ -170,6 +172,18 @@ class W_ModuleObject(W_RootObject):
 
     def find_instance_var(self, space, name):
         return self.instance_variables.get(space, name) or space.w_nil
+
+    def set_constraint_var(self, space, name, w_value):
+        return self.instance_variable_constraints.set(space, name, w_value)
+
+    def find_constraint_var(self, space, name):
+        return self.instance_variable_constraints.get(space, name) or space.w_nil
+
+    def set_class_constraint_var(self, space, name, w_value):
+        return self.class_variable_constraints.set(space, name, w_value)
+
+    def find_class_constraint_var(self, space, name):
+        return self.class_variable_constraints.get(space, name) or space.w_nil
 
     def ancestors(self, include_singleton=True, include_self=True):
         if include_self:
