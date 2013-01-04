@@ -651,11 +651,11 @@ class ObjectSpace(object):
 
     def get_constraint_variables(self):
         alive = []
-        for weakref in self.constraint_variables:
-            w_var = weakref()
+        for weak in self.constraint_variables:
+            w_var = weak()
             if w_var:
                 alive.append(w_var)
-        self.constraint_variables = alive
+        self.constraint_variables = [weakref.ref(w_v) for w_v in alive]
         return alive
 
     def ensure_constraints(self):
