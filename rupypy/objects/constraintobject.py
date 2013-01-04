@@ -75,7 +75,7 @@ class W_ConstraintVariableObject(W_Object):
 
     @classdef.method("variable")
     def method_variable(self, space):
-        return get_external_variable(space)
+        return self.get_external_variable(space)
 
     @classdef.method("set!")
     def method_set_i(self, space):
