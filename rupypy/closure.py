@@ -22,7 +22,7 @@ class LocalCell(BaseCell):
         return result
 
     def get_constraint(self):
-        raise RuntimeError("Local cells should not have constraints")
+        return None
 
     def set_constraint(self, w_value):
         raise RuntimeError("Local cells should not have constraints")
