@@ -1380,7 +1380,7 @@ end
 if defined? Topaz && defined? ConstraintVariable
   ConstraintVariable.for_variables_of_type Numeric do |name, value|
     v = Cassowary::Variable.new(name: name, value: value)
-    Cassowary::SimplexSolver.instance.add_stay(v)
+    Cassowary::SimplexSolver.instance.add_edit_var(v, Cassowary::Strength::StrongStrength)
     v
   end
 end
