@@ -177,13 +177,13 @@ class W_ModuleObject(W_RootObject):
         return self.instance_variable_constraints.set(space, name, w_value)
 
     def find_constraint_var(self, space, name):
-        return self.instance_variable_constraints.get(space, name) or space.w_nil
+        return self.instance_variable_constraints.get(space, name)
 
     def set_class_constraint_var(self, space, name, w_value):
         return self.class_variable_constraints.set(space, name, w_value)
 
     def find_class_constraint_var(self, space, name):
-        return self.class_variable_constraints.get(space, name) or space.w_nil
+        return self.class_variable_constraints.get(space, name)
 
     def ancestors(self, include_singleton=True, include_self=True):
         if include_self:
