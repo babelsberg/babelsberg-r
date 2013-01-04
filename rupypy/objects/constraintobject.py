@@ -1,4 +1,4 @@
-from rupypy.module import ClassDef, ModuleDef
+from rupypy.module import ClassDef, Module, ModuleDef
 from rupypy.objects.objectobject import W_Object
 from rupypy.utils.cache import Cache
 
