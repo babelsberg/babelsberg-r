@@ -6,16 +6,24 @@ from rupypy.utils.cache import Cache
 class W_ConstraintVariableObject(W_Object):
     classdef = ClassDef("ConstraintVariable", W_Object.classdef, filepath=__file__)
 
-    def __init__(self, space, cell=None, w_owner=None, ivar=None,
-                 cvar=None, gvar=None):
+    def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None):
         W_Object.__init__(self, space)
-        self.cell = cell
-        self.w_owner = w_owner
-        self.ivar = ivar
-        self.cvar = cvar
-        self.gvar = gvar
-        assert cell or (w_owner and (ivar or cvar )) or gvar
+        self.cell = None
+        self.w_owner = None
+        self.ivar = None
+        self.cvar = None
+        if cell:
+            self.cell = cell
+        elif w_owner and ivar:
+            self.w_owner = w_owner
+            self.ivar = ivar
+        elif w_owner and cvar:
+            self.w_owner = w_owner
+            self.cvar = cvar
+        else:
+            raise RuntimeError("Invalid ConstraintVariableObject initialization")
         self.value = self.get_value(space)
+        self.w_external_variable = space.w_nil
 
     def get_value(self, space):
         if self.cell:
@@ -24,8 +32,6 @@ class W_ConstraintVariableObject(W_Object):
             return self.w_owner.find_instance_var(space, self.ivar) or space.w_nil
         elif self.cvar is not None:
             return self.w_owner.find_class_var(space, self.cvar) or space.w_nil
-        elif self.gvar is not None:
-            return space.globals.get(space, self.gvar) or space.w_nil
         else:
             raise NotImplementedError("inconsistent constraint variable")
 
@@ -36,8 +42,6 @@ class W_ConstraintVariableObject(W_Object):
             self.w_owner.set_instance_var(space, self.ivar, w_value)
         elif self.cvar is not None:
             self.w_owner.set_class_var(space, self.cvar, w_value)
-        elif self.gvar is not None:
-            space.globals.set(space, self.gvar, w_value)
         else:
             raise NotImplementedError("inconsistent constraint variable")
 
@@ -54,29 +58,13 @@ class W_ConstraintVariableObject(W_Object):
             return space.newstr_fromstr("ivar-%s" % clsname)
         elif self.cvar is not None:
             return space.newstr_fromstr("cvar-%s" % clsname)
-        elif self.gvar is not None:
-            return space.newstr_fromstr("global-%s" % clsname)
         return space.w_nil
-
-    def get_variable(self, space):
-        if self.cell:
-            return self.cell.get_constraint()
-        else:
-            raise NotImplementedError("constraints for ivars/cvars/gvars")
-
-    def set_variable(self, space, w_constraint):
-        if self.cell:
-            self.cell.set_constraint(w_constraint)
-        else:
-            raise NotImplementedError("constraints for ivars/cvars/gvars")
 
     @classdef.method("variable")
     def method_variable(self, space):
-        w_constraint = self.get_variable(space)
-        if not w_constraint:
-            w_constraint = space.send(self, space.newsymbol("create_variable"))
-            self.set_variable(space, w_constraint)
-        return w_constraint
+        if not self.w_external_variable:
+            self.w_external_variable = space.send(self, space.newsymbol("create_variable"))
+        return self.w_external_variable
 
     @classdef.method("set_impl")
     def method_set_impl(self, space, w_value):
