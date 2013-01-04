@@ -604,6 +604,7 @@ module Cassowary
       @instance ||= begin
                       s = SimplexSolver.new
                       s.auto_solve = false
+                      s.begin_edit
                       s
                     end
     end
