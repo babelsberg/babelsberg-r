@@ -182,6 +182,7 @@ class FlagNode(StorageNode):
             # Only copy flags that are still set
             w_target.set_flag(space, self.name)
 
+
 class ConstraintVarNode(StorageNode):
     @jit.elidable
     def find_constraint_var(self, space, name):
