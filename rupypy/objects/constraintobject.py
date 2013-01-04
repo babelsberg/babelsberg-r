@@ -55,7 +55,9 @@ class W_ConstraintVariableObject(W_Object):
 
     @classdef.method("suggest_value")
     def method_suggest_value(self, space, w_value):
-        space.send(self.get_external_variable(space), "suggest_value", [w_value])
+        space.send(self.get_external_variable(space),
+                   space.newsymbol("suggest_value"),
+                   [w_value])
         return w_value
 
     @classdef.method("value")
