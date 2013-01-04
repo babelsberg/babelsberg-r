@@ -374,10 +374,10 @@ class ObjectSpace(object):
                 cell.set_constraint(w_var)
             elif w_owner:
                 if ivar:
-                    w_var = w_owner.set_constraint_var(self, ivar, w_var)
+                    w_owner.set_constraint_var(self, ivar, w_var)
                 elif cvar:
                     assert isinstance(w_owner, W_ModuleObject)
-                    w_var = w_owner.set_class_constraint_var(self, cvar, w_var)
+                    w_owner.set_class_constraint_var(self, cvar, w_var)
             return w_var
 
     @jit.unroll_safe
