@@ -349,7 +349,7 @@ class ObjectSpace(object):
     def newproc(self, block, is_lambda=False):
         return W_ProcObject(self, block, is_lambda)
 
-    def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
+    def findconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
         w_var = None
         if cell:
             w_var = cell.get_constraint()
@@ -359,6 +359,10 @@ class ObjectSpace(object):
             elif cvar:
                 assert isinstance(w_owner, W_ModuleObject)
                 w_var = w_owner.find_class_constraint_var(self, cvar)
+        return w_var
+
+    def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
+        w_var = self.findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar)
         if w_var:
             return w_var
         else:
