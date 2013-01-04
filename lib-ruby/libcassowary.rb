@@ -176,15 +176,12 @@ module Cassowary
       "#{super}[#{value.inspect}]"
     end
 
-    def try_add_edit_constraint
-      return if @edit_constraint
-      @edit_constraint = EditConstraint.new variable: self, strength: Strength::StrongStrength
-      SimplexSolver.instance.add_constraint(@edit_constraint)
-    end
-
     def suggest_value(v)
-      try_add_edit_constraint
-      SimplexSolver.instance.suggest_value(self, v)
+      self.value = v
+      if @stay
+        SimplexSolver.instance.remove_constraint(@stay)
+      end
+      @stay = SimplexSolver.instance.add_stay(self)
     end
   end
 end
@@ -604,7 +601,6 @@ module Cassowary
       @instance ||= begin
                       s = SimplexSolver.new
                       s.auto_solve = false
-                      s.begin_edit
                       s
                     end
     end
