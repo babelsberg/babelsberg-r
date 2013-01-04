@@ -347,10 +347,31 @@ class ObjectSpace(object):
     def newproc(self, block, is_lambda=False):
         return W_ProcObject(self, block, is_lambda)
 
-    def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None, gvar=None):
-        return W_ConstraintVariableObject(
-            cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar, gvar=gvar
-        )
+    def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
+        w_var = None
+        if cell:
+            w_var = cell.get_constraint()
+        elif w_owner:
+            if ivar:
+                w_var = w_owner.find_constraint_var(self, ivar)
+            elif cvar:
+                assert isinstance(w_owner, W_ModuleObject)
+                w_var = w_owner.find_class_constraint_var(self, cvar)
+        if w_var:
+            return w_var
+        else:
+            w_var = W_ConstraintVariableObject(
+                cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar
+            )
+            if cell:
+                cell.set_constraint(w_var)
+            elif w_owner:
+                if ivar:
+                    w_var = w_owner.set_constraint_var(self, ivar, w_var)
+                elif cvar:
+                    assert isinstance(w_owner, W_ModuleObject)
+                    w_var = w_owner.set_class_constraint_var(self, cvar, w_var)
+            return w_var
 
     @jit.unroll_safe
     def newbinding_fromframe(self, frame):
