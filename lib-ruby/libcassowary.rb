@@ -129,7 +129,7 @@ module Cassowary
 
     attr_accessor :value
 
-    def initialize(hash)
+    def initialize(hash = {})
       super
       self.value = hash[:value]
     end
