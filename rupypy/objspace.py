@@ -363,7 +363,7 @@ class ObjectSpace(object):
             return w_var
         else:
             w_var = W_ConstraintVariableObject(
-                cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar
+                self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar
             )
             self.constraint_variables.append(weakref.ref(w_var))
             if cell:
