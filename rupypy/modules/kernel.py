@@ -259,6 +259,7 @@ class Kernel(Module):
         w_dup = space.send(space.getnonsingletonclass(self), space.newsymbol("allocate"))
         w_dup.copy_instance_vars(space, self)
         w_dup.copy_flags(space, self)
+        w_dup.copy_constraint_vars(space, self)
         w_dup.unset_flag(space, "frozen?")
         space.send(w_dup, space.newsymbol("initialize_dup"), [self])
         return w_dup
@@ -272,6 +273,7 @@ class Kernel(Module):
         w_dup = space.send(space.getnonsingletonclass(self), space.newsymbol("allocate"))
         w_dup.copy_instance_vars(space, self)
         w_dup.copy_flags(space, self)
+        w_dup.copy_constraint_vars(space, self)
         w_dup.copy_singletonclass(space, space.getsingletonclass(self))
         space.send(w_dup, space.newsymbol("initialize_clone"), [self])
         return w_dup

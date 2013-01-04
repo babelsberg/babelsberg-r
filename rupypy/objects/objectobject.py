@@ -267,3 +267,19 @@ class W_Object(W_RootObject):
     def copy_flags(self, space, w_other):
         assert isinstance(w_other, W_Object)
         w_other.map.copy_flags(space, w_other, self)
+
+    def find_constraint_var(self, space, name):
+        idx = jit.promote(self.map).find_constraint_var(space, name)
+        if idx == -1:
+            return None
+        return self.storage[idx]
+
+    def set_constraint_var(self, space, name, w_value):
+        idx = jit.promote(self.map).find_constraint_var(space, name)
+        if idx == -1:
+            self.map.add_constraint_var(space, self, name)
+        self.storage[idx] = w_value
+
+    def copy_constraint_vars(self, space, w_other):
+        assert isinstance(w_other, W_Object)
+        w_other.map.copy_constraint_vars(space, w_other, self)
