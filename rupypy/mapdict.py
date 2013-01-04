@@ -75,6 +75,9 @@ class ClassNode(BaseNode):
     def find_flag(self, space, name):
         return -1
 
+    def find_constraint_var(self, space, name):
+        return -1
+
     def change_class(self, space, w_cls):
         return space.fromcache(MapTransitionCache).get_class_node(w_cls)
 
