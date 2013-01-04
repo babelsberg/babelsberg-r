@@ -96,6 +96,9 @@ class ClassNode(BaseNode):
     def copy_flags(self, space, w_obj, w_target):
         pass
 
+    def copy_constraint_vars(self, space, w_obj, w_target):
+        pass
+
 
 class StorageNode(BaseNode):
     _immutable_fields_ = ["prev", "name", "pos"]
