@@ -174,6 +174,7 @@ class Interpreter(object):
 
     def STORE_DEREF(self, space, bytecode, frame, pc, idx):
         frame.cells[idx].set(frame, idx, frame.peek())
+        space.ensure_constraints()
 
     def LOAD_DEREF_CONSTRAINT(self, space, bytecode, frame, pc, idx):
         frame.cells[idx].upgrade_to_closure(frame, idx)
@@ -241,6 +242,7 @@ class Interpreter(object):
         w_value = frame.pop()
         w_obj = frame.pop()
         space.set_instance_var(w_obj, space.symbol_w(w_name), w_value)
+        space.ensure_constraints()
         frame.push(w_value)
 
     def DEFINED_INSTANCE_VAR(self, space, bytecode, frame, pc, idx):
@@ -274,6 +276,7 @@ class Interpreter(object):
         w_module = frame.pop()
         assert isinstance(w_module, W_ModuleObject)
         space.set_class_var(w_module, name, w_value)
+        space.ensure_constraints()
         frame.push(w_value)
 
     def DEFINED_CLASS_VAR(self, space, bytecode, frame, pc, idx):
