@@ -1,6 +1,7 @@
 from __future__ import absolute_import
 
 import os
+import weakref
 
 from pypy.rlib import jit
 from pypy.rlib.objectmodel import specialize
@@ -50,7 +51,7 @@ from rupypy.objects.integerobject import W_IntegerObject
 from rupypy.objects.intobject import W_FixnumObject
 from rupypy.objects.methodobject import W_MethodObject, W_UnboundMethodObject
 from rupypy.objects.moduleobject import W_ModuleObject
-from rupypy.objects.constraintobject import W_ConstraintObject, W_ConstraintVariableObject
+from rupypy.objects.constraintobject import W_ConstraintVariableObject, Constraints
 from rupypy.objects.nilobject import W_NilObject
 from rupypy.objects.numericobject import W_NumericObject
 from rupypy.objects.objectobject import W_Object, W_BaseObject
@@ -83,7 +84,8 @@ class ObjectSpace(object):
         self.exit_handlers_w = []
 
         self.executing_constraints = [False]
-        self.constraints = []
+        self.constraint_variables = []
+        self.constraint_solvers = []
 
         self.w_true = W_TrueObject(self)
         self.w_false = W_FalseObject(self)
@@ -129,8 +131,8 @@ class ObjectSpace(object):
         self.w_ZeroDivisionError = self.getclassfor(W_ZeroDivisionError)
         self.w_kernel = self.getmoduleobject(Kernel.moduledef)
 
-        self.w_constraint = self.getclassfor(W_ConstraintObject)
         self.w_constraintvariable = self.getclassfor(W_ConstraintVariableObject)
+        self.w_constraints = self.getmoduleobject(Constraints.moduledef)
 
         self.w_topaz = self.getmoduleobject(Topaz.moduledef)
 
@@ -149,7 +151,7 @@ class ObjectSpace(object):
 
             self.w_kernel, self.w_topaz,
 
-            self.w_constraint, self.w_constraintvariable,
+            self.w_constraints, self.w_constraintvariable,
 
             self.getclassfor(W_NilObject),
             self.getclassfor(W_TrueObject),
@@ -363,6 +365,7 @@ class ObjectSpace(object):
             w_var = W_ConstraintVariableObject(
                 cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar
             )
+            self.constraint_variables.append(weakref.ref(w_var))
             if cell:
                 cell.set_constraint(w_var)
             elif w_owner:
@@ -628,57 +631,37 @@ class ObjectSpace(object):
             self.int_w(self.send(w_obj, self.newsymbol("__id__")))
         )
 
-    def add_constraint(self, w_constraint):
-        priority = w_constraint.get_priority()
-        # Add in front
-        if len(self.constraints) == 0 or self.constraints[0][0] > priority:
-            self.constraints.insert(0, (priority, [w_constraint]))
-            return self.w_true
-        # Add at end
-        elif self.constraints[-1][0] < priority:
-            self.constraints.append((priority, [w_constraint]))
-            return self.w_true
-        # Add in the middle
+    def add_constraint_solver(self, w_solver):
+        if not w_solver in self.constraint_solvers:
+            self.constraint_solvers.append(w_solver)
+            return True
         else:
-            for idx, (prio, priorityqueue) in enumerate(self.constraints):
-                if prio > priority:
-                    self.constraints.insert(idx, (priority, [w_constraint]))
-                    return self.w_true
-                elif prio == priority:
-                    if w_constraint not in priorityqueue:
-                        priorityqueue.append(w_constraint)
-                        return self.w_true
-                    else:
-                        return self.w_false
-        raise NotImplementedError("should not reach here")
+            return False
 
-    def remove_constraint(self, w_constraint):
-        for prio, priorityqueue in self.constraints:
-            if prio == w_constraint.get_priority():
-                try:
-                    priorityqueue.remove(w_constraint)
-                    return self.w_true
-                except ValueError:
-                    return self.w_false
-        return self.w_false
+    def remove_constraint_solver(self, w_solver):
+        if w_solver in self.constraint_solvers:
+            self.constraint_solvers.remove(w_solver)
+            return True
+        else:
+            return False
+
+    def get_constraint_variables(self):
+        alive = []
+        for weakref in self.constraint_variables:
+            w_var = weakref()
+            if w_var:
+                alive.append(w_var)
+        self.constraint_variables = alive
+        return alive
 
     def ensure_constraints(self):
         if self.is_executing_constraints():
             return
         self.set_executing_constraints(True)
-        # Execute from low to high priority
-        for prio, priorityqueue in self.constraints:
-            for w_constraint in priorityqueue:
-                if not self.is_true(self.send(w_constraint, self.newsymbol("satisfied?"))):
-                    self.send(w_constraint, self.newsymbol("satisfy!"))
-                if not self.is_true(self.send(w_constraint, self.newsymbol("satisfied?"))):
-                    self.set_executing_constraints(False)
-                    raise self.error(
-                        self.w_RuntimeError,
-                        "inconsistent constraint %s" % self.str_w(self.send(
-                            w_constraint, self.newsymbol("inspect")
-                        ))
-                    )
+        for w_solver in self.constraint_solvers:
+            self.send(w_solver, self.newsymbol("solve"))
+        for w_var in self.get_constraint_variables():
+            self.send(w_var, self.newsymbol("set!"))
         self.set_executing_constraints(False)
 
     def is_executing_constraints(self):
