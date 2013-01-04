@@ -495,17 +495,63 @@
 # puts b.value
 
 
-require "libcassowary"
+require File.expand_path("../lib-ruby/libcassowary.rb", __FILE__)
+
+# def constrain:(constraint)
+#   constraint
+# end
 
 a = 1
-b = 1
-constrain: a + b == 5
+@a = 2
+@@b = 1
+
+constrain: a + @@b == 10
 puts a
-puts b
-constrain: a == 3
+puts @a
+puts @@b
+constrain: @@b == @a * 2
 puts a
-puts b
-c2 = constrain:(a.area == 1)
+puts @a
+puts @@b
+constrain: @a <= 1
+puts a
+puts @a
+puts @@b
+
+# constrain: b == 4
+# puts a
+# puts @a
+# puts b
+
+class Point
+  attr_reader :x, :y
+
+  def initialize(x, y)
+    @x = x
+    @y = y
+    constrain: @x >= 0
+    constrain: @y >= 0
+    constrain: @x < 640
+    constrain: @y < 480
+  end
+
+  Constraints.for_variables_of_type Point do |name, value|
+    Cassowary::Variable.new value: x
+    Cassowary::Variable.new value: y
+  end
+end
+
+class HorizontalLine
+  attr_reader :start, :end
+
+  def initialize(pt1, pt2)
+    @start = pt1
+    @end = pt2
+    constrain: pt1.y == pt2.y
+  end
+end
+
+# c2 = constrain:(a.area == 1)
 
 # ary1 = [1, 2, 3]
 # ary2 = []
