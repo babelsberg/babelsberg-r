@@ -1384,7 +1384,7 @@ end
 
 # CassowaryTests.new.test_add_delete1
 
-if defined? Topaz && defined? ConstraintVariable
+if defined?(Topaz) && defined?(Constraints)
   Constraints.for_variables_of_type Numeric do |name, value|
     v = Cassowary::Variable.new(name: name, value: value)
     v.suggest_value(value)
