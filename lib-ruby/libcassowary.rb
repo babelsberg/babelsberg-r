@@ -175,6 +175,17 @@ module Cassowary
     def inspect
       "#{super}[#{value.inspect}]"
     end
+
+    def try_add_edit_constraint
+      return if @edit_constraint
+      @edit_constraint = EditConstraint.new variable: self, strength: Strength::StrongStrength
+      SimplexSolver.instance.add_constraint(@edit_constraint)
+    end
+
+    def suggest_value(v)
+      try_add_edit_constraint
+      SimplexSolver.instance.suggest_value(self, v)
+    end
   end
 end
 
@@ -202,8 +213,12 @@ module Cassowary
       false
     end
 
-    def solver
-      SimplexSolver.instance
+    def enable
+      SimplexSolver.instance.add_constraint(self)
+    end
+
+    def disable
+      SimplexSolver.instance.remove_constraint(self)
     end
   end
 end
@@ -1255,15 +1270,6 @@ module Cassowary
       end
     end
 
-    def external_variables
-      vars = rows.keys.select do |var|
-        var.external?
-      end
-      vars += columns.keys.select do |var|
-        var.external?
-      end
-    end
-
     def substitute_out(old_var, expr)
       col = columns.delete(old_var)
       col.each do |v|
@@ -1378,11 +1384,12 @@ end
 # CassowaryTests.new.test_add_delete1
 
 if defined? Topaz && defined? ConstraintVariable
-  ConstraintVariable.for_variables_of_type Numeric do |name, value|
+  Constraints.for_variables_of_type Numeric do |name, value|
     v = Cassowary::Variable.new(name: name, value: value)
-    Cassowary::SimplexSolver.instance.add_edit_var(v, Cassowary::Strength::StrongStrength)
+    v.suggest_value(value)
     v
   end
+  Constraints.register_solver Cassowary::SimplexSolver.instance
 end
 
 puts "Cassowary constraint solver loaded."
