@@ -1,4 +1,4 @@
-from rupypy.module import ClassDef
+from rupypy.module import ClassDef, ModuleDef
 from rupypy.objects.objectobject import W_Object
 from rupypy.utils.cache import Cache
 
@@ -22,10 +22,13 @@ class W_ConstraintVariableObject(W_Object):
             self.cvar = cvar
         else:
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
-        self.value = self.get_value(space)
         self.w_external_variable = space.w_nil
 
-    def get_value(self, space):
+    def __del__(self):
+        # TODO: remove external variable from solver
+        pass
+
+    def load_value(self, space):
         if self.cell:
             return self.cell.get(None, 0) or space.w_nil
         elif self.ivar is not None:
@@ -35,7 +38,7 @@ class W_ConstraintVariableObject(W_Object):
         else:
             raise NotImplementedError("inconsistent constraint variable")
 
-    def set_value(self, space, w_value):
+    def store_value(self, space, w_value):
         if self.cell:
             self.cell.set(None, 0, w_value)
         elif self.ivar is not None:
@@ -45,13 +48,23 @@ class W_ConstraintVariableObject(W_Object):
         else:
             raise NotImplementedError("inconsistent constraint variable")
 
+    def get_external_variable(self, space):
+        if self.w_external_variable is space.w_nil:
+            self.w_external_variable = space.send(self, space.newsymbol("create_variable"))
+        return self.w_external_variable
+
+    @classdef.method("suggest_value")
+    def method_suggest_value(self, space, w_value):
+        space.send(self.get_external_variable(space), "suggest_value", [w_value])
+        return w_value
+
     @classdef.method("value")
     def method_value(self, space):
-        return self.get_value(space)
+        return self.load_value(space)
 
     @classdef.method("name")
     def method_name(self, space):
-        clsname = space.getclass(self.value).name
+        clsname = space.getclass(self.load_value(space)).name
         if self.cell:
             return space.newstr_fromstr("local-%s" % clsname)
         elif self.ivar is not None:
@@ -62,38 +75,24 @@ class W_ConstraintVariableObject(W_Object):
 
     @classdef.method("variable")
     def method_variable(self, space):
-        if not self.w_external_variable:
-            self.w_external_variable = space.send(self, space.newsymbol("create_variable"))
-        return self.w_external_variable
+        return get_external_variable(space)
 
-    @classdef.method("set_impl")
-    def method_set_impl(self, space, w_value):
-        self.set_value(space, w_value)
+    @classdef.method("set!")
+    def method_set_i(self, space):
+        w_evar = self.get_external_variable(space)
+        w_value = space.send(w_evar, space.newsymbol("value"))
+        self.store_value(space, w_value)
         return w_value
 
     classdef.app_method("""
-    def self.variable_handlers
-      @variable_handlers ||= {}
-    end
-
-    def self.for_variables_of_type(klass, &block)
-      variable_handlers[klass] = block
-    end
-
-    def set!
-      set_impl(variable.value)
-    end
-
     def create_variable
       block = nil
       value.class.ancestors.each do |klass|
-        block = self.class.variable_handlers[klass]
+        block = Constraints.variable_handlers[klass]
         break if block
       end
       if block
-        var = block[name, value]
-        var.instance_variable_set("@_constraintvariable", self)
-        var
+        return block[name, value]
       else
         raise "no solver registered for #{value.class}s"
       end
@@ -116,77 +115,23 @@ class W_ConstraintVariableObject(W_Object):
     """)
 
 
-class W_ConstraintObject(W_Object):
-    classdef = ClassDef("Constraint", W_Object.classdef, filepath=__file__)
+class Constraints(Module):
+    moduledef = ModuleDef("Constraints", filepath=__file__)
 
-    def __init__(self, space, priority, w_test_block):
-        W_Object.__init__(self, space)
-        self.priority = priority
-        self.w_test_block = w_test_block
+    moduledef.app_method("""
+    def self.variable_handlers
+      @variable_handlers ||= {}
+    end
 
-    def get_priority(self):
-        return self.priority
-
-    @classdef.method("inspect")
-    def method_inspect(self, space):
-        return space.newstr_fromstr("#<%s:0x%x priority:%d>" % (
-            space.str_w(space.send(space.getclass(self), space.newsymbol("name"))),
-            space.int_w(space.send(self, space.newsymbol("__id__"))),
-            self.priority
-        ))
-
-    @classdef.method("satisfied?")
-    def method_satisfiedp(self, space):
-        return space.invoke_block(self.w_test_block, [])
-
-    @classdef.method("satisfy!")
-    def method_satisfyb(self, space):
-        return space.w_nil
-        # XXX: Old code below for limited-domain solver
-        # for w_value, cell in self.w_test_block.get_closure_variables():
-        #     instances_w = space.listview(space.send(self, space.newsymbol("instances_for"), [w_value]))
-        #     for w_obj in instances_w:
-        #         # cell is closure cell, so not stored in frame, indices are meaningless
-        #         cell.set(0, 0, w_obj)
-        #         if space.is_true(space.invoke_block(self.w_test_block, [])):
-        #             return self.w_true
-        #     # cell is closure cell, so not stored in frame, indices are meaningless
-        #     cell.set(0, 0, w_value)
-        # raise space.error(
-        #     space.w_RuntimeError,
-        #     "unsatisfiable constraint %s" % space.str_w(space.send(
-        #             self, space.newsymbol("inspect")
-        #     ))
-        # )
-
-    classdef.app_method("""
-    def instances_for(object)
-      instances = []
-      ObjectSpace.each_object(object.class) do |o|
-        instances << o
-      end
-      instances
+    def self.for_variables_of_type(klass, &block)
+      variable_handlers[klass] = block
     end
     """)
 
-    @classdef.method("priority")
-    def method_priority(self, space):
-        return space.newint(self.priority)
+    @moduledef.function("register_solver")
+    def method_register_solver(self, space, w_solver):
+        return space.newbool(space.add_constraint_solver(w_solver))
 
-    @classdef.method("enable")
-    def method_constraint(self, space):
-        return space.add_constraint(self)
-
-    @classdef.method("disable")
-    def method_constraint(self, space):
-        return space.remove_constraint(self)
-
-    @classdef.singleton_method("new", priority="int")
-    def method_new(self, space, priority, block):
-        w_obj = W_ConstraintObject(space, priority, block)
-        space.send(w_obj, space.newsymbol("initialize"))
-        return w_obj
-
-    @classdef.singleton_method("allocate")
-    def method_allocate(self, space):
-        raise space.error(space.w_TypeError, "no allocator for Constraints. Use .new")
+    @moduledef.function("deregister_solver")
+    def method_deregister_solver(self, space, w_solver):
+        return space.newbool(space.remove_constraint_solver(w_solver))
