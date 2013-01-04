@@ -993,10 +993,7 @@ class Global(Node):
         self.name = name
 
     def compile(self, ctx):
-        if ctx.in_constraint:
-            self.compile_constraint(ctx)
-        else:
-            ctx.emit(consts.LOAD_GLOBAL, ctx.create_symbol_const(self.name))
+        ctx.emit(consts.LOAD_GLOBAL, ctx.create_symbol_const(self.name))
 
     def compile_receiver(self, ctx):
         return 0
@@ -1009,9 +1006,6 @@ class Global(Node):
 
     def compile_defined(self, ctx):
         ctx.emit(consts.DEFINED_GLOBAL, ctx.create_symbol_const(self.name))
-
-    def compile_constraint(self, ctx):
-        ctx.emit(consts.LOAD_GLOBAL_CONSTRAINT, ctx.create_symbol_const(self.name))
 
 
 class InstanceVariable(Node):

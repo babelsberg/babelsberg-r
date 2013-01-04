@@ -319,11 +319,6 @@ class Interpreter(object):
         else:
             frame.push(space.w_nil)
 
-    def LOAD_GLOBAL_CONSTRAINT(self, space, bytecode, frame, pc, idx):
-        name = space.symbol_w(bytecode.consts_w[idx])
-        w_var = space.newconstraintvariable(gvar=name)
-        frame.push(w_var)
-
     @jit.unroll_safe
     def BUILD_ARRAY(self, space, bytecode, frame, pc, n_items):
         items_w = frame.popitemsreverse(n_items)
