@@ -513,7 +513,7 @@ class Interpreter(object):
         assert isinstance(w_block, W_BlockObject)
         w_res = space.invoke_constraint_block(w_block)
         frame.push(w_res)
-        self.SEND(self, space, bytecode, frame, pc, meth_idx, 1)
+        self.SEND(space, bytecode, frame, pc, meth_idx, 1)
 
     def SEND_SPLAT(self, space, bytecode, frame, pc, meth_idx):
         args_w = space.listview(frame.pop())
