@@ -19,13 +19,6 @@ from rupypy.scope import StaticScope
 
 
 class ConstraintInterpreter(Interpreter):
-    jitdriver = jit.JitDriver(
-        greens=["pc", "bytecode", "block_bytecode", "w_trace_proc"],
-        reds=["self", "frame"],
-        virtualizables=["frame"],
-        get_printable_location=get_printable_location,
-    )
-
     def LOAD_DEREF(self, space, bytecode, frame, pc, idx):
         frame.cells[idx].upgrade_to_closure(frame, idx)
         w_obj = (frame.cells[idx].get(frame, idx) or space.w_nil)
