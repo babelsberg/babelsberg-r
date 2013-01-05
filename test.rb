@@ -501,32 +501,28 @@ require File.expand_path("../lib-ruby/libcassowary.rb", __FILE__)
 #   constraint
 # end
 
-a = 1
-@a = 2
-@@b = 1
-
+a = @a = @@b = 2
+puts a, @a, @@b
 constrain: { a + @@b == 10 }
-puts a
-puts @a
-puts @@b
+puts a, @a, @@b
 constrain: { @@b == @a * 2 }
-puts a
-puts @a
-puts @@b
-constrain: { @a <= 1 }
-puts a
-puts @a
-puts @@b
+puts a, @a, @@b
+constrain: { @a > 1 }
+puts a, @a, @@b
+# @a = 5
+constrain: { @a == 5 }
+puts a, @a, @@b
 
-@a = 0
-b = 0
-
-puts a
-puts @a
-puts b
 
 class Point
-  attr_reader :x, :y
+  # attr_reader :x, :y
+  def x
+    @x
+  end
+
+  def y
+    @y
+  end
 
   def initialize(x, y)
     @x = x
@@ -555,7 +551,14 @@ puts a
 puts b
 
 class HorizontalLine
-  attr_reader :start, :end
+  # attr_reader :start, :end
+  def start
+    @start
+  end
+
+  def end
+    @end
+  end
 
   def initialize(pt1, pt2)
     @start = pt1
@@ -569,5 +572,7 @@ class HorizontalLine
   alias inspect to_s
 end
 
-h = HorizontalLine.new(Point.new(1,1), Point.new(2,2))
+h = HorizontalLine.new(Point.new(1, 1), Point.new(2, 2))
+puts h
+constrain: { h.start.x == h.end.x }
 puts h
