@@ -384,6 +384,10 @@ class ObjectSpace(object):
             w_var = W_ConstraintVariableObject(
                 self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar
             )
+            if not w_var.get_external_variable(self):
+                # No constraint solver variable available for this object
+                return None
+
             self.constraint_variables.append(weakref.ref(w_var))
             if cell:
                 cell.set_constraint(w_var)
@@ -508,6 +512,14 @@ class ObjectSpace(object):
         raw_method = w_cls.find_method(self, name)
         return self._send_raw(w_method, raw_method, w_receiver, w_cls, args_w, block)
 
+    def send_no_constraint(self, w_receiver, w_method, args_w=None, block=None):
+        previous = self.creating_constraint
+        try:
+            self.creating_constraint = False
+            return self.send(w_receiver, w_method, args_w, block)
+        finally:
+            self.creating_constraint = previous
+
     def send_super(self, w_cls, w_receiver, w_method, args_w, block=None):
         name = self.symbol_w(w_method)
         raw_method = w_cls.find_method_super(self, name)
@@ -564,6 +576,14 @@ class ObjectSpace(object):
             frame.cells[len(bc.cellvars) + idx] = cell
         with self.getexecutioncontext().visit_frame(frame):
             return self.execute_constraint_frame(frame, bc)
+
+    def invoke_non_constraint_block(self, block, args_w):
+        previous = self.creating_constraint
+        try:
+            self.creating_constraint = False
+            return self.invoke_block(block, args_w)
+        finally:
+            self.creating_constraint = previous
 
     def invoke_function(self, w_function, w_receiver, args_w, block):
         w_name = self.newstr_fromstr(w_function.name)

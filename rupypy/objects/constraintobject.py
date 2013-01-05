@@ -1,5 +1,7 @@
 from rupypy.module import ClassDef, Module, ModuleDef
+from rupypy.objects.hashobject import W_HashObject
 from rupypy.objects.objectobject import W_Object
+from rupypy.objects.procobject import W_ProcObject
 from rupypy.utils.cache import Cache
 
 
@@ -22,7 +24,7 @@ class W_ConstraintVariableObject(W_Object):
             self.cvar = cvar
         else:
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
-        self.w_external_variable = space.w_nil
+        self.w_external_variable = None
 
     def __del__(self):
         # TODO: remove external variable from solver
@@ -49,9 +51,41 @@ class W_ConstraintVariableObject(W_Object):
             raise NotImplementedError("inconsistent constraint variable")
 
     def get_external_variable(self, space):
-        if self.w_external_variable is space.w_nil:
-            self.w_external_variable = space.send(self, space.newsymbol("create_variable"))
+        if self.w_external_variable is None:
+            w_proc = None
+            w_value = self.load_value(space)
+            w_hash = space.find_instance_var(space.w_constraints, "@variable_handlers")
+            if not isinstance(w_hash, W_HashObject):
+                return None
+            for w_mod in space.getclass(w_value).ancestors(include_singleton=False):
+                try:
+                    w_proc = w_hash.contents[w_mod]
+                except KeyError:
+                    pass
+                if w_proc:
+                    break
+            if w_proc:
+                if not isinstance(w_proc, W_ProcObject):
+                    raise space.error(
+                        space.w_TypeError,
+                        "non-proc in constraint variable handlers"
+                    )
+                else:
+                    self.w_external_variable = space.invoke_non_constraint_block(
+                        w_proc.block,
+                        [self.get_name(space), w_value]
+                    )
         return self.w_external_variable
+
+    def get_name(self, space):
+        clsname = space.getclass(self.load_value(space)).name
+        if self.cell:
+            return space.newstr_fromstr("local-%s" % clsname)
+        elif self.ivar is not None:
+            return space.newstr_fromstr("ivar-%s" % clsname)
+        elif self.cvar is not None:
+            return space.newstr_fromstr("cvar-%s" % clsname)
+        return space.w_nil
 
     @classdef.method("suggest_value")
     def method_suggest_value(self, space, w_value):
@@ -66,14 +100,7 @@ class W_ConstraintVariableObject(W_Object):
 
     @classdef.method("name")
     def method_name(self, space):
-        clsname = space.getclass(self.load_value(space)).name
-        if self.cell:
-            return space.newstr_fromstr("local-%s" % clsname)
-        elif self.ivar is not None:
-            return space.newstr_fromstr("ivar-%s" % clsname)
-        elif self.cvar is not None:
-            return space.newstr_fromstr("cvar-%s" % clsname)
-        return space.w_nil
+        return self.get_name(space)
 
     @classdef.method("variable")
     def method_variable(self, space):
@@ -87,20 +114,6 @@ class W_ConstraintVariableObject(W_Object):
         return w_value
 
     classdef.app_method("""
-    def create_variable
-      block = nil
-      value.class.ancestors.each do |klass|
-        block = Constraints.variable_handlers[klass]
-        break if block
-      end
-      if block
-        return block[name, value]
-      else
-        return value
-        # raise "no solver registered for #{value.class}s"
-      end
-    end
-
     def ==(other)
       variable == (other.kind_of?(self.class) ? other.variable : other)
     end

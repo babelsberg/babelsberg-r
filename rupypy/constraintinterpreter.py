@@ -1,38 +1,43 @@
 from pypy.rlib import jit
-from pypy.rlib.debug import check_nonneg
-from pypy.rlib.objectmodel import we_are_translated, specialize
 
-from rupypy import consts
-from rupypy.error import RubyError
-from rupypy.executioncontext import IntegerWrapper
 from rupypy.interpreter import Interpreter
-from rupypy.objects.arrayobject import W_ArrayObject
-from rupypy.objects.blockobject import W_BlockObject
-from rupypy.objects.classobject import W_ClassObject
-from rupypy.objects.codeobject import W_CodeObject
-from rupypy.objects.functionobject import W_FunctionObject
-from rupypy.objects.moduleobject import W_ModuleObject
-from rupypy.objects.objectobject import W_Root
-from rupypy.objects.procobject import W_ProcObject
-from rupypy.objects.stringobject import W_StringObject
-from rupypy.scope import StaticScope
+from rupypy.objects.constraintobject import W_ConstraintVariableObject
 
 
 class ConstraintInterpreter(Interpreter):
     def LOAD_DEREF(self, space, bytecode, frame, pc, idx):
         frame.cells[idx].upgrade_to_closure(frame, idx)
-        w_obj = (frame.cells[idx].get(frame, idx) or space.w_nil)
-        w_var = space.newconstraintvariable(cell=frame.cells[idx])
-        frame.push(w_var)
+        w_res = space.newconstraintvariable(cell=frame.cells[idx])
+        if w_res is None:
+            w_res = frame.cells[idx].get(frame, idx) or space.w_nil
+        frame.push(w_res)
 
     def LOAD_INSTANCE_VAR(self, space, bytecode, frame, pc, idx):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_obj = frame.pop()
-        w_var = space.newconstraintvariable(w_owner=w_obj, ivar=name)
-        frame.push(w_var)
+        w_res = space.newconstraintvariable(w_owner=w_obj, ivar=name)
+        if w_res is None:
+            w_res = space.find_instance_var(w_obj, space.symbol_w(w_name))
+        frame.push(w_res)
 
     def LOAD_CLASS_VAR(self, space, bytecode, frame, pc, idx):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_obj = frame.pop()
-        w_var = space.newconstraintvariable(w_owner=w_obj, cvar=name)
+        assert isinstance(w_obj, W_ModuleObject)
+        w_res = space.newconstraintvariable(w_owner=w_obj, cvar=name)
+        if w_res is None:
+            w_res = space.find_class_var(w_module, name)
+            if w_res is None:
+                raise space.error(space.w_NameError,
+                    "uninitialized class variable %s in %s" % (name, w_module.name)
+                )
         frame.push(w_var)
+
+    def SEND(self, space, bytecode, frame, pc, meth_idx, num_args):
+        args_w = frame.popitemsreverse(num_args)
+        w_receiver = frame.pop()
+        if isinstance(w_receiver, W_ConstraintVariableObject):
+            w_res = space.send_no_constraint(w_receiver, bytecode.consts_w[meth_idx], args_w)
+        else:
+            w_res = space.send(w_receiver, bytecode.consts_w[meth_idx], args_w)
+        frame.push(w_res)
