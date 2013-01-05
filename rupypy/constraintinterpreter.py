@@ -18,7 +18,7 @@ class ConstraintInterpreter(Interpreter):
         w_obj = frame.pop()
         w_res = space.newconstraintvariable(w_owner=w_obj, ivar=name)
         if w_res is None:
-            w_res = space.find_instance_var(w_obj, space.symbol_w(w_name))
+            w_res = space.find_instance_var(w_obj, name)
         frame.push(w_res)
 
     def LOAD_CLASS_VAR(self, space, bytecode, frame, pc, idx):
@@ -32,7 +32,7 @@ class ConstraintInterpreter(Interpreter):
                 raise space.error(space.w_NameError,
                     "uninitialized class variable %s in %s" % (name, w_module.name)
                 )
-        frame.push(w_var)
+        frame.push(w_res)
 
     def SEND(self, space, bytecode, frame, pc, meth_idx, num_args):
         args_w = frame.popitemsreverse(num_args)
