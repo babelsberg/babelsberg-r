@@ -21,8 +21,17 @@ module Cassowary
       cn_equality(LinearInequality, self - expr, strength, weight)
     end
 
+    def >(expr, strength = Strength::RequiredStrength, weight = 1.0)
+      cn_equality(LinearInequality, self - (expr + 1), strength, weight)
+    end
+
     def <=(expr, strength = Strength::RequiredStrength, weight = 1.0)
       expr = expr.as_linear_expression if expr.is_a?(Numeric)
+      cn_equality(LinearInequality, expr - self, strength, weight)
+    end
+
+    def <(expr, strength = Strength::RequiredStrength, weight = 1.0)
+      expr = expr.is_a?(Numeric) ? (expr - 1).as_linear_expression : (expr - 1)
       cn_equality(LinearInequality, expr - self, strength, weight)
     end
 
