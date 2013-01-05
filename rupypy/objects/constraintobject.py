@@ -96,7 +96,8 @@ class W_ConstraintVariableObject(W_Object):
       if block
         return block[name, value]
       else
-        raise "no solver registered for #{value.class}s"
+        return value
+        # raise "no solver registered for #{value.class}s"
       end
     end
 
