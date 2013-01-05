@@ -179,12 +179,6 @@ class Interpreter(object):
             space.send(w_var, space.newsymbol("suggest_value"), [frame.peek()])
             space.ensure_constraints()
 
-    def LOAD_DEREF_CONSTRAINT(self, space, bytecode, frame, pc, idx):
-        frame.cells[idx].upgrade_to_closure(frame, idx)
-        w_obj = (frame.cells[idx].get(frame, idx) or space.w_nil)
-        w_var = space.newconstraintvariable(cell=frame.cells[idx])
-        frame.push(w_var)
-
     def LOAD_CLOSURE(self, space, bytecode, frame, pc, idx):
         frame.push(frame.cells[idx].upgrade_to_closure(frame, idx))
 
@@ -259,12 +253,6 @@ class Interpreter(object):
         else:
             frame.push(space.w_nil)
 
-    def LOAD_INSTANCE_VAR_CONSTRAINT(self, space, bytecode, frame, pc, idx):
-        name = space.symbol_w(bytecode.consts_w[idx])
-        w_obj = frame.pop()
-        w_var = space.newconstraintvariable(w_owner=w_obj, ivar=name)
-        frame.push(w_var)
-
     def LOAD_CLASS_VAR(self, space, bytecode, frame, pc, idx):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_module = frame.pop()
@@ -295,12 +283,6 @@ class Interpreter(object):
             frame.push(space.newstr_fromstr("class variable"))
         else:
             frame.push(space.w_nil)
-
-    def LOAD_CLASS_VAR_CONSTRAINT(self, space, bytecode, frame, pc, idx):
-        name = space.symbol_w(bytecode.consts_w[idx])
-        w_obj = frame.pop()
-        w_var = space.newconstraintvariable(w_owner=w_obj, cvar=name)
-        frame.push(w_var)
 
     def LOAD_GLOBAL(self, space, bytecode, frame, pc, idx):
         name = space.symbol_w(bytecode.consts_w[idx])

@@ -21,12 +21,6 @@ class BaseNode(object):
         else:
             raise NotImplementedError(type(self).__name__)
 
-    def compile_constraint(self, ctx):
-        if we_are_translated():
-            raise NotImplementedError
-        else:
-            raise NotImplementedError(type(self).__name__)
-
 
 class Node(BaseNode):
     _attrs_ = ["lineno"]
@@ -966,10 +960,7 @@ class Variable(Node):
         self.name = name
 
     def compile(self, ctx):
-        if ctx.in_constraint:
-            self.compile_constraint(ctx)
-        else:
-            ctx.emit(consts.LOAD_DEREF, ctx.symtable.get_cell_num(self.name))
+        ctx.emit(consts.LOAD_DEREF, ctx.symtable.get_cell_num(self.name))
 
     def compile_receiver(self, ctx):
         return 0
@@ -982,10 +973,6 @@ class Variable(Node):
 
     def compile_defined(self, ctx):
         ConstantString("local-variable").compile(ctx)
-
-    def compile_constraint(self, ctx):
-        ctx.emit(consts.LOAD_DEREF_CONSTRAINT,
-                 ctx.symtable.get_cell_num(self.name))
 
 
 class Global(Node):
@@ -1016,19 +1003,12 @@ class InstanceVariable(Node):
         self.compile_receiver(ctx)
         self.compile_load(ctx)
 
-    def compile_constraint(self, ctx):
-        ctx.emit(consts.LOAD_INSTANCE_VAR_CONSTRAINT,
-                 ctx.create_symbol_const(self.name))
-
     def compile_receiver(self, ctx):
         ctx.emit(consts.LOAD_SELF)
         return 1
 
     def compile_load(self, ctx):
-        if ctx.in_constraint:
-            self.compile_constraint(ctx)
-        else:
-            ctx.emit(consts.LOAD_INSTANCE_VAR, ctx.create_symbol_const(self.name))
+        ctx.emit(consts.LOAD_INSTANCE_VAR, ctx.create_symbol_const(self.name))
 
     def compile_store(self, ctx):
         ctx.emit(consts.STORE_INSTANCE_VAR, ctx.create_symbol_const(self.name))
@@ -1048,19 +1028,12 @@ class ClassVariable(Node):
             self.compile_receiver(ctx)
             self.compile_load(ctx)
 
-    def compile_constraint(self, ctx):
-        ctx.emit(consts.LOAD_CLASS_VAR_CONSTRAINT,
-                 ctx.create_symbol_const(self.name))
-
     def compile_receiver(self, ctx):
         ctx.emit(consts.LOAD_SCOPE)
         return 1
 
     def compile_load(self, ctx):
-        if ctx.in_constraint:
-            self.compile_constraint(ctx)
-        else:
-            ctx.emit(consts.LOAD_CLASS_VAR, ctx.create_symbol_const(self.name))
+        ctx.emit(consts.LOAD_CLASS_VAR, ctx.create_symbol_const(self.name))
 
     def compile_store(self, ctx):
         ctx.emit(consts.STORE_CLASS_VAR, ctx.create_symbol_const(self.name))
