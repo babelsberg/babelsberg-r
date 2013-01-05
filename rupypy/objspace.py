@@ -655,7 +655,9 @@ class ObjectSpace(object):
             w_var = weak()
             if w_var:
                 alive.append(w_var)
-        self.constraint_variables[:] = [weakref.ref(w_v) for w_v in alive]
+        self.constraint_variables[0:len(self.constraint_variables)] = []
+        for w_v in alive:
+            self.constraint_variables.append(weakref.ref(w_v))
         return alive
 
     def ensure_constraints(self):
