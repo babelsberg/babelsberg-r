@@ -2,6 +2,7 @@ from pypy.rlib import jit
 
 from rupypy.interpreter import Interpreter
 from rupypy.objects.constraintobject import W_ConstraintVariableObject
+from rupypy.objects.moduleobject import W_ModuleObject
 
 
 class ConstraintInterpreter(Interpreter):
