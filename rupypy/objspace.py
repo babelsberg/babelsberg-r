@@ -13,6 +13,7 @@ from rply.errors import ParsingError
 from rupypy.astcompiler import CompilerContext, SymbolTable
 from rupypy.celldict import GlobalsDict
 from rupypy.closure import ClosureCell
+from rupypy.constraintinterpreter import ConstraintInterpreter
 from rupypy.error import RubyError, print_traceback
 from rupypy.executioncontext import ExecutionContext
 from rupypy.frame import Frame
@@ -83,7 +84,8 @@ class ObjectSpace(object):
         self.bootstrap = True
         self.exit_handlers_w = []
 
-        self.executing_constraints = [False]
+        self.executing_constraints = False
+        self.creating_constraint = False
         self.constraint_variables = []
         self.constraint_solvers = []
 
@@ -274,10 +276,20 @@ class ObjectSpace(object):
         return Frame(jit.promote(bc), w_self, lexical_scope, block, parent_interp, regexp_match_cell)
 
     def execute_frame(self, frame, bc):
-        return Interpreter().interpret(self, frame, bc)
+        if self.creating_constraint:
+            return ConstraintInterpreter().interpret(self, frame, bc)
+        else:
+            return Interpreter().interpret(self, frame, bc)
 
     def execute_constraint_frame(self, frame, bc):
-        return ConstraintInterpreter().interpret(self, frame, bc)
+        if self.creating_constraint:
+            import pdb; pdb.set_trace()
+            raise RuntimeError("nested constraint creation?")
+        try:
+            self.creating_constraint = True
+            return ConstraintInterpreter().interpret(self, frame, bc)
+        finally:
+            self.creating_constraint = False
 
     # Methods for allocating new objects.
 
@@ -677,17 +689,13 @@ class ObjectSpace(object):
         return alive
 
     def ensure_constraints(self):
-        if self.is_executing_constraints():
+        if self.executing_constraints:
             return
-        self.set_executing_constraints(True)
-        for w_solver in self.constraint_solvers:
-            self.send(w_solver, self.newsymbol("solve"))
-        for w_var in self.get_constraint_variables():
-            self.send(w_var, self.newsymbol("set!"))
-        self.set_executing_constraints(False)
-
-    def is_executing_constraints(self):
-        return self.executing_constraints[0]
-
-    def set_executing_constraints(self, value):
-        self.executing_constraints[0] = value
+        try:
+            self.executing_constraints = True
+            for w_solver in self.constraint_solvers:
+                self.send(w_solver, self.newsymbol("solve"))
+            for w_var in self.get_constraint_variables():
+                self.send(w_var, self.newsymbol("set!"))
+        finally:
+            self.executing_constraints = False
