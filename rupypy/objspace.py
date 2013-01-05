@@ -276,6 +276,9 @@ class ObjectSpace(object):
     def execute_frame(self, frame, bc):
         return Interpreter().interpret(self, frame, bc)
 
+    def execute_constraint_frame(self, frame, bc):
+        return ConstraintInterpreter().interpret(self, frame, bc)
+
     # Methods for allocating new objects.
 
     def newbool(self, boolvalue):
@@ -536,6 +539,19 @@ class ObjectSpace(object):
 
         with self.getexecutioncontext().visit_frame(frame):
             return self.execute_frame(frame, bc)
+
+    def invoke_constraint_block(self, block):
+        bc = block.bytecode
+        frame = self.create_frame(
+            bc, w_self=block.w_self, lexical_scope=block.lexical_scope,
+            block=block.block, parent_interp=block.parent_interp,
+            regexp_match_cell=block.regexp_match_cell,
+        )
+        assert len(block.cells) == len(bc.freevars)
+        for idx, cell in enumerate(block.cells):
+            frame.cells[len(bc.cellvars) + idx] = cell
+        with self.getexecutioncontext().visit_frame(frame):
+            return self.execute_constraint_frame(frame, bc)
 
     def invoke_function(self, w_function, w_receiver, args_w, block):
         w_name = self.newstr_fromstr(w_function.name)

@@ -508,6 +508,13 @@ class Interpreter(object):
         w_res = space.send(w_receiver, bytecode.consts_w[meth_idx], args_w, block=w_block)
         frame.push(w_res)
 
+    def SEND_CONSTRAINT(self, space, bytecode, frame, pc, meth_idx):
+        w_block = frame.pop()
+        assert isinstance(w_block, W_BlockObject)
+        w_res = space.invoke_constraint_block(w_block)
+        frame.push(w_res)
+        self.SEND(self, space, bytecode, frame, pc, meth_idx, 1)
+
     def SEND_SPLAT(self, space, bytecode, frame, pc, meth_idx):
         args_w = space.listview(frame.pop())
         w_receiver = frame.pop()
