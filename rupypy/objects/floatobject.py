@@ -25,6 +25,7 @@ class W_FloatObject(W_NumericObject):
     def float_w(self, space):
         return self.floatvalue
 
+    @classdef.method("inspect")
     @classdef.method("to_s")
     def method_to_s(self, space):
         return space.newstr_fromstr(str(self.floatvalue))
