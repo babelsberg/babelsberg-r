@@ -148,11 +148,20 @@ class W_RootObject(W_BaseObject):
     def method_nilp(self, space):
         return space.w_false
 
-    @classdef.method("constrain:")
+    @classdef.method("__constrain__")
     def method_constrain(self, space, block):
-        w_constraint = space.invoke_constraint_block(block)
-        space.send(w_arg, space.newsymbol("enable"))
+        return space.invoke_constraint_block(block)
+
+    @classdef.method("__solve_constraints__")
+    def method_solve_constraints(self, space):
         space.ensure_constraints()
+        return space.w_nil
+
+    @classdef.method("constrain")
+    def method_always(self, space, block):
+        w_arg = space.send(self, space.newsymbol("__constrain__"), block=block)
+        space.send(w_arg, space.newsymbol("enable"))
+        space.send(self, space.newsymbol("__solve_constraints__"))
         return w_arg
 
     @classdef.method("hash")
