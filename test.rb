@@ -497,25 +497,23 @@
 
 require File.expand_path("../lib-ruby/libcassowary.rb", __FILE__)
 
-# def constrain:(constraint)
+# def always(constraint)
 #   constraint
 # end
 
 a = @a = @@b = 2
 puts a, @a, @@b
-constrain: { a + @@b == 10 }
+constrain { a + @@b == 10 }
 puts a, @a, @@b
-constrain: { @@b == @a * 2 }
+constrain { @@b == @a * 2 }
 puts a, @a, @@b
-constrain: { @a > 1 }
+constrain { @a > 1 }
 puts a, @a, @@b
-# @a = 5
-constrain: { @a == 5 }
+constrain { @a == 5 }
 puts a, @a, @@b
 
 
 class Point
-  # attr_reader :x, :y
   def x
     @x
   end
@@ -527,10 +525,10 @@ class Point
   def initialize(x, y)
     @x = x
     @y = y
-    constrain: { @x >= 0 }
-    constrain: { @y >= 0 }
-    constrain: { @x < 640 }
-    constrain: { @y < 480 }
+    constrain { @x >= 0 }
+    constrain { @y >= 0 }
+    constrain { @x < 640 }
+    constrain { @y < 480 }
   end
 
   def to_s
@@ -539,19 +537,18 @@ class Point
   alias inspect to_s
 end
 
-a = Point.new(-1, 10)
-b = Point.new(20, 20)
-puts a
-puts b
-constrain: { a.x == b.x }
-puts a
-puts b
-constrain: { a.x == 5 }
-puts a
-puts b
+pt1 = Point.new(-1, 10)
+pt2 = Point.new(20, 20)
+puts pt1
+puts pt2
+constrain { pt1.x == pt2.x }
+puts pt1
+puts pt2
+constrain { pt1.x == 5 }
+puts pt1
+puts pt2
 
 class HorizontalLine
-  # attr_reader :start, :end
   def start
     @start
   end
@@ -563,7 +560,11 @@ class HorizontalLine
   def initialize(pt1, pt2)
     @start = pt1
     @end = pt2
-    constrain: { pt1.y == pt2.y }
+    constrain { pt1.y == pt2.y }
+  end
+
+  def length
+    @end.x - @start.x
   end
 
   def to_s
@@ -573,6 +574,6 @@ class HorizontalLine
 end
 
 h = HorizontalLine.new(Point.new(1, 1), Point.new(2, 2))
-puts h
-constrain: { h.start.x == h.end.x }
-puts h
+puts h, h.length
+constrain { h.length >= 100 }
+puts h, h.length
