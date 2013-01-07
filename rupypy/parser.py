@@ -351,10 +351,7 @@ class Parser(object):
               }
         """
         # TODO: sym table setup, and useless statement
-        if p[0]:
-            return BoxAST(ast.Main(ast.Block(p[0].getastlist())))
-        else:
-            return BoxAST(ast.Main(ast.Block([ast.Statement(ast.Nil())])))
+        return BoxAST(ast.Main(ast.Block(p[0].getastlist()) if p[0] is not None else ast.Nil()))
 
     @pg.production("top_compstmt : top_stmts opt_terms")
     def top_compstmt(self, p):
