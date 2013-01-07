@@ -362,8 +362,6 @@ class Lexer(object):
                 break
             elif ch.isalnum() or ch == "_":
                 self.add(ch)
-            elif ch == ":" and "".join(self.current_value) == "constrain":
-                self.add(ch)
             else:
                 self.unread()
                 yield self.emit_identifier(command_state)
