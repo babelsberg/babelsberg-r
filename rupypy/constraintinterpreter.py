@@ -39,6 +39,11 @@ class ConstraintInterpreter(Interpreter):
         w_receiver = frame.pop()
         if isinstance(w_receiver, W_ConstraintVariableObject):
             w_res = space.send_no_constraint(w_receiver, bytecode.consts_w[meth_idx], args_w)
+        elif space.is_kind_of(
+                w_receiver,
+                space.find_const(space.find_const(space.w_object, "Cassowary"), "Equalities")):
+            # XXX: Hack to make it just work before I refactor
+            w_res = space.send_no_constraint(w_receiver, bytecode.consts_w[meth_idx], args_w)
         else:
             w_res = space.send(w_receiver, bytecode.consts_w[meth_idx], args_w)
         frame.push(w_res)
