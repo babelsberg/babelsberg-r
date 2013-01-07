@@ -149,7 +149,8 @@ class W_RootObject(W_BaseObject):
         return space.w_false
 
     @classdef.method("constrain:")
-    def method_constrain(self, space, w_arg):
+    def method_constrain(self, space, block):
+        w_constraint = space.invoke_constraint_block(block)
         space.send(w_arg, space.newsymbol("enable"))
         space.ensure_constraints()
         return w_arg

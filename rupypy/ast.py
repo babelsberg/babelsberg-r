@@ -732,23 +732,6 @@ class Send(BaseSend):
         BaseSend.__init__(self, receiver, args, block_arg, lineno)
         self.method = method
 
-    def compile(self, ctx):
-        if self.method.startswith("constrain:"):
-            with ctx.set_lineno(self.lineno):
-                self.receiver.compile(ctx)
-                block = self.get_block()
-                if self.is_splat() or len(self.args) != 0 or block is None:
-                    raise ctx.space.error(
-                        ctx.space.w_SyntaxError,
-                        "line %d: `constrain:' methods take only a block" % (self.lineno)
-                    )
-                else:
-                    block.compile(ctx)
-                    symbol = self.method_name_const(ctx)
-                    ctx.emit(consts.SEND_CONSTRAINT, symbol)
-        else:
-            BaseSend.compile(self, ctx)
-
     def method_name_const(self, ctx):
         return ctx.create_symbol_const(self.method)
 

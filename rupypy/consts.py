@@ -64,7 +64,6 @@ BYTECODES = [
     ("SEND", 2, SEND_EFFECT),
     ("SEND_BLOCK", 2, SEND_EFFECT),
     ("SEND_SPLAT", 1, -1),
-    ("SEND_CONSTRAINT", 1, -1),
     ("SEND_BLOCK_SPLAT", 1, -2),
     ("DEFINED_METHOD", 1, 0),
 
