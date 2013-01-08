@@ -751,13 +751,14 @@ module Cassowary
 
       # Re-solve the current collection of constraints for the new values in newEditConstants.
       self.infeasible_rows = []
-      reset_stay_constants
+      update_stay_constants
       reset_edit_constants
       dual_optimize
       set_external_variables
     end
 
     def solve
+      update_stay_constants
       optimize objective
       set_external_variables
     end
@@ -1257,6 +1258,32 @@ module Cassowary
       end
     end
 
+    def update_stay_constants
+      # Each of the non-required stays will be represented by an
+      # equation of the form
+      #
+      #   v = c + eplus - eminus
+      #
+      # where v is the variable with the stay, c is the previous value
+      # of v, and eplus and eminus are slack variables that hold the
+      # error in satisfying the stay constraint. We are about to solve
+      # the whole thing again. Reset c in this expression to the
+      # current value of v, so the "programmer intent" is still
+      # satisfied.
+
+      stay_plus_error_vars.each_with_index do |ev, idx|
+        expr = rows[ev] || rows[stay_minus_error_vars[idx]]
+        if expr
+          marker_vars.each_pair do |staycn, stayvariable|
+            if stayvariable == expr
+              expr.constant = staycn.variable.value
+              break
+            end
+          end
+        end
+      end
+    end
+
     def set_external_variables
       # Set each external basic variable to its value, and set each
       # external parametric variable to 0.  (It isn't clear that we
@@ -1347,53 +1374,11 @@ class Numeric
   end
 end
 
-# __END__
-
-# require "test/unit"
-
-# class CassowaryTests# < Test::Unit::TestCase
-#   include Cassowary
-
-#   def assert(bool)
-#     raise RuntimeError, "Assertion failed" unless bool
-#   end
-
-#   def test_add_delete1
-#     x = Variable.new(name: 'x', value: 10)
-#     solver = SimplexSolver.new
-#     solver.add_constraint x.==(100.0, Strength::WeakStrength)
-#     c10 = x <= 10.0
-#     c20 = x <= 20.0
-#     solver.add_constraint c10
-#     solver.add_constraint c20
-#     assert x.value.cl_approx(10.0)
-
-#     solver.remove_constraint c10
-#     assert x.value.cl_approx(20.0)
-
-#     solver.remove_constraint c20
-#     assert x.value.cl_approx(100.0)
-
-#     c10again = x <= 10.0
-#     solver.add_constraint c10
-#     solver.add_constraint c10again
-#     assert x.value.cl_approx(10.0)
-
-#     solver.remove_constraint c10
-#     assert x.value.cl_approx(10.0)
-
-#     solver.remove_constraint c10again
-#     assert x.value.cl_approx(100.0)
-#   end
-# end
-
-# CassowaryTests.new.test_add_delete1
-
-if defined?(Topaz) && defined?(Constraints)
-  Constraints.for_variables_of_type Numeric do |name, value|
-    Cassowary::Variable.new(name: name, value: value)
-  end
-  Constraints.register_solver Cassowary::SimplexSolver.instance
+Constraints.for_variables_of_type Numeric do |name, value|
+  v = Cassowary::Variable.new(name: name, value: value)
+  Cassowary::SimplexSolver.instance.add_stay(v)
+  v
 end
+Constraints.register_solver Cassowary::SimplexSolver.instance
 
 puts "Cassowary constraint solver loaded."
