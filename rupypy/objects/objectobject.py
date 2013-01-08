@@ -150,7 +150,8 @@ class W_RootObject(W_BaseObject):
 
     @classdef.method("__constrain__")
     def method_constrain(self, space, block):
-        return space.invoke_constraint_block(block)
+        with space.constraint_construction():
+            return space.invoke_block(block, [])
 
     @classdef.method("__solve_constraints__")
     def method_solve_constraints(self, space):

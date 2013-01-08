@@ -66,6 +66,11 @@ from rupypy.objects.timeobject import W_TimeObject
 from rupypy.parser import Parser
 
 
+NORMAL_EXECUTION = 0
+EXECUTING_CONSTRAINTS = 1
+CONSTRUCTING_CONSTRAINT = 2
+
+
 class SpaceCache(Cache):
     def __init__(self, space):
         Cache.__init__(self)
@@ -84,8 +89,7 @@ class ObjectSpace(object):
         self.bootstrap = True
         self.exit_handlers_w = []
 
-        self.executing_constraints = False
-        self.creating_constraint = False
+        self.execution_mode_stack = [NORMAL_EXECUTION]
         self.constraint_variables = []
         self.constraint_solvers = []
 
@@ -277,20 +281,10 @@ class ObjectSpace(object):
         return Frame(jit.promote(bc), w_self, lexical_scope, block, parent_interp, regexp_match_cell)
 
     def execute_frame(self, frame, bc):
-        if self.creating_constraint:
+        if self.is_constructing_constraint():
             return ConstraintInterpreter().interpret(self, frame, bc)
         else:
             return Interpreter().interpret(self, frame, bc)
-
-    def execute_constraint_frame(self, frame, bc):
-        if self.creating_constraint:
-            import pdb; pdb.set_trace()
-            raise RuntimeError("nested constraint creation?")
-        try:
-            self.creating_constraint = True
-            return ConstraintInterpreter().interpret(self, frame, bc)
-        finally:
-            self.creating_constraint = False
 
     # Methods for allocating new objects.
 
@@ -513,14 +507,6 @@ class ObjectSpace(object):
         raw_method = w_cls.find_method(self, name)
         return self._send_raw(w_method, raw_method, w_receiver, w_cls, args_w, block)
 
-    def send_no_constraint(self, w_receiver, w_method, args_w=None, block=None):
-        previous = self.creating_constraint
-        try:
-            self.creating_constraint = False
-            return self.send(w_receiver, w_method, args_w, block)
-        finally:
-            self.creating_constraint = previous
-
     def send_super(self, w_cls, w_receiver, w_method, args_w, block=None):
         name = self.symbol_w(w_method)
         raw_method = w_cls.find_method_super(self, name)
@@ -564,27 +550,6 @@ class ObjectSpace(object):
 
         with self.getexecutioncontext().visit_frame(frame):
             return self.execute_frame(frame, bc)
-
-    def invoke_constraint_block(self, block):
-        bc = block.bytecode
-        frame = self.create_frame(
-            bc, w_self=block.w_self, lexical_scope=block.lexical_scope,
-            block=block.block, parent_interp=block.parent_interp,
-            regexp_match_cell=block.regexp_match_cell,
-        )
-        assert len(block.cells) == len(bc.freevars)
-        for idx, cell in enumerate(block.cells):
-            frame.cells[len(bc.cellvars) + idx] = cell
-        with self.getexecutioncontext().visit_frame(frame):
-            return self.execute_constraint_frame(frame, bc)
-
-    def invoke_non_constraint_block(self, block, args_w):
-        previous = self.creating_constraint
-        try:
-            self.creating_constraint = False
-            return self.invoke_block(block, args_w)
-        finally:
-            self.creating_constraint = previous
 
     def invoke_function(self, w_function, w_receiver, args_w, block):
         w_name = self.newstr_fromstr(w_function.name)
@@ -710,24 +675,45 @@ class ObjectSpace(object):
         return alive
 
     def ensure_constraints(self):
-        if self.executing_constraints:
+        if not self.is_executing_normally():
             return
-        try:
-            self.executing_constraints = True
+        with self.constraint_execution():
             for w_solver in self.constraint_solvers:
                 self.send(w_solver, self.newsymbol("solve"))
             for w_var in self.get_constraint_variables():
                 self.send(w_var, self.newsymbol("set!"))
-        finally:
-            self.executing_constraints = False
 
     def suggest_value(self, w_var, w_value):
-        if self.executing_constraints:
+        if not self.is_executing_normally():
             return
-        try:
-            self.executing_constraints = True
+        with self.constraint_execution():
             self.send(w_var, self.newsymbol("suggest_value"), [w_value])
             for w_var in self.get_constraint_variables():
                 self.send(w_var, self.newsymbol("set!"))
-        finally:
-            self.executing_constraints = False
+
+    def is_executing_normally(self):
+        return self.execution_mode_stack[-1] == NORMAL_EXECUTION
+
+    def is_constructing_constraint(self):
+        return self.execution_mode_stack[-1] == CONSTRUCTING_CONSTRAINT
+
+    def normal_execution(self):
+        return _ExecutionModeContextManager(self, NORMAL_EXECUTION)
+
+    def constraint_execution(self):
+        return _ExecutionModeContextManager(self, EXECUTING_CONSTRAINTS)
+
+    def constraint_construction(self):
+        return _ExecutionModeContextManager(self, CONSTRUCTING_CONSTRAINT)
+
+
+class _ExecutionModeContextManager(object):
+    def __init__(self, space, executiontype):
+        self.space = space
+        self.executiontype = executiontype
+
+    def __enter__(self):
+        self.space.execution_mode_stack.append(self.executiontype)
+
+    def __exit__(self, exc_type, exc_value, tb):
+        self.space.execution_mode_stack.pop()

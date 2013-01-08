@@ -76,10 +76,11 @@ class W_ConstraintVariableObject(W_ConstraintObject):
                         "non-proc in constraint variable handlers"
                     )
                 else:
-                    self.w_external_variable = space.invoke_non_constraint_block(
-                        w_proc.block,
-                        [self.get_name(space), w_value]
-                    )
+                    with space.normal_execution():
+                        self.w_external_variable = space.invoke_block(
+                            w_proc.block,
+                            [self.get_name(space), w_value]
+                        )
         return self.w_external_variable
 
     def get_name(self, space):

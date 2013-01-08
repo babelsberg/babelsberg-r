@@ -37,8 +37,10 @@ class ConstraintInterpreter(Interpreter):
     def SEND(self, space, bytecode, frame, pc, meth_idx, num_args):
         args_w = frame.popitemsreverse(num_args)
         w_receiver = frame.pop()
+        w_res = None
         if space.is_kind_of(w_receiver, space.w_constraint):
-            w_res = space.send_no_constraint(w_receiver, bytecode.consts_w[meth_idx], args_w)
+            with space.normal_execution():
+                w_res = space.send(w_receiver, bytecode.consts_w[meth_idx], args_w)
         else:
             w_res = space.send(w_receiver, bytecode.consts_w[meth_idx], args_w)
         frame.push(w_res)
