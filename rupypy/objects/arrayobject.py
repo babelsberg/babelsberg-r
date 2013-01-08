@@ -376,6 +376,12 @@ class W_ArrayObject(W_Object):
         return true
     end
 
+    def index(value)
+        self.each_with_index do |v, idx|
+            return idx if v == value
+        end
+    end
+
     def hash
         res = 0x345678
         self.each do |x|
