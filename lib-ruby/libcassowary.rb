@@ -186,11 +186,11 @@ module Cassowary
     end
 
     def suggest_value(v)
-      self.value = v
-      if @stay
-        SimplexSolver.instance.remove_constraint(@stay)
-      end
-      @stay = SimplexSolver.instance.add_stay(self)
+      SimplexSolver.instance.add_edit_var(self, Strength::StrongStrength)
+      SimplexSolver.instance.begin_edit
+      SimplexSolver.instance.suggest_value(self, v)
+      SimplexSolver.instance.resolve
+      SimplexSolver.instance.end_edit
     end
   end
 end
@@ -1391,9 +1391,7 @@ end
 
 if defined?(Topaz) && defined?(Constraints)
   Constraints.for_variables_of_type Numeric do |name, value|
-    v = Cassowary::Variable.new(name: name, value: value)
-    v.suggest_value(value)
-    v
+    Cassowary::Variable.new(name: name, value: value)
   end
   Constraints.register_solver Cassowary::SimplexSolver.instance
 end
