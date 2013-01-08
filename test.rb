@@ -509,7 +509,7 @@ constrain { @@b == @a * 2 }
 puts a, @a, @@b
 constrain { @a > 1 }
 puts a, @a, @@b
-constrain { @a == 5 }
+a = 5
 puts a, @a, @@b
 
 
