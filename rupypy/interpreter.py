@@ -241,7 +241,7 @@ class Interpreter(object):
         space.set_instance_var(w_obj, name, w_value)
         w_var = space.findconstraintvariable(w_owner=w_obj, ivar=name)
         if w_var:
-            space.send(w_var, space.newsymbol("suggest_value"), [frame.peek()])
+            space.send(w_var, space.newsymbol("suggest_value"), [w_value])
             space.ensure_constraints()
         frame.push(w_value)
 
@@ -272,7 +272,7 @@ class Interpreter(object):
         space.set_class_var(w_module, name, w_value)
         w_var = space.findconstraintvariable(w_owner=w_module, cvar=name)
         if w_var:
-            space.send(w_var, space.newsymbol("suggest_value"), [frame.peek()])
+            space.send(w_var, space.newsymbol("suggest_value"), [w_value])
             space.ensure_constraints()
         frame.push(w_value)
 
