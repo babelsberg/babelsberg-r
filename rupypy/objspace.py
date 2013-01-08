@@ -52,7 +52,7 @@ from rupypy.objects.integerobject import W_IntegerObject
 from rupypy.objects.intobject import W_FixnumObject
 from rupypy.objects.methodobject import W_MethodObject, W_UnboundMethodObject
 from rupypy.objects.moduleobject import W_ModuleObject
-from rupypy.objects.constraintobject import W_ConstraintVariableObject, Constraints
+from rupypy.objects.constraintobject import W_ConstraintObject, W_ConstraintVariableObject, Constraints
 from rupypy.objects.nilobject import W_NilObject
 from rupypy.objects.numericobject import W_NumericObject
 from rupypy.objects.objectobject import W_Object, W_BaseObject
@@ -133,6 +133,7 @@ class ObjectSpace(object):
         self.w_ZeroDivisionError = self.getclassfor(W_ZeroDivisionError)
         self.w_kernel = self.getmoduleobject(Kernel.moduledef)
 
+        self.w_constraint = self.getclassfor(W_ConstraintObject)
         self.w_constraintvariable = self.getclassfor(W_ConstraintVariableObject)
         self.w_constraints = self.getmoduleobject(Constraints.moduledef)
 
@@ -153,7 +154,7 @@ class ObjectSpace(object):
 
             self.w_kernel, self.w_topaz,
 
-            self.w_constraints, self.w_constraintvariable,
+            self.w_constraint, self.w_constraints, self.w_constraintvariable,
 
             self.getclassfor(W_NilObject),
             self.getclassfor(W_TrueObject),

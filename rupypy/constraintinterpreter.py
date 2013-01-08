@@ -1,7 +1,7 @@
 from pypy.rlib import jit
 
 from rupypy.interpreter import Interpreter
-from rupypy.objects.constraintobject import W_ConstraintVariableObject
+from rupypy.objects.constraintobject import W_ConstraintObject
 from rupypy.objects.moduleobject import W_ModuleObject
 
 
@@ -37,12 +37,7 @@ class ConstraintInterpreter(Interpreter):
     def SEND(self, space, bytecode, frame, pc, meth_idx, num_args):
         args_w = frame.popitemsreverse(num_args)
         w_receiver = frame.pop()
-        if isinstance(w_receiver, W_ConstraintVariableObject):
-            w_res = space.send_no_constraint(w_receiver, bytecode.consts_w[meth_idx], args_w)
-        elif space.is_kind_of(
-                w_receiver,
-                space.find_const(space.find_const(space.w_object, "Cassowary"), "Equalities")):
-            # XXX: Hack to make it just work before I refactor
+        if space.is_kind_of(w_receiver, space.w_constraint):
             w_res = space.send_no_constraint(w_receiver, bytecode.consts_w[meth_idx], args_w)
         else:
             w_res = space.send(w_receiver, bytecode.consts_w[meth_idx], args_w)

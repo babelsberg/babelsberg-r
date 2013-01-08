@@ -47,7 +47,7 @@ module Cassowary
 end
 
 module Cassowary
-  class AbstractVariable
+  class AbstractVariable < ConstraintObject
     attr_accessor :name
 
     def initialize(hash = {})
@@ -196,7 +196,7 @@ module Cassowary
 end
 
 module Cassowary
-  class Constraint
+  class Constraint < ConstraintObject
     attr_accessor :strength, :weight
 
     def expression
@@ -434,7 +434,7 @@ module Cassowary
 end
 
 module Cassowary
-  class LinearExpression
+  class LinearExpression < ConstraintObject
     include Equalities
 
     attr_accessor :constant, :terms

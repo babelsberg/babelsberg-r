@@ -5,8 +5,13 @@ from rupypy.objects.procobject import W_ProcObject
 from rupypy.utils.cache import Cache
 
 
-class W_ConstraintVariableObject(W_Object):
-    classdef = ClassDef("ConstraintVariable", W_Object.classdef, filepath=__file__)
+# Marker class for constraint solver objects
+class W_ConstraintObject(W_Object):
+    classdef = ClassDef("ConstraintObject", W_Object.classdef, filepath=__file__)
+
+
+class W_ConstraintVariableObject(W_ConstraintObject):
+    classdef = ClassDef("ConstraintVariable", W_ConstraintObject.classdef, filepath=__file__)
 
     def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None):
         W_Object.__init__(self, space)
