@@ -173,11 +173,11 @@ class Interpreter(object):
         frame.push(frame.cells[idx].get(frame, idx) or space.w_nil)
 
     def STORE_DEREF(self, space, bytecode, frame, pc, idx):
-        frame.cells[idx].set(frame, idx, frame.peek())
         w_var = space.findconstraintvariable(cell=frame.cells[idx])
         if w_var:
-            space.send(w_var, space.newsymbol("suggest_value"), [frame.peek()])
-            space.ensure_constraints()
+            space.suggest_value(w_var, frame.peek())
+        else:
+            frame.cells[idx].set(frame, idx, frame.peek())
 
     def LOAD_CLOSURE(self, space, bytecode, frame, pc, idx):
         frame.push(frame.cells[idx].upgrade_to_closure(frame, idx))
@@ -238,11 +238,11 @@ class Interpreter(object):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_value = frame.pop()
         w_obj = frame.pop()
-        space.set_instance_var(w_obj, name, w_value)
         w_var = space.findconstraintvariable(w_owner=w_obj, ivar=name)
         if w_var:
-            space.send(w_var, space.newsymbol("suggest_value"), [w_value])
-            space.ensure_constraints()
+            space.suggest_value(w_var, w_value)
+        else:
+            space.set_instance_var(w_obj, name, w_value)
         frame.push(w_value)
 
     def DEFINED_INSTANCE_VAR(self, space, bytecode, frame, pc, idx):
@@ -269,11 +269,11 @@ class Interpreter(object):
         w_value = frame.pop()
         w_module = frame.pop()
         assert isinstance(w_module, W_ModuleObject)
-        space.set_class_var(w_module, name, w_value)
         w_var = space.findconstraintvariable(w_owner=w_module, cvar=name)
         if w_var:
-            space.send(w_var, space.newsymbol("suggest_value"), [w_value])
-            space.ensure_constraints()
+            space.suggest_value(w_var, w_value)
+        else:
+            space.set_class_var(w_module, name, w_value)
         frame.push(w_value)
 
     def DEFINED_CLASS_VAR(self, space, bytecode, frame, pc, idx):

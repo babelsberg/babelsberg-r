@@ -719,3 +719,14 @@ class ObjectSpace(object):
                 self.send(w_var, self.newsymbol("set!"))
         finally:
             self.executing_constraints = False
+
+    def suggest_value(self, w_var, w_value):
+        if self.executing_constraints:
+            return
+        try:
+            self.executing_constraints = True
+            self.send(w_var, self.newsymbol("suggest_value"), [w_value])
+            for w_var in self.get_constraint_variables():
+                self.send(w_var, self.newsymbol("set!"))
+        finally:
+            self.executing_constraints = False

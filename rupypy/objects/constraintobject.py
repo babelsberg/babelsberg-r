@@ -87,13 +87,6 @@ class W_ConstraintVariableObject(W_Object):
             return space.newstr_fromstr("cvar-%s" % clsname)
         return space.w_nil
 
-    @classdef.method("suggest_value")
-    def method_suggest_value(self, space, w_value):
-        space.send(self.get_external_variable(space),
-                   space.newsymbol("suggest_value"),
-                   [w_value])
-        return w_value
-
     @classdef.method("value")
     def method_value(self, space):
         return self.load_value(space)
@@ -114,6 +107,10 @@ class W_ConstraintVariableObject(W_Object):
         return w_value
 
     classdef.app_method("""
+    def suggest_value(val)
+      variable.suggest_value(val)
+    end
+
     def ==(other)
       variable == (other.kind_of?(self.class) ? other.variable : other)
     end
