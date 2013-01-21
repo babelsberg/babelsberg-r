@@ -23,9 +23,9 @@ class ConstraintInterpreter(Interpreter):
 
     def LOAD_CLASS_VAR(self, space, bytecode, frame, pc, idx):
         name = space.symbol_w(bytecode.consts_w[idx])
-        w_obj = frame.pop()
-        assert isinstance(w_obj, W_ModuleObject)
-        w_res = space.newconstraintvariable(w_owner=w_obj, cvar=name)
+        w_module = frame.pop()
+        assert isinstance(w_module, W_ModuleObject)
+        w_res = space.newconstraintvariable(w_owner=w_module, cvar=name)
         if w_res is None:
             w_res = space.find_class_var(w_module, name)
             if w_res is None:
