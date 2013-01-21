@@ -15,10 +15,10 @@ class TestConstraintVariableObject(BaseTopazTest):
         """)
         assert self.unwrap(space, w_res) == 10
         w_res = space.execute("""
-        a = 1
-        constrain { a >= 10 }
-        a = 11
-        return a
+        b = 1
+        constrain { b > 10 }
+        b = 11
+        return b
         """)
         assert self.unwrap(space, w_res) == 11
 
@@ -31,10 +31,10 @@ class TestConstraintVariableObject(BaseTopazTest):
         """)
         assert self.unwrap(space, w_res) == 10
         w_res = space.execute("""
-        @a = 1
-        constrain { @a >= 10 }
-        @a = 11
-        return @a
+        @b = 1
+        constrain { @b > 10 }
+        @b = 11
+        return @b
         """)
         assert self.unwrap(space, w_res) == 11
 
@@ -47,10 +47,10 @@ class TestConstraintVariableObject(BaseTopazTest):
         """)
         assert self.unwrap(space, w_res) == 10
         w_res = space.execute("""
-        @@a = 1
-        constrain { @@a >= 10 }
-        @@a = 11
-        return @@a
+        @@b = 1
+        constrain { @@b > 10 }
+        @@b = 11
+        return @@b
         """)
         assert self.unwrap(space, w_res) == 11
 
@@ -88,11 +88,11 @@ class TestConstraintVariableObject(BaseTopazTest):
         assert self.unwrap(space, w_res) == [
             [[0, 10], [20, 20]],
             [[0, 10], [0, 20]],
-            [[5, 10], [5, 10]]
+            [[5, 10], [5, 20]]
         ] or self.unwrap(space, w_res) == [
             [[0, 10], [20, 20]],
             [[20, 10], [20, 20]],
-            [[5, 10], [5, 10]]
+            [[5, 10], [5, 20]]
         ]
 
     def test_complex_path(self, space):
