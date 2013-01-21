@@ -1,7 +1,12 @@
 import copy
 
-from pypy.rlib import jit
+from rpython.rlib import jit
 
+
+NUM_DIGITS = 4
+NUM_DIGITS_POW2 = 1 << NUM_DIGITS
+# note: we use "x * NUM_DIGITS_POW2" instead of "x << NUM_DIGITS" because
+# we want to propagate knowledge that the result cannot be negative
 
 class MapTransitionCache(object):
     def __init__(self, space):
@@ -28,22 +33,41 @@ class MapTransitionCache(object):
 
 
 class BaseNode(object):
-    _attrs_ = ()
+    _attrs_ = ["_size_estimate"]
+    _size_estimate = 0
 
     def __deepcopy__(self, memo):
         memo[id(self)] = result = object.__new__(self.__class__)
         return result
 
+    @jit.elidable
+    def size_estimate(self):
+        return self._size_estimate >> NUM_DIGITS
+
+    @jit.unroll_safe
+    def update_storage_size(self, w_obj, node):
+        if not jit.we_are_jitted():
+            size_est = (self._size_estimate + node.size_estimate() - self.size_estimate())
+            assert size_est >= (self.length() * NUM_DIGITS_POW2)
+            self._size_estimate = size_est
+        if node.length() > self.length():
+            # note that node.size_estimate() is always at least node.length()
+            new_storage = [None] * node.size_estimate()
+            if w_obj.storage:
+                new_storage[:len(w_obj.storage)] = w_obj.storage
+            w_obj.storage = new_storage
+
     def add_attr(self, space, w_obj, name):
-        attr_node = space.fromcache(MapTransitionCache).transition_add_attr(w_obj.map, name, len(w_obj.storage))
+        attr_node = space.fromcache(MapTransitionCache).transition_add_attr(w_obj.map, name, self.length())
+        self.update_storage_size(w_obj, attr_node)
         w_obj.map = attr_node
-        w_obj.storage.append(None)
         return attr_node.pos
 
     def add_flag(self, space, w_obj, name):
-        flag_node = space.fromcache(MapTransitionCache).transition_add_flag(w_obj.map, name, len(w_obj.storage))
+        flag_node = space.fromcache(MapTransitionCache).transition_add_flag(w_obj.map, name, self.length())
+        self.update_storage_size(w_obj, flag_node)
         w_obj.map = flag_node
-        w_obj.storage.append(space.w_true)
+        w_obj.storage[flag_node.pos] = space.w_true
 
     def add_constraint_var(self, space, w_obj, name):
         var_node = space.fromcache(MapTransitionCache).transition_add_constraint_var(w_obj.map, name, len(w_obj.storage))
@@ -80,18 +104,6 @@ class ClassNode(BaseNode):
     def change_class(self, space, w_cls):
         return space.fromcache(MapTransitionCache).get_class_node(w_cls)
 
-    def add_attr(self, space, w_obj, name):
-        w_obj.storage = []
-        return BaseNode.add_attr(self, space, w_obj, name)
-
-    def add_flag(self, space, w_obj, name):
-        w_obj.storage = []
-        BaseNode.add_flag(self, space, w_obj, name)
-
-    def add_constraint_var(self, space, w_obj, name):
-        w_obj.storage = []
-        BaseNode.add_constraint_var(self, space, w_obj, name)
-
     def copy_attrs(self, space, w_obj, w_target):
         pass
 
@@ -101,6 +113,9 @@ class ClassNode(BaseNode):
     def copy_constraint_vars(self, space, w_obj, w_target):
         pass
 
+    def length(self):
+        return 0
+
 
 class StorageNode(BaseNode):
     _immutable_fields_ = ["prev", "name", "pos"]
@@ -109,6 +124,7 @@ class StorageNode(BaseNode):
         self.prev = prev
         self.name = name
         self.pos = pos
+        self._size_estimate = self.length() * NUM_DIGITS_POW2
 
     @jit.elidable
     def get_class(self):
@@ -138,6 +154,9 @@ class StorageNode(BaseNode):
 
     def copy_constraint_vars(self, space, w_obj, w_target):
         self.prev.copy_constraint_vars(space, w_obj, w_target)
+
+    def length(self):
+        return self.pos + 1
 
 
 class AttributeNode(StorageNode):

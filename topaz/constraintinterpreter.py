@@ -1,4 +1,4 @@
-from pypy.rlib import jit
+from rpython.rlib import jit
 
 from topaz.interpreter import Interpreter
 from topaz.objects.constraintobject import W_ConstraintObject
