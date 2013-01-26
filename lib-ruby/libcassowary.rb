@@ -219,7 +219,19 @@ module Cassowary
       false
     end
 
-    def enable
+    def enable(strength=:required)
+      if strength == :required
+        self.strength = Strength::RequiredStrength
+      elsif strength == :strong
+        self.strength = Strength::StrongStrength
+      elsif strength == :medium
+        self.strength = Strength::MediumStrength
+      elsif strength == :weak
+        self.strength = Strength::WeakStrength
+      else
+        raise ArgumentError, "Unsupported symbolic strength #{strength} " +
+          "(expected one of :required, :strong, :medium, :weak"
+      end
       SimplexSolver.instance.add_constraint(self)
     end
 

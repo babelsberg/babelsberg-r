@@ -163,10 +163,12 @@ class W_RootObject(W_BaseObject):
         space.ensure_constraints()
         return space.w_nil
 
-    @classdef.method("constrain")
-    def method_always(self, space, block):
+    @classdef.method("always")
+    def method_always(self, space, w_strength=None, block=None):
+        if block is None:
+            raise space.error(space.w_ArgumentError, "no constraint block given")
         w_arg = space.send(self, space.newsymbol("__constrain__"), block=block)
-        space.send(w_arg, space.newsymbol("enable"))
+        space.send(w_arg, space.newsymbol("enable"), [] if w_strength is None else [w_strength])
         space.send(self, space.newsymbol("__solve_constraints__"))
         return w_arg
 
