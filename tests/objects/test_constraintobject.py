@@ -151,3 +151,18 @@ class TestConstraintVariableObject(BaseTopazTest):
             space.execute("always { true }")
         with self.raises(space, "TypeError"):
             space.execute("always { true }")
+
+    def test_preferences(self, space):
+        w_res = space.execute("""
+        require "libcassowary"
+        res = []
+        x = 10
+        always(:strong) { x > 10 }
+        res << x
+        always(:medium) { x < 5 }
+        res << x
+        always(:required) { x < 10 }
+        res << x
+        return res
+        """)
+        assert self.unwrap(space, w_res) == [11, 11, 9]
