@@ -167,6 +167,9 @@ class Interpreter(object):
         frame.push(bytecode.consts_w[idx])
 
     def LOAD_DEREF(self, space, bytecode, frame, pc, idx):
+        w_var = space.findconstraintvariable(cell=frame.cells[idx])
+        if w_var:
+            space.send(w_var, space.newsymbol("set!"))
         frame.push(frame.cells[idx].get(frame, idx) or space.w_nil)
 
     def STORE_DEREF(self, space, bytecode, frame, pc, idx):
@@ -231,9 +234,12 @@ class Interpreter(object):
                 frame.push(space.w_nil)
 
     def LOAD_INSTANCE_VAR(self, space, bytecode, frame, pc, idx):
-        w_name = bytecode.consts_w[idx]
+        name = space.symbol_w(bytecode.consts_w[idx])
         w_obj = frame.pop()
-        w_res = space.find_instance_var(w_obj, space.symbol_w(w_name))
+        w_var = space.findconstraintvariable(w_owner=w_obj, ivar=name)
+        if w_var:
+            space.send(w_var, space.newsymbol("set!"))
+        w_res = space.find_instance_var(w_obj, name)
         frame.push(w_res)
 
     def STORE_INSTANCE_VAR(self, space, bytecode, frame, pc, idx):
@@ -260,6 +266,9 @@ class Interpreter(object):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_module = frame.pop()
         assert isinstance(w_module, W_ModuleObject)
+        w_var = space.findconstraintvariable(w_owner=w_module, cvar=name)
+        if w_var:
+            space.send(w_var, space.newsymbol("set!"))
         w_value = space.find_class_var(w_module, name)
         if w_value is None:
             raise space.error(space.w_NameError,

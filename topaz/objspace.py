@@ -89,7 +89,6 @@ class ObjectSpace(object):
         self.exit_handlers_w = []
 
         self.execution_mode_stack = [NORMAL_EXECUTION]
-        self.constraint_variables = []
         self.constraint_solvers = []
 
         self.w_true = W_TrueObject(self)
@@ -382,7 +381,6 @@ class ObjectSpace(object):
                 # No constraint solver variable available for this object
                 return None
 
-            self.constraint_variables.append(weakref.ref(w_var))
             if cell:
                 cell.set_constraint(w_var)
             elif w_owner:
@@ -662,36 +660,18 @@ class ObjectSpace(object):
         else:
             return False
 
-    @jit.unroll_safe
-    def get_constraint_variables(self):
-        alive = []
-        for weak in self.constraint_variables:
-            w_var = weak()
-            if w_var:
-                alive.append(w_var)
-        self.constraint_variables[0:len(self.constraint_variables)] = []
-        for w_v in alive:
-            self.constraint_variables.append(weakref.ref(w_v))
-        return alive
-
-    @jit.unroll_safe
     def ensure_constraints(self):
         if not self.is_executing_normally():
             return
         with self.constraint_execution():
             for w_solver in self.constraint_solvers:
                 self.send(w_solver, self.newsymbol("solve"))
-            for w_var in self.get_constraint_variables():
-                self.send(w_var, self.newsymbol("set!"))
 
-    @jit.unroll_safe
     def suggest_value(self, w_var, w_value):
         if not self.is_executing_normally():
             return
         with self.constraint_execution():
             self.send(w_var, self.newsymbol("suggest_value"), [w_value])
-            for w_var in self.get_constraint_variables():
-                self.send(w_var, self.newsymbol("set!"))
 
     def is_executing_normally(self):
         return self.execution_mode_stack[-1] == NORMAL_EXECUTION
