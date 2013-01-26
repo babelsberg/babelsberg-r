@@ -168,6 +168,8 @@ class Interpreter(object):
 
     def LOAD_DEREF(self, space, bytecode, frame, pc, idx):
         w_var = space.findconstraintvariable(cell=frame.cells[idx])
+        # TODO: think of something to mark these dirty so we don't do
+        # this lookup all the time
         if w_var:
             space.send(w_var, space.newsymbol("set!"))
         frame.push(frame.cells[idx].get(frame, idx) or space.w_nil)
