@@ -1067,7 +1067,7 @@ module Cassowary
 
           zrow = rows[objective]
           zrow.terms[eminus] = cn.strength.symbolic_weight * cn.weight
-          error_vars[cb] = [eminus]
+          error_vars[cn] = [eminus]
           note_added_variable(eminus, objective)
         end
       else
