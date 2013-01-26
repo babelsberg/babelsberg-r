@@ -662,6 +662,7 @@ class ObjectSpace(object):
         else:
             return False
 
+    @jit.unroll_safe
     def get_constraint_variables(self):
         alive = []
         for weak in self.constraint_variables:
@@ -673,6 +674,7 @@ class ObjectSpace(object):
             self.constraint_variables.append(weakref.ref(w_v))
         return alive
 
+    @jit.unroll_safe
     def ensure_constraints(self):
         if not self.is_executing_normally():
             return
@@ -682,6 +684,7 @@ class ObjectSpace(object):
             for w_var in self.get_constraint_variables():
                 self.send(w_var, self.newsymbol("set!"))
 
+    @jit.unroll_safe
     def suggest_value(self, w_var, w_value):
         if not self.is_executing_normally():
             return
