@@ -10,13 +10,13 @@ class TestConstraintVariableObject(BaseTopazTest):
         w_res = space.execute("""
         require "libcassowary"
         a = 1
-        constrain { a == 10 }
+        always{ a == 10 }
         return a
         """)
         assert self.unwrap(space, w_res) == 10
         w_res = space.execute("""
         b = 1
-        constrain { b > 10 }
+        always { b > 10 }
         b = 11
         return b
         """)
@@ -26,13 +26,13 @@ class TestConstraintVariableObject(BaseTopazTest):
         w_res = space.execute("""
         require "libcassowary"
         @a = 1
-        constrain { @a == 10 }
+        always { @a == 10 }
         return @a
         """)
         assert self.unwrap(space, w_res) == 10
         w_res = space.execute("""
         @b = 1
-        constrain { @b > 10 }
+        always { @b > 10 }
         @b = 11
         return @b
         """)
@@ -42,13 +42,13 @@ class TestConstraintVariableObject(BaseTopazTest):
         w_res = space.execute("""
         require "libcassowary"
         @@a = 1
-        constrain { @@a == 10 }
+        always { @@a == 10 }
         return @@a
         """)
         assert self.unwrap(space, w_res) == 10
         w_res = space.execute("""
         @@b = 1
-        constrain { @@b > 10 }
+        always { @@b > 10 }
         @@b = 11
         return @@b
         """)
@@ -70,19 +70,19 @@ class TestConstraintVariableObject(BaseTopazTest):
           def initialize(x, y)
             @x = x
             @y = y
-            constrain { @x >= 0 }
-            constrain { @y >= 0 }
-            constrain { @x < 640 }
-            constrain { @y < 480 }
+            always { @x >= 0 }
+            always { @y >= 0 }
+            always { @x < 640 }
+            always { @y < 480 }
           end
         end
         
         pt1 = Point.new(-1, 10)
         pt2 = Point.new(20, 20)
         res << [[pt1.x, pt1.y], [pt2.x, pt2.y]]
-        constrain { pt1.x == pt2.x }
+        always { pt1.x == pt2.x }
         res << [[pt1.x, pt1.y], [pt2.x, pt2.y]]
-        constrain { pt1.x == 5 }
+        always { pt1.x == 5 }
         res << [[pt1.x, pt1.y], [pt2.x, pt2.y]]
         """)
         assert self.unwrap(space, w_res) == [
@@ -111,10 +111,10 @@ class TestConstraintVariableObject(BaseTopazTest):
           def initialize(x, y)
             @x = x
             @y = y
-            constrain { @x >= 0 }
-            constrain { @y >= 0 }
-            constrain { @x < 640 }
-            constrain { @y < 480 }
+            always { @x >= 0 }
+            always { @y >= 0 }
+            always { @x < 640 }
+            always { @y < 480 }
           end
         end
 
@@ -130,7 +130,7 @@ class TestConstraintVariableObject(BaseTopazTest):
           def initialize(pt1, pt2)
             @start = pt1
             @end = pt2
-            constrain { pt1.y == pt2.y }
+            always { pt1.y == pt2.y }
           end
         
           def length
@@ -139,7 +139,15 @@ class TestConstraintVariableObject(BaseTopazTest):
         end
         
         h = HorizontalLine.new(Point.new(1, 1), Point.new(2, 2))
-        constrain { h.length >= 100 }
+        always { h.length >= 100 }
         return h.length
         """)
         assert self.unwrap(space, w_res) == 100
+
+    def test_errors(self, space):
+        with self.raises(space, "ArgumentError"):
+            space.execute("always")
+        with self.raises(space, "TypeError"):
+            space.execute("always { true }")
+        with self.raises(space, "TypeError"):
+            space.execute("always { true }")

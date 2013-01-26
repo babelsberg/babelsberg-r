@@ -168,6 +168,12 @@ class W_RootObject(W_BaseObject):
         if block is None:
             raise space.error(space.w_ArgumentError, "no constraint block given")
         w_arg = space.send(self, space.newsymbol("__constrain__"), block=block)
+        if not space.respond_to(w_arg, space.newsymbol("enable")):
+            raise space.error(
+                space.w_TypeError,
+                "constraint block did not return an object that responds to #enable " +
+                "(may be constraint solver bug)"
+            )
         space.send(w_arg, space.newsymbol("enable"), [] if w_strength is None else [w_strength])
         space.send(self, space.newsymbol("__solve_constraints__"))
         return w_arg
