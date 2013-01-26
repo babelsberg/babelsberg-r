@@ -172,7 +172,7 @@ class W_RootObject(W_BaseObject):
             raise space.error(
                 space.w_TypeError,
                 "constraint block did not return an object that responds to #enable " +
-                "(may be constraint solver bug)"
+                "(did you `require' your solver?)"
             )
         space.send(w_arg, space.newsymbol("enable"), [] if w_strength is None else [w_strength])
         space.send(self, space.newsymbol("__solve_constraints__"))
