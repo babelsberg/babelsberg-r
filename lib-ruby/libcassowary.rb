@@ -734,8 +734,8 @@ module Cassowary
       end
 
       if cn.stay_constraint?
-        self.stay_plus_error_vars = stay_plus_error_vars.reject do |v| evars.include? v end
-        self.stay_minus_error_vars = stay_minus_error_vars.reject do |v| evars.include? v end
+        self.stay_plus_error_vars = stay_plus_error_vars.select do |v| !evars.include?(v) end
+        self.stay_minus_error_vars = stay_minus_error_vars.select do |v| !evars.include?(v) end
       end
 
       if cn.edit_constraint?
