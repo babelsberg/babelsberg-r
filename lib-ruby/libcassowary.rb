@@ -463,7 +463,7 @@ module Cassowary
     end
 
     def any_variable
-      if terms.any?
+      unless terms.empty?
         terms.keys.first
       else
         raise InternalError, "expression is constant"
