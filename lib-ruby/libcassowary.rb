@@ -186,11 +186,14 @@ module Cassowary
     end
 
     def suggest_value(v)
-      SimplexSolver.instance.add_edit_var(self, Strength::StrongStrength)
-      SimplexSolver.instance.begin_edit
-      SimplexSolver.instance.suggest_value(self, v)
-      SimplexSolver.instance.resolve
-      SimplexSolver.instance.end_edit
+      # SimplexSolver.instance.add_edit_var(self, Strength::StrongStrength)
+      # SimplexSolver.instance.begin_edit
+      c = self == v
+      SimplexSolver.instance.add_constraint(c)
+      # SimplexSolver.instance.suggest_value(self, v)
+      SimplexSolver.instance.solve
+      SimplexSolver.instance.remove_constraint(c)
+      # SimplexSolver.instance.end_edit
     end
   end
 end
