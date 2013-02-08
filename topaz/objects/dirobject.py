@@ -9,7 +9,7 @@ from topaz.utils.glob import Glob
 from topaz.utils.ll_dir import opendir, readdir, closedir
 
 
-class W_Dir(W_Object):
+class W_DirObject(W_Object):
     classdef = ClassDef("Dir", W_Object.classdef, filepath=__file__)
     classdef.include_module(Enumerable)
 
@@ -32,9 +32,10 @@ class W_Dir(W_Object):
 
     @classdef.singleton_method("allocate")
     def method_allocate(self, space, args_w):
-        return W_Dir(space)
+        return W_DirObject(space)
 
     @classdef.singleton_method("pwd")
+    @classdef.singleton_method("getwd")
     def method_pwd(self, space):
         return space.newstr_fromstr(os.getcwd())
 

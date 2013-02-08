@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import os
 import weakref
 
-from rpython.rlib import jit
+from rpython.rlib import jit, rpath
 from rpython.rlib.cache import Cache
 from rpython.rlib.objectmodel import specialize
 
@@ -18,8 +18,6 @@ from topaz.executioncontext import ExecutionContext
 from topaz.frame import Frame
 from topaz.interpreter import Interpreter
 from topaz.lexer import LexerError, Lexer
-from topaz.lib.dir import W_Dir
-from topaz.lib.random import W_RandomObject
 from topaz.module import ClassCache, ModuleCache
 from topaz.modules.comparable import Comparable
 from topaz.modules.enumerable import Enumerable
@@ -36,6 +34,7 @@ from topaz.objects.boolobject import W_TrueObject, W_FalseObject
 from topaz.objects.classobject import W_ClassObject
 from topaz.objects.codeobject import W_CodeObject
 from topaz.objects.constraintobject import W_ConstraintObject, W_ConstraintVariableObject, Constraints
+from topaz.objects.dirobject import W_DirObject
 from topaz.objects.encodingobject import W_EncodingObject
 from topaz.objects.envobject import W_EnvObject
 from topaz.objects.exceptionobject import (W_ExceptionObject, W_NoMethodError,
@@ -56,6 +55,7 @@ from topaz.objects.nilobject import W_NilObject
 from topaz.objects.numericobject import W_NumericObject
 from topaz.objects.objectobject import W_Object, W_BaseObject
 from topaz.objects.procobject import W_ProcObject
+from topaz.objects.randomobject import W_RandomObject
 from topaz.objects.rangeobject import W_RangeObject
 from topaz.objects.regexpobject import W_RegexpObject
 from topaz.objects.stringobject import W_StringObject
@@ -116,6 +116,8 @@ class ObjectSpace(object):
         self.w_string = self.getclassfor(W_StringObject)
         self.w_regexp = self.getclassfor(W_RegexpObject)
         self.w_hash = self.getclassfor(W_HashObject)
+        self.w_method = self.getclassfor(W_MethodObject)
+        self.w_unbound_method = self.getclassfor(W_UnboundMethodObject)
         self.w_NoMethodError = self.getclassfor(W_NoMethodError)
         self.w_ArgumentError = self.getclassfor(W_ArgumentError)
         self.w_LocalJumpError = self.getclassfor(W_LocalJumpError)
@@ -146,7 +148,7 @@ class ObjectSpace(object):
             self.w_basicobject, self.w_object, self.w_array, self.w_proc,
             self.w_numeric, self.w_fixnum, self.w_float, self.w_string,
             self.w_symbol, self.w_class, self.w_module, self.w_hash,
-            self.w_regexp,
+            self.w_regexp, self.w_method, self.w_unbound_method,
 
             self.w_NoMethodError, self.w_ArgumentError, self.w_TypeError,
             self.w_ZeroDivisionError, self.w_SystemExit, self.w_RangeError,
@@ -165,14 +167,12 @@ class ObjectSpace(object):
             self.getclassfor(W_RangeObject),
             self.getclassfor(W_IOObject),
             self.getclassfor(W_FileObject),
-            self.getclassfor(W_Dir),
+            self.getclassfor(W_DirObject),
             self.getclassfor(W_EncodingObject),
             self.getclassfor(W_IntegerObject),
             self.getclassfor(W_RandomObject),
             self.getclassfor(W_ThreadObject),
             self.getclassfor(W_TimeObject),
-            self.getclassfor(W_MethodObject),
-            self.getclassfor(W_UnboundMethodObject),
 
             self.getclassfor(W_ExceptionObject),
             self.getclassfor(W_StandardError),
@@ -205,11 +205,7 @@ class ObjectSpace(object):
         self.send(self.w_object, self.newsymbol("include"), [self.w_kernel])
         self.bootstrap = False
 
-        self.w_load_path = self.newarray([
-            self.newstr_fromstr(os.path.abspath(
-                os.path.join(os.path.dirname(__file__), os.path.pardir, "lib-ruby")
-            ))
-        ])
+        self.w_load_path = self.newarray([])
         self.globals.define_virtual("$LOAD_PATH", lambda space: space.w_load_path)
         self.globals.define_virtual("$:", lambda space: space.w_load_path)
 
@@ -219,6 +215,8 @@ class ObjectSpace(object):
 
         self.w_main_thread = W_ThreadObject(self)
 
+        self.w_load_path = self.newarray([])
+        self.base_lib_path = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), os.path.pardir), "lib-ruby"))
         # TODO: this should really go in a better place.
         self.execute("""
         def self.include *mods
@@ -228,6 +226,21 @@ class ObjectSpace(object):
 
     def _freeze_(self):
         return True
+
+    def setup(self, executable):
+        """
+        Performs runtime setup.
+        """
+        path = rpath.rabspath(executable)
+        # Fallback to a path relative to the compiled location.
+        lib_path = self.base_lib_path
+        while path:
+            path = rpath.rabspath(os.path.join(path, os.path.pardir))
+            if os.path.isdir(os.path.join(path, "lib-ruby")):
+                lib_path = os.path.join(path, "lib-ruby")
+                break
+
+        self.send(self.w_load_path, self.newsymbol("unshift"), [self.newstr_fromstr(lib_path)])
 
     @specialize.memo()
     def fromcache(self, key):
@@ -244,7 +257,7 @@ class ObjectSpace(object):
         except ParsingError as e:
             raise self.error(self.w_SyntaxError, "line %d" % e.getsourcepos().lineno)
         except LexerError as e:
-            raise self.error(self.w_SyntaxError, "line %d" % e.pos.lineno)
+            raise self.error(self.w_SyntaxError, "line %d (%s)" % (e.pos.lineno, e.msg))
 
     def compile(self, source, filepath, initial_lineno=1, symtable=None):
         if symtable is None:
@@ -398,6 +411,12 @@ class ObjectSpace(object):
         for i in xrange(len(frame.cells)):
             cells[i] = frame.cells[i].upgrade_to_closure(frame, i)
         return W_BindingObject(self, names, cells, frame.w_self, frame.lexical_scope)
+
+    @jit.unroll_safe
+    def newbinding_fromblock(self, block):
+        names = block.bytecode.cellvars + block.bytecode.freevars
+        cells = block.cells[:]
+        return W_BindingObject(self, names, cells, block.w_self, block.lexical_scope)
 
     def int_w(self, w_obj):
         return w_obj.int_w(self)

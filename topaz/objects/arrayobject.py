@@ -48,6 +48,10 @@ class W_ArrayObject(W_Object):
     def singleton_method_allocate(self, space):
         return space.newarray([])
 
+    @classdef.singleton_method("[]")
+    def singleton_method_subscript(self, space, args_w):
+        return space.newarray(args_w)
+
     @classdef.method("initialize_copy")
     def method_initialize_copy(self, space, w_other):
         assert isinstance(w_other, W_ArrayObject)
@@ -106,7 +110,7 @@ class W_ArrayObject(W_Object):
             self.items_w[start] = w_obj
         elif as_range:
             assert end >= 0
-            w_converted = space.convert_type(w_obj, space.w_array, 'to_ary', raise_error=False)
+            w_converted = space.convert_type(w_obj, space.w_array, "to_ary", raise_error=False)
             if w_converted is space.w_nil:
                 rep_w = [w_obj]
             else:

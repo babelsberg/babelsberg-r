@@ -463,6 +463,11 @@ class TestParser(BaseTopazTest):
             ast.Statement(ast.Send(ast.Self(1), "a", [], None, 1))
         ]))
 
+    def test_tab_indentation(self, space):
+        assert space.parse("\ta") == ast.Main(ast.Block([
+            ast.Statement(ast.Send(ast.Self(1), "a", [], None, 1))
+        ]))
+
     def test_if_statement(self, space):
         res = lambda lineno: ast.Main(ast.Block([
             ast.Statement(ast.If(ast.ConstantInt(3), ast.Block([
@@ -990,6 +995,21 @@ class TestParser(BaseTopazTest):
         assert space.parse('"\u2603"') == string(u"\u2603".encode("utf-8"))
         assert space.parse('?\u2603') == string(u"\u2603".encode("utf-8"))
         assert space.parse('"\uffff"') == string(u"\uffff".encode("utf-8"))
+        assert space.parse('"\u{ff}"') == string(u"\u00ff".encode("utf-8"))
+        assert space.parse('?\u{ff}') == string(u"\u00ff".encode("utf-8"))
+        assert space.parse('"\u{3042 3044 3046 3048}"') == string(u"\u3042\u3044\u3046\u3048".encode("utf-8"))
+        with self.raises(space, "SyntaxError", "line 1 (invalid Unicode escape)"):
+            space.parse('"\u123x"')
+        with self.raises(space, "SyntaxError", "line 1 (invalid Unicode escape)"):
+            space.parse('"\u{}"')
+        with self.raises(space, "SyntaxError", "line 1 (invalid Unicode escape)"):
+            space.parse('"\u{ 3042}"')
+        with self.raises(space, "SyntaxError", "line 1 (unterminated Unicode escape)"):
+            space.parse('"\u{123x}"')
+        with self.raises(space, "SyntaxError", "line 1 (unterminated Unicode escape)"):
+            space.parse('?\u{3042 3044}')
+        with self.raises(space, "SyntaxError", "line 1 (invalid Unicode codepoint (too large))"):
+            space.parse('"\u{110000}"')
 
     def test_dynamic_string(self, space):
         const_string = lambda strvalue: ast.Main(ast.Block([
@@ -1460,6 +1480,11 @@ HERE
             ast.Statement(ast.Symbol(ast.DynamicString([ast.Block([ast.Statement(ast.ConstantInt(2))])]), 1))
         ]))
         assert space.parse("%s{foo bar}") == sym("foo bar")
+        assert space.parse(":-@") == sym("-@")
+        assert space.parse(":+@") == sym("+@")
+        assert space.parse(":$-w") == sym("$-w")
+        assert space.parse(u":åäö".encode("utf-8")) == sym(u"åäö".encode("utf-8"))
+        assert space.parse(u":８ ９ ＡＢＣ".encode("utf-8")) == sym(u"８ ９ ＡＢＣ".encode("utf-8"))
 
     def test_do_symbol(self, space):
         r = space.parse("f :do")
@@ -2025,6 +2050,7 @@ HERE
         assert space.parse("$'") == simple_global("$'")
         assert space.parse("$+") == simple_global("$+")
         assert space.parse("$,") == simple_global("$,")
+        assert space.parse("$-w") == simple_global("$-w")
 
     def test_comments(self, space):
         r = space.parse("""

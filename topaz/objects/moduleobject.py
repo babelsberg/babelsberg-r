@@ -42,6 +42,30 @@ class UndefMethod(W_FunctionObject):
         return space.send(w_obj, space.newsymbol("method_missing"), args_w, block)
 
 
+class DefineMethodBlock(W_FunctionObject):
+    _immutable_fields_ = ["name", "block"]
+
+    def __init__(self, name, block):
+        self.name = name
+        self.block = block
+
+    def call(self, space, w_obj, args_w, block):
+        method_block = self.block.copy(w_self=w_obj)
+        return space.invoke_block(method_block, args_w, block)
+
+
+class DefineMethodMethod(W_FunctionObject):
+    _immutable_fields_ = ["name", "w_unbound_method"]
+
+    def __init__(self, name, w_unbound_method):
+        self.name = name
+        self.w_unbound_method = w_unbound_method
+
+    def call(self, space, w_obj, args_w, block):
+        w_bound_method = space.send(self.w_unbound_method, space.newsymbol("bind"), [w_obj])
+        return space.send(w_bound_method, space.newsymbol("call"), args_w, block)
+
+
 class W_ModuleObject(W_RootObject):
     _immutable_fields_ = ["version?", "included_modules?[*]", "klass?", "name?"]
 
@@ -212,7 +236,8 @@ class W_ModuleObject(W_RootObject):
 
     def included(self, space, w_mod):
         self.descendants.append(w_mod)
-        space.send(self, space.newsymbol("included"), [w_mod])
+        if space.respond_to(self, space.newsymbol("included")):
+            space.send(self, space.newsymbol("included"), [w_mod])
 
     def extend_object(self, space, w_obj, w_mod):
         if w_mod not in self.ancestors():
@@ -221,12 +246,8 @@ class W_ModuleObject(W_RootObject):
 
     def extended(self, space, w_obj, w_mod):
         self.descendants.append(w_mod)
-        space.send(self, space.newsymbol("extended"), [w_obj])
-
-    def inherited(self, space, w_mod):
-        self.descendants.append(w_mod)
-        if not space.bootstrap:
-            space.send(self, space.newsymbol("inherited"), [w_mod])
+        if space.respond_to(self, space.newsymbol("extended")):
+            space.send(self, space.newsymbol("extended"), [w_obj])
 
     def set_visibility(self, space, names_w, visibility):
         names = [space.symbol_w(w_name) for w_name in names_w]
@@ -261,6 +282,21 @@ class W_ModuleObject(W_RootObject):
         ancestors = self.ancestors()
         for idx in xrange(len(ancestors) - 1, -1, -1):
             w_mod.include_module(space, ancestors[idx])
+
+    @classdef.method("define_method", name="symbol")
+    def method_define_method(self, space, name, w_method=None, block=None):
+        if w_method is not None:
+            if space.is_kind_of(w_method, space.w_method):
+                w_method = space.send(w_method, space.newsymbol("unbind"))
+
+            if space.is_kind_of(w_method, space.w_unbound_method):
+                self.define_method(space, name, DefineMethodMethod(name, w_method))
+            elif space.is_kind_of(w_method, space.w_proc):
+                self.define_method(space, name, DefineMethodBlock(name, w_method.get_block()))
+        elif block is not None:
+            self.define_method(space, name, DefineMethodBlock(name, block))
+        else:
+            raise space.error(space.w_ArgumentError, "tried to create Proc object without a block")
 
     @classdef.method("attr_accessor")
     def method_attr_accessor(self, space, args_w):
@@ -312,16 +348,14 @@ class W_ModuleObject(W_RootObject):
     def method_ancestors(self, space):
         return space.newarray(self.ancestors(include_singleton=False))
 
-    @classdef.method("inherited")
-    def method_inherited(self, space, w_mod):
-        pass
-
     @classdef.method("included")
     def method_included(self, space, w_mod):
+        # TODO: should be private
         pass
 
     @classdef.method("extended")
     def method_included(self, space, w_mod):
+        # TODO: should be private
         pass
 
     @classdef.method("name")
