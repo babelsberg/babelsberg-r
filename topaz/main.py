@@ -3,7 +3,7 @@ from __future__ import absolute_import
 import os
 
 from rpython.rlib.objectmodel import specialize
-from rpython.rlib.streamio import open_file_as_stream
+from rpython.rlib.streamio import open_file_as_stream, fdopen_as_stream
 
 from topaz.error import RubyError, print_traceback
 from topaz.objects.exceptionobject import W_SystemExit
@@ -25,6 +25,7 @@ def _entry_point(space, argv):
     verbose = False
     path = None
     exprs = []
+    load_path_entries = []
     idx = 1
     while idx < len(argv):
         arg = argv[idx]
@@ -32,7 +33,17 @@ def _entry_point(space, argv):
             verbose = True
         elif arg == "-e":
             idx += 1
+            if idx == len(argv):
+                os.write(2, "no code specified for -e (RuntimeError)\n")
+                return 1
             exprs.append(argv[idx])
+        elif arg.startswith("-e"):
+            exprs.append(arg[2:])
+        elif arg == "-I":
+            idx += 1
+            load_path_entries += argv[idx].split(os.pathsep)
+        elif arg.startswith("-I"):
+            load_path_entries += arg[2:].split(os.pathsep)
         else:
             break
         idx += 1
@@ -43,6 +54,12 @@ def _entry_point(space, argv):
     while idx < len(argv):
         argv_w.append(space.newstr_fromstr(argv[idx]))
         idx += 1
+    for path_entry in load_path_entries:
+        space.send(
+            space.w_load_path,
+            space.newsymbol("<<"),
+            [space.newstr_fromstr(path_entry)]
+        )
     space.set_const(space.w_object, "ARGV", space.newarray(argv_w))
 
     system, _, _, _, cpu = os.uname()
@@ -76,7 +93,8 @@ def _entry_point(space, argv):
     elif verbose:
         return 0
     else:
-        raise NotImplementedError("reading script from stdin")
+        source = fdopen_as_stream(0, "r").readall()
+        path = "-"
 
     space.globals.set(space, "$0", space.newstr_fromstr(path))
     status = 0

@@ -2,7 +2,7 @@ import copy
 
 from rpython.rlib.listsort import TimSort
 
-from topaz.module import ClassDef
+from topaz.module import ClassDef, check_frozen
 from topaz.modules.enumerable import Enumerable
 from topaz.objects.objectobject import W_Object
 from topaz.utils.packing.pack import RPacker
@@ -139,10 +139,9 @@ class W_ArrayObject(W_Object):
     def method_emptyp(self, space):
         return space.newbool(len(self.items_w) == 0)
 
-    @classdef.method("+")
-    def method_add(self, space, w_other):
-        assert isinstance(w_other, W_ArrayObject)
-        return space.newarray(self.items_w + w_other.items_w)
+    @classdef.method("+", other="array")
+    def method_add(self, space, other):
+        return space.newarray(self.items_w + other)
 
     classdef.app_method("""
     def -(other)
@@ -157,21 +156,25 @@ class W_ArrayObject(W_Object):
     """)
 
     @classdef.method("<<")
+    @check_frozen()
     def method_lshift(self, space, w_obj):
         self.items_w.append(w_obj)
         return self
 
-    @classdef.method("concat")
-    def method_concat(self, space, w_ary):
-        self.items_w += space.listview(w_ary)
+    @classdef.method("concat", other="array")
+    @check_frozen()
+    def method_concat(self, space, other):
+        self.items_w += other
         return self
 
     @classdef.method("push")
+    @check_frozen()
     def method_push(self, space, args_w):
         self.items_w.extend(args_w)
         return self
 
     @classdef.method("shift")
+    @check_frozen()
     def method_shift(self, space, w_n=None):
         if w_n is None:
             if self.items_w:
@@ -186,6 +189,7 @@ class W_ArrayObject(W_Object):
         return space.newarray(items_w)
 
     @classdef.method("unshift")
+    @check_frozen()
     def method_unshift(self, space, args_w):
         for i in xrange(len(args_w) - 1, -1, -1):
             w_obj = args_w[i]
@@ -208,6 +212,12 @@ class W_ArrayObject(W_Object):
             space.str_w(space.send(w_o, space.newsymbol("to_s")))
             for w_o in self.items_w
         ]))
+
+    @classdef.singleton_method("try_convert")
+    def method_try_convert(self, space, w_obj):
+        if not space.is_kind_of(w_obj, space.w_array):
+            w_obj = space.convert_type(w_obj, space.w_array, "to_ary", raise_error=False)
+        return w_obj
 
     classdef.app_method("""
     def at idx
@@ -244,6 +254,10 @@ class W_ArrayObject(W_Object):
         self.select { |each| !each.nil? }
     end
 
+    def compact!
+        reject! { |obj| obj.nil? }
+    end
+
     def reject!(&block)
         prev_size = self.size
         self.delete_if(&block)
@@ -254,6 +268,7 @@ class W_ArrayObject(W_Object):
 
     classdef.app_method("""
     def delete_if
+        raise RuntimeError, "can't modify frozen #{self.class}" if frozen?
         i = 0
         c = 0
         sz = self.size
@@ -301,8 +316,11 @@ class W_ArrayObject(W_Object):
     """)
 
     @classdef.method("delete_at", idx="int")
+    @check_frozen()
     def method_delete_at(self, space, idx):
-        if idx >= len(self.items_w):
+        if idx < 0:
+            idx += len(self.items_w)
+        if idx < 0 or idx >= len(self.items_w):
             return space.w_nil
         else:
             return self.items_w.pop(idx)
@@ -330,7 +348,8 @@ class W_ArrayObject(W_Object):
         return self
 
     @classdef.method("clear")
-    def method_clear(self):
+    @check_frozen()
+    def method_clear(self, space):
         del self.items_w[:]
         return self
 
@@ -340,6 +359,31 @@ class W_ArrayObject(W_Object):
         return self
 
     classdef.app_method("""
+    def flatten(level = -1)
+        list = []
+        recursion = Thread.current.recursion_guard(self) do
+            self.each do |item|
+                if level == 0
+                    list << item
+                elsif ary = Array.try_convert(item)
+                    list.concat(ary.flatten(level - 1))
+                else
+                    list << item
+                end
+            end
+            return list
+        end
+        if recursion
+            raise ArgumentError, "tried to flatten recursive array"
+        end
+    end
+
+    def flatten!(level = -1)
+        list = self.flatten(level)
+        self.clear
+        return self.concat list
+    end
+
     def sort(&block)
         dup.sort!(&block)
     end
