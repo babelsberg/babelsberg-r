@@ -1,4 +1,5 @@
 from topaz.objects.objectobject import W_Root
+from topaz.objects.intobject import W_FixnumObject
 
 
 class BaseCell(W_Root):
@@ -6,19 +7,18 @@ class BaseCell(W_Root):
 
 
 class LocalCell(BaseCell):
-    def get(self, frame, pos):
+    def get(self, space, frame, pos):
         return frame.localsstack_w[pos]
 
-    get_prev = get
-
-    def set(self, frame, pos, w_value):
+    def set(self, space, frame, pos, w_value):
         frame.localsstack_w[pos] = w_value
 
-    def advance_time(self, frame, pos):
-        pass
-
-    def upgrade_to_closure(self, frame, pos):
-        frame.cells[pos] = result = ClosureCell(self.get(frame, pos), None)
+    def upgrade_to_closure(self, space, frame, pos):
+        w_obj = self.get(space, frame, pos)
+        if isinstance(w_obj, W_FixnumObject):
+            frame.cells[pos] = result = IntCell(space.int_w(w_obj))
+        else:
+            frame.cells[pos] = result = ClosureCell(w_obj)
         return result
 
     def get_constraint(self):
@@ -33,19 +33,13 @@ class ClosureCell(BaseCell):
         self.w_value = [w_value, w_prev]
         self.w_constraint = None
 
-    def get(self, frame, pos):
-        return self.w_value[0]
+    def get(self, space, frame, pos):
+        return self.w_value
 
-    def get_prev(self, frame, pos):
-        return self.w_value[1]
+    def set(self, space, frame, pos, w_value):
+        self.w_value = w_value
 
-    def set(self, frame, pos, w_value):
-        self.w_value[0] = w_value
-
-    def advance_time(self, frame, pos):
-        self.w_value[1] = self.w_value[0]
-
-    def upgrade_to_closure(self, frame, pos):
+    def upgrade_to_closure(self, space, frame, pos):
         return self
 
     def get_constraint(self):
@@ -53,3 +47,22 @@ class ClosureCell(BaseCell):
 
     def set_constraint(self, w_value):
         self.w_constraint = w_value
+
+
+class IntCell(ClosureCell):
+    def __init__(self, intvalue):
+        ClosureCell.__init__(self, None)
+        self.intvalue = intvalue
+
+    def get(self, space, frame, pos):
+        if self.w_value is None:
+            return space.newint(self.intvalue)
+        else:
+            return ClosureCell.get(self, space, frame, pos)
+
+    def set(self, space, frame, pos, w_value):
+        if isinstance(w_value, W_FixnumObject):
+            self.intvalue = space.int_w(w_value)
+            self.w_value = None
+        else:
+            ClosureCell.set(self, space, frame, pos, w_value)

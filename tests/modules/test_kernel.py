@@ -1,4 +1,5 @@
 import os
+import time
 
 import pytest
 
@@ -15,6 +16,11 @@ class TestKernel(BaseTopazTest):
         space.execute("print 1, 3")
         out, err = capfd.readouterr()
         assert out == "13"
+
+    def test_p(self, space, capfd):
+        space.execute("p 1,2,3")
+        out, err = capfd.readouterr()
+        assert out == "1\n2\n3\n"
 
     def test_lambda(self, space):
         w_res = space.execute("""
@@ -197,6 +203,17 @@ class TestKernel(BaseTopazTest):
         return res
         """)
         assert self.unwrap(space, w_res) == [1, 2, 3]
+
+    def test_sleep(self, space):
+        now = time.time()
+        w_res = space.execute("return sleep 0.001")
+        assert space.int_w(w_res) == 0
+        assert time.time() - now >= 0.001
+
+        now = time.time()
+        w_res = space.execute("return sleep 0.002")
+        assert space.int_w(w_res) == 0
+        assert time.time() - now >= 0.002
 
     def test_trust(self, space):
         w_res = space.execute("return 'a'.untrusted?")

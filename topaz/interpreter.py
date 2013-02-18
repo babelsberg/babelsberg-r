@@ -27,6 +27,7 @@ class Interpreter(object):
         reds=["self", "frame"],
         virtualizables=["frame"],
         get_printable_location=get_printable_location,
+        check_untranslated=False
     )
 
     def __init__(self):
@@ -172,7 +173,7 @@ class Interpreter(object):
         # this lookup all the time
         if w_var:
             space.send(w_var, space.newsymbol("set!"))
-        frame.push(frame.cells[idx].get(frame, idx) or space.w_nil)
+        frame.push(frame.cells[idx].get(space, frame, idx) or space.w_nil)
 
     def STORE_DEREF(self, space, bytecode, frame, pc, idx):
         w_var = space.findconstraintvariable(cell=frame.cells[idx])
@@ -180,9 +181,10 @@ class Interpreter(object):
             space.suggest_value(w_var, frame.peek())
         else:
             frame.cells[idx].set(frame, idx, frame.peek())
+        frame.cells[idx].set(space, frame, idx, frame.peek())
 
     def LOAD_CLOSURE(self, space, bytecode, frame, pc, idx):
-        frame.push(frame.cells[idx].upgrade_to_closure(frame, idx))
+        frame.push(frame.cells[idx].upgrade_to_closure(space, frame, idx))
 
     def LOAD_CONSTANT(self, space, bytecode, frame, pc, idx):
         space.getexecutioncontext().last_instr = pc
@@ -365,6 +367,11 @@ class Interpreter(object):
             self, frame.regexp_match_cell
         )
         frame.push(block)
+
+    def BUILD_LAMBDA(self, space, bytecode, frame, pc):
+        block = frame.pop()
+        assert isinstance(block, W_BlockObject)
+        frame.push(space.newproc(block, is_lambda=True))
 
     def BUILD_CLASS(self, space, bytecode, frame, pc):
         space.getexecutioncontext().last_instr = pc

@@ -2,7 +2,8 @@ import copy
 
 from rpython.rlib.listsort import TimSort
 
-from topaz.module import ClassDef
+from topaz.coerce import Coerce
+from topaz.module import ClassDef, check_frozen
 from topaz.modules.enumerable import Enumerable
 from topaz.objects.objectobject import W_Object
 from topaz.utils.packing.pack import RPacker
@@ -52,11 +53,12 @@ class W_ArrayObject(W_Object):
     def singleton_method_subscript(self, space, args_w):
         return space.newarray(args_w)
 
-    @classdef.method("initialize_copy")
-    def method_initialize_copy(self, space, w_other):
-        assert isinstance(w_other, W_ArrayObject)
+    @classdef.method("initialize_copy", other_w="array")
+    @classdef.method("replace", other_w="array")
+    @check_frozen()
+    def method_replace(self, space, other_w):
         del self.items_w[:]
-        self.items_w.extend(w_other.items_w)
+        self.items_w.extend(other_w)
         return self
 
     classdef.app_method("""
@@ -74,6 +76,7 @@ class W_ArrayObject(W_Object):
 
     @classdef.method("at")
     @classdef.method("[]")
+    @classdef.method("slice")
     def method_subscript(self, space, w_idx, w_count=None):
         start, end, as_range, nil = space.subscript_access(len(self.items_w), w_idx, w_count=w_count)
         if nil:
@@ -130,6 +133,26 @@ class W_ArrayObject(W_Object):
             self.items_w[start] = w_obj
         return w_obj
 
+    @classdef.method("slice!")
+    @check_frozen()
+    def method_slice_i(self, space, w_idx, w_count=None):
+        start, end, as_range, nil = space.subscript_access(len(self.items_w), w_idx, w_count=w_count)
+
+        if nil:
+            return space.w_nil
+        elif as_range:
+            start = min(max(start, 0), len(self.items_w))
+            end = min(max(end, 0), len(self.items_w))
+            delta = (end - start)
+            assert delta >= 0
+            w_items = self.items_w[start:start + delta]
+            del self.items_w[start:start + delta]
+            return space.newarray(w_items)
+        else:
+            w_item = self.items_w[start]
+            del self.items_w[start]
+            return w_item
+
     @classdef.method("size")
     @classdef.method("length")
     def method_length(self, space):
@@ -139,10 +162,9 @@ class W_ArrayObject(W_Object):
     def method_emptyp(self, space):
         return space.newbool(len(self.items_w) == 0)
 
-    @classdef.method("+")
-    def method_add(self, space, w_other):
-        assert isinstance(w_other, W_ArrayObject)
-        return space.newarray(self.items_w + w_other.items_w)
+    @classdef.method("+", other="array")
+    def method_add(self, space, other):
+        return space.newarray(self.items_w + other)
 
     classdef.app_method("""
     def -(other)
@@ -157,21 +179,25 @@ class W_ArrayObject(W_Object):
     """)
 
     @classdef.method("<<")
+    @check_frozen()
     def method_lshift(self, space, w_obj):
         self.items_w.append(w_obj)
         return self
 
-    @classdef.method("concat")
-    def method_concat(self, space, w_ary):
-        self.items_w += space.listview(w_ary)
+    @classdef.method("concat", other="array")
+    @check_frozen()
+    def method_concat(self, space, other):
+        self.items_w += other
         return self
 
     @classdef.method("push")
+    @check_frozen()
     def method_push(self, space, args_w):
         self.items_w.extend(args_w)
         return self
 
     @classdef.method("shift")
+    @check_frozen()
     def method_shift(self, space, w_n=None):
         if w_n is None:
             if self.items_w:
@@ -186,6 +212,7 @@ class W_ArrayObject(W_Object):
         return space.newarray(items_w)
 
     @classdef.method("unshift")
+    @check_frozen()
     def method_unshift(self, space, args_w):
         for i in xrange(len(args_w) - 1, -1, -1):
             w_obj = args_w[i]
@@ -208,6 +235,12 @@ class W_ArrayObject(W_Object):
             space.str_w(space.send(w_o, space.newsymbol("to_s")))
             for w_o in self.items_w
         ]))
+
+    @classdef.singleton_method("try_convert")
+    def method_try_convert(self, space, w_obj):
+        if not space.is_kind_of(w_obj, space.w_array):
+            w_obj = space.convert_type(w_obj, space.w_array, "to_ary", raise_error=False)
+        return w_obj
 
     classdef.app_method("""
     def at idx
@@ -244,16 +277,29 @@ class W_ArrayObject(W_Object):
         self.select { |each| !each.nil? }
     end
 
+    def compact!
+        reject! { |obj| obj.nil? }
+    end
+
     def reject!(&block)
         prev_size = self.size
         self.delete_if(&block)
         return nil if prev_size == self.size
         self
     end
+
+    def assoc(key)
+        detect { |arr| arr.is_a?(Array) && arr[0] == key }
+    end
+
+    def rassoc(value)
+        detect { |arr| arr.is_a?(Array) && arr[1] == value }
+    end
     """)
 
     classdef.app_method("""
     def delete_if
+        raise RuntimeError, "can't modify frozen #{self.class}" if frozen?
         i = 0
         c = 0
         sz = self.size
@@ -301,8 +347,11 @@ class W_ArrayObject(W_Object):
     """)
 
     @classdef.method("delete_at", idx="int")
+    @check_frozen()
     def method_delete_at(self, space, idx):
-        if idx >= len(self.items_w):
+        if idx < 0:
+            idx += len(self.items_w)
+        if idx < 0 or idx >= len(self.items_w):
             return space.w_nil
         else:
             return self.items_w.pop(idx)
@@ -314,7 +363,16 @@ class W_ArrayObject(W_Object):
     """)
 
     @classdef.method("last")
-    def method_last(self, space):
+    def method_last(self, space, w_count=None):
+        if w_count is not None:
+            count = Coerce.int(space, w_count)
+            if count < 0:
+                raise space.error(space.w_ArgumentError, "negative array size")
+            start = len(self.items_w) - count
+            if start < 0:
+                start = 0
+            return space.newarray(self.items_w[start:])
+
         if len(self.items_w) == 0:
             return space.w_nil
         else:
@@ -330,7 +388,8 @@ class W_ArrayObject(W_Object):
         return self
 
     @classdef.method("clear")
-    def method_clear(self):
+    @check_frozen()
+    def method_clear(self, space):
         del self.items_w[:]
         return self
 
@@ -340,6 +399,31 @@ class W_ArrayObject(W_Object):
         return self
 
     classdef.app_method("""
+    def flatten(level = -1)
+        list = []
+        recursion = Thread.current.recursion_guard(self) do
+            self.each do |item|
+                if level == 0
+                    list << item
+                elsif ary = Array.try_convert(item)
+                    list.concat(ary.flatten(level - 1))
+                else
+                    list << item
+                end
+            end
+            return list
+        end
+        if recursion
+            raise ArgumentError, "tried to flatten recursive array"
+        end
+    end
+
+    def flatten!(level = -1)
+        list = self.flatten(level)
+        self.clear
+        return self.concat list
+    end
+
     def sort(&block)
         dup.sort!(&block)
     end
@@ -422,5 +506,38 @@ class W_ArrayObject(W_Object):
             max = e if (block ? block.call(max, e) : max <=> e) < 0
         end
         max
+    end
+    """)
+
+    classdef.app_method("""
+    def uniq!(&block)
+        raise RuntimeError, "can't modify frozen #{self.class}" if frozen?
+        seen = {}
+        old_len = self.length
+        i = 0
+        shifted = 0
+        while i < self.length do
+            item = self[i]
+            item = yield(item) if block
+            if seen.include? item
+                shifted += 1
+            else
+                seen[item] = nil
+                self[i - shifted] = item if shifted > 0
+            end
+            i += 1
+        end
+        if shifted > 0
+            self.slice!(-shifted, shifted)
+            return self
+        else
+            return nil
+        end
+    end
+
+    def uniq(&block)
+        arr = self.dup
+        arr.uniq!(&block)
+        return arr
     end
     """)
