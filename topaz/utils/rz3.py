@@ -1,4 +1,5 @@
 import os
+import platform
 import sys
 
 from rpython.rtyper.tool import rffi_platform
@@ -6,9 +7,13 @@ from rpython.rtyper.lltypesystem import rffi, lltype
 from rpython.translator.tool.cbuild import ExternalCompilationInfo
 
 
+class Z3Error(Exception):
+    pass
+
+
 WINNT = os.name == "nt"
 POSIX = os.name == "posix"
-
+_64BIT = "64bit" in platform.architecture()[0]
 
 z3_dir = os.path.abspath(os.path.join(
     os.path.dirname(__file__),
@@ -77,14 +82,57 @@ z3_del_context = rffi.llexternal("Z3_del_context", [Z3_context], lltype.Void, co
 # AST
 Z3_ast = rffi.COpaquePtr("Z3_ast")
 Z3_func_decl = rffi.COpaquePtr("Z3_func_decl")
+
 _z3_get_numeral_string = rffi.llexternal(
     "Z3_get_numeral_string",
     [Z3_context, Z3_ast],
     rffi.CCHARP,
     compilation_info=eci
 )
+
 def z3_get_numeral_string(ctx, ast):
     return rffi.charp2str(_z3_get_numeral_string(ctx, ast))
+
+_z3_get_numeral_int = rffi.llexternal(
+    "Z3_get_numeral_int64" if _64BIT else "Z3_get_numeral_int64",
+    [Z3_context, Z3_ast, rffi.INTP],
+    rffi.INT,
+    compilation_info=eci
+)
+
+def z3_get_numeral_int(ctx, ast):
+    ptr = lltype.malloc(rffi.INTP.TO, 1, flavor='raw')
+    status = _z3_get_numeral_int(ctx, ast, ptr)
+    if status != 1:
+        raise Z3Error("result does not fit into int-type")
+    else:
+        return int(ptr[0])
+
+if _64BIT:
+    _z3_get_numeral_real = rffi.llexternal(
+        "Z3_get_numeral_rational_int64",
+        [Z3_context, Z3_ast, rffi.INTP, rffi.INTP],
+        rffi.INT,
+        compilation_info=eci
+    )
+    def z3_get_numeral_real(ctx, ast):
+        nom = lltype.malloc(rffi.INTP.TO, 1, flavor='raw')
+        den = lltype.malloc(rffi.INTP.TO, 1, flavor='raw')
+        status = _z3_get_numeral_real(ctx, ast, nom, den)
+        if status != 1:
+            raise Z3Error("result does not fit into int-type")
+        else:
+            return float(nom[0]) / float(den[0])
+else:
+    _z3_get_denominator = rffi.llexternal("Z3_get_denominator", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
+    _z3_get_numerator = rffi.llexternal("Z3_get_numerator", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
+    def z3_get_numeral_real(ctx, ast):
+        nom_ast = _z3_get_numerator(ctx, ast)
+        den_ast = _z3_get_denominator(ctx, ast)
+        nom = z3_get_numeral_int(ctx, nom_ast)
+        den = z3_get_numeral_int(ctx, den_ast)
+        return float(nom) / float(den)
+
 z3_get_ast_kind = rffi.llexternal("Z3_get_ast_kind", [Z3_context, Z3_ast], rffi.INT, compilation_info=eci)
 z3_get_app_decl = rffi.llexternal("Z3_get_app_decl", [Z3_context, Z3_ast], Z3_func_decl, compilation_info=eci)
 

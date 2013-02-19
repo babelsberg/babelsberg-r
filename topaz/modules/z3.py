@@ -112,9 +112,12 @@ class Z3(Module):
             interp_ast = rz3.z3_model_get_const_interp(self.ctx, self.model, w_ast.getdecl(self.ctx))
             kind = rz3.z3_get_ast_kind(self.ctx, interp_ast)
             if kind == 0: # Z3_NUMERAL_AST
-                numstr = rz3.z3_get_numeral_string(self.ctx, interp_ast)
+                try:
+                    return space.newint(rz3.z3_get_numeral_int(self.ctx, interp_ast))
+                except rz3.Z3Error:
+                    return space.newfloat(rz3.z3_get_numeral_real(self.ctx, interp_ast))
             else:
-                raise NotImplementedError("only numeral asts implemented")
+                raise NotImplementedError("Ast type %d" % kind)
             return space.newstr_fromstr(numstr)
 
 

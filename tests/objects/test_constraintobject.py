@@ -174,4 +174,4 @@ class TestConstraintVariableObject(BaseTopazTest):
         always { a ** 2.0 < 16 }
         return a
         """)
-        assert self.unwrap(space, w_res) == "-3"
+        assert self.unwrap(space, w_res) == -3
