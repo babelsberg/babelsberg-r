@@ -203,3 +203,52 @@ class TestConstraintVariableObject(BaseTopazTest):
         return a
         """)
         assert w_res is space.w_true
+
+    def test_complex_path_with_z3(self, space):
+        w_res = space.execute("""
+        require "libz3"
+        res = []
+        class Point
+          def x
+            @x
+          end
+        
+          def y
+            @y
+          end
+        
+          def initialize(x, y)
+            @x = x
+            @y = y
+            always { @x >= 0 }
+            always { @y >= 0 }
+            always { @x < 640 }
+            always { @y < 480 }
+          end
+        end
+
+        class HorizontalLine
+          def start
+            @start
+          end
+        
+          def end
+            @end
+          end
+        
+          def initialize(pt1, pt2)
+            @start = pt1
+            @end = pt2
+            always { pt1.y == pt2.y }
+          end
+        
+          def length
+            @end.x - @start.x
+          end
+        end
+        
+        h = HorizontalLine.new(Point.new(1, 1), Point.new(2, 2))
+        always { h.length >= 100 }
+        return h.length
+        """)
+        assert self.unwrap(space, w_res) == 100

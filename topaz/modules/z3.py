@@ -144,16 +144,20 @@ class W_Z3AstObject(W_Object):
 
         raise space.error(space.w_TypeError, "Z3 can only use Bools, Floats, and Fixnums")
 
+    def coerce_constant_arg(self, space, w_other):
+        if space.is_kind_of(w_other, space.w_z3ast):
+            other = w_other.getast()
+        elif w_other is space.w_nil or w_other is space.w_false or w_other is space.w_true:
+            other = Z3.make_bool(space.is_true(w_other))
+        else:
+            float = Coerce.float(space, w_other)
+            other = Z3.make_real(float)
+        return other
+
     def new_binop(classdef, name, func):
         @classdef.method(name)
         def method(self, space, w_other):
-            if space.is_kind_of(w_other, space.w_z3ast):
-                other = w_other.getast()
-            elif w_other is space.w_nil or w_other is space.w_false or w_other is space.w_true:
-                other = Z3.make_bool(space.is_true(w_other))
-            else:
-                float = Coerce.float(space, w_other)
-                other = Z3.make_real(float)
+            other = self.coerce_constant_arg(space, w_other)
             ast = func(Z3.get_context(), self.getast(), other)
             w_obj = W_Z3AstObject(space)
             w_obj.setast(ast)
@@ -164,6 +168,10 @@ class W_Z3AstObject(W_Object):
     method_gt = new_binop(classdef, ">", rz3.z3_mk_gt)
     method_gt = new_binop(classdef, "**", rz3.z3_mk_power)
     method_gt = new_binop(classdef, "==", rz3.z3_mk_eq)
+    method_gt = new_binop(classdef, ">=", rz3.z3_mk_ge)
+    method_gt = new_binop(classdef, "<=", rz3.z3_mk_le)
+    method_gt = new_binop(classdef, "+", rz3.z3_mk_add)
+    method_gt = new_binop(classdef, "-", rz3.z3_mk_sub)
 
     @classdef.method("enable")
     def method_enable(self, space):

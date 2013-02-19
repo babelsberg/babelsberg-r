@@ -81,6 +81,7 @@ z3_del_context = rffi.llexternal("Z3_del_context", [Z3_context], lltype.Void, co
 
 # AST
 Z3_ast = rffi.COpaquePtr("Z3_ast")
+Z3_astP = rffi.VOIDPP
 Z3_func_decl = rffi.COpaquePtr("Z3_func_decl")
 
 _z3_get_numeral_string = rffi.llexternal(
@@ -101,12 +102,14 @@ _z3_get_numeral_int = rffi.llexternal(
 )
 
 def z3_get_numeral_int(ctx, ast):
-    ptr = lltype.malloc(rffi.INTP.TO, 1, flavor='raw')
+    ptr = lltype.malloc(rffi.INTP.TO, 1, flavor='raw', zero=True)
     status = _z3_get_numeral_int(ctx, ast, ptr)
+    result = int(ptr[0])
+    lltype.free(ptr, flavor='raw')
     if status != 1:
         raise Z3Error("result does not fit into int-type")
     else:
-        return int(ptr[0])
+        return result
 
 if _64BIT:
     _z3_get_numeral_real = rffi.llexternal(
@@ -116,13 +119,17 @@ if _64BIT:
         compilation_info=eci
     )
     def z3_get_numeral_real(ctx, ast):
-        nom = lltype.malloc(rffi.INTP.TO, 1, flavor='raw')
-        den = lltype.malloc(rffi.INTP.TO, 1, flavor='raw')
+        nom = lltype.malloc(rffi.INTP.TO, 1, flavor='raw', zero=True)
+        den = lltype.malloc(rffi.INTP.TO, 1, flavor='raw', zero=True)
         status = _z3_get_numeral_real(ctx, ast, nom, den)
+        fnom = float(nom[0])
+        fden = float(den[0])
+        lltype.free(nom, flavor='raw')
+        lltype.free(den, flavor='raw')
         if status != 1:
             raise Z3Error("result does not fit into int-type")
         else:
-            return float(nom[0]) / float(den[0])
+            return fnom / fden
 else:
     _z3_get_denominator = rffi.llexternal("Z3_get_denominator", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
     _z3_get_numerator = rffi.llexternal("Z3_get_numerator", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
@@ -147,8 +154,29 @@ def binop(name):
     globals()[name.lower()] = rffi.llexternal(name, [Z3_context, Z3_ast, Z3_ast], Z3_ast, compilation_info=eci)
 binop("Z3_mk_lt")
 binop("Z3_mk_gt")
+binop("Z3_mk_le")
+binop("Z3_mk_ge")
 binop("Z3_mk_power")
 binop("Z3_mk_eq")
+
+def multiop(name):
+    globals()["_" + name.lower()] = rffi.llexternal(
+        name,
+        [Z3_context, rffi.UINT, Z3_astP],
+        Z3_ast,
+        compilation_info=eci
+    )
+    def method(ctx, left, right):
+        ptr = lltype.malloc(Z3_astP.TO, 2, flavor='raw')
+        ptr[0] = left
+        ptr[1] = right
+        ast = globals()["_" + name.lower()](ctx, 2, ptr)
+        lltype.free(ptr, flavor='raw')
+        return ast
+    method.__name__ = name.lower()
+    globals()[name.lower()] = method
+multiop("Z3_mk_add")
+multiop("Z3_mk_sub")
 
 # Numerals
 z3_mk_real = rffi.llexternal("Z3_mk_real", [Z3_context, rffi.INT, rffi.INT], Z3_ast, compilation_info=eci)
