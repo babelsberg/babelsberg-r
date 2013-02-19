@@ -121,6 +121,7 @@ class ObjectSpace(object):
         self.w_hash = self.getclassfor(W_HashObject)
         self.w_method = self.getclassfor(W_MethodObject)
         self.w_unbound_method = self.getclassfor(W_UnboundMethodObject)
+        self.w_io = self.getclassfor(W_IOObject)
         self.w_NoMethodError = self.getclassfor(W_NoMethodError)
         self.w_ArgumentError = self.getclassfor(W_ArgumentError)
         self.w_LocalJumpError = self.getclassfor(W_LocalJumpError)
@@ -154,7 +155,7 @@ class ObjectSpace(object):
             self.w_basicobject, self.w_object, self.w_array, self.w_proc,
             self.w_numeric, self.w_fixnum, self.w_float, self.w_string,
             self.w_symbol, self.w_class, self.w_module, self.w_hash,
-            self.w_regexp, self.w_method, self.w_unbound_method,
+            self.w_regexp, self.w_method, self.w_unbound_method, self.w_io,
 
             self.w_NoMethodError, self.w_ArgumentError, self.w_TypeError,
             self.w_ZeroDivisionError, self.w_SystemExit, self.w_RangeError,
@@ -172,7 +173,6 @@ class ObjectSpace(object):
             self.getclassfor(W_TrueObject),
             self.getclassfor(W_FalseObject),
             self.getclassfor(W_RangeObject),
-            self.getclassfor(W_IOObject),
             self.getclassfor(W_FileObject),
             self.getclassfor(W_DirObject),
             self.getclassfor(W_EncodingObject),
@@ -241,13 +241,22 @@ class ObjectSpace(object):
         path = rpath.rabspath(executable)
         # Fallback to a path relative to the compiled location.
         lib_path = self.base_lib_path
+        kernel_path = os.path.join(os.path.join(lib_path, os.path.pardir), "lib-topaz")
         while path:
             path = rpath.rabspath(os.path.join(path, os.path.pardir))
             if os.path.isdir(os.path.join(path, "lib-ruby")):
                 lib_path = os.path.join(path, "lib-ruby")
+                kernel_path = os.path.join(path, "lib-topaz")
                 break
-
         self.send(self.w_load_path, self.newsymbol("unshift"), [self.newstr_fromstr(lib_path)])
+        self.load_kernel(kernel_path)
+
+    def load_kernel(self, kernel_path):
+        self.send(
+            self.w_kernel,
+            self.newsymbol("load"),
+            [self.newstr_fromstr(os.path.join(kernel_path, "bootstrap.rb"))]
+        )
 
     @specialize.memo()
     def fromcache(self, key):
