@@ -10,7 +10,7 @@ class ConstraintInterpreter(Interpreter):
         frame.cells[idx].upgrade_to_closure(frame, idx)
         w_res = space.newconstraintvariable(cell=frame.cells[idx])
         if w_res is None:
-            w_res = frame.cells[idx].get(frame, idx) or space.w_nil
+            w_res = frame.cells[idx].get(space, frame, idx) or space.w_nil
         frame.push(w_res)
 
     def LOAD_INSTANCE_VAR(self, space, bytecode, frame, pc, idx):
