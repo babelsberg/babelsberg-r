@@ -180,7 +180,7 @@ class Interpreter(object):
         if w_var:
             space.suggest_value(w_var, frame.peek())
         else:
-            frame.cells[idx].set(frame, idx, frame.peek())
+            frame.cells[idx].set(space, frame, idx, frame.peek())
         frame.cells[idx].set(space, frame, idx, frame.peek())
 
     def LOAD_CLOSURE(self, space, bytecode, frame, pc, idx):
