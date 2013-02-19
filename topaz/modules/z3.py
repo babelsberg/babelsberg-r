@@ -15,7 +15,9 @@ class Z3(Module):
     @staticmethod
     def get_solver(ctx):
         if not Z3.made_solver:
-            Z3.solver = rz3.z3_mk_solver(ctx)
+            solver = rz3.z3_mk_solver(ctx)
+            rz3.z3_solver_inc_ref(ctx, solver)
+            Z3.solver = solver
             Z3.made_solver = True
         return Z3.solver
 

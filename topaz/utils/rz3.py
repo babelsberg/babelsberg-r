@@ -208,3 +208,6 @@ z3_solver_get_model = rffi.llexternal(
     Z3_model,
     compilation_info=eci
 )
+
+# Refcounting
+z3_solver_inc_ref = rffi.llexternal("Z3_solver_inc_ref", [Z3_context, Z3_solver], lltype.Void, compilation_info=eci)
