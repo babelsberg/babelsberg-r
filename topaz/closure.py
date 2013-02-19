@@ -29,8 +29,8 @@ class LocalCell(BaseCell):
 
 
 class ClosureCell(BaseCell):
-    def __init__(self, w_value, w_prev = None):
-        self.w_value = [w_value, w_prev]
+    def __init__(self, w_value):
+        self.w_value = w_value
         self.w_constraint = None
 
     def get(self, space, frame, pos):

@@ -37,7 +37,7 @@ class W_ConstraintVariableObject(W_ConstraintObject):
 
     def load_value(self, space):
         if self.cell:
-            return self.cell.get(None, 0) or space.w_nil
+            return self.cell.get(space, None, 0) or space.w_nil
         elif self.ivar is not None:
             return self.w_owner.find_instance_var(space, self.ivar) or space.w_nil
         elif self.cvar is not None:
@@ -47,7 +47,7 @@ class W_ConstraintVariableObject(W_ConstraintObject):
 
     def store_value(self, space, w_value):
         if self.cell:
-            self.cell.set(None, 0, w_value)
+            self.cell.set(space, None, 0, w_value)
         elif self.ivar is not None:
             self.w_owner.set_instance_var(space, self.ivar, w_value)
         elif self.cvar is not None:

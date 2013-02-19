@@ -7,7 +7,7 @@ from topaz.objects.moduleobject import W_ModuleObject
 
 class ConstraintInterpreter(Interpreter):
     def LOAD_DEREF(self, space, bytecode, frame, pc, idx):
-        frame.cells[idx].upgrade_to_closure(frame, idx)
+        frame.cells[idx].upgrade_to_closure(space, frame, idx)
         w_res = space.newconstraintvariable(cell=frame.cells[idx])
         if w_res is None:
             w_res = frame.cells[idx].get(space, frame, idx) or space.w_nil
