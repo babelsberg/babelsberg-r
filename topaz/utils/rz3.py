@@ -177,6 +177,8 @@ def multiop(name):
     globals()[name.lower()] = method
 multiop("Z3_mk_add")
 multiop("Z3_mk_sub")
+multiop("Z3_mk_div")
+multiop("Z3_mk_mul")
 
 # Numerals
 z3_mk_real = rffi.llexternal("Z3_mk_real", [Z3_context, rffi.INT, rffi.INT], Z3_ast, compilation_info=eci)
@@ -236,6 +238,7 @@ z3_solver_get_model = rffi.llexternal(
     Z3_model,
     compilation_info=eci
 )
+z3_solver_reset = rffi.llexternal("Z3_solver_reset", [Z3_context, Z3_solver], lltype.Void, compilation_info=eci)
 
 # Refcounting
 z3_solver_inc_ref = rffi.llexternal("Z3_solver_inc_ref", [Z3_context, Z3_solver], lltype.Void, compilation_info=eci)

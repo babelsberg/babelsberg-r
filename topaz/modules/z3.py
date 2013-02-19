@@ -80,6 +80,7 @@ class Z3(Module):
     def method_solve(self, space):
         self.ctx = Z3.get_context()
         self.solver = Z3.get_solver(self.ctx)
+        rz3.z3_solver_reset(self.ctx, self.solver)
         for constraint in Z3.enabled_constraints:
             rz3.z3_solver_assert(self.ctx, self.solver, constraint.getast())
         solve_result = rz3.z3_solver_check(self.ctx, self.solver)
@@ -166,12 +167,14 @@ class W_Z3AstObject(W_Object):
         return method
     method_lt = new_binop(classdef, "<", rz3.z3_mk_lt)
     method_gt = new_binop(classdef, ">", rz3.z3_mk_gt)
-    method_gt = new_binop(classdef, "**", rz3.z3_mk_power)
-    method_gt = new_binop(classdef, "==", rz3.z3_mk_eq)
-    method_gt = new_binop(classdef, ">=", rz3.z3_mk_ge)
-    method_gt = new_binop(classdef, "<=", rz3.z3_mk_le)
-    method_gt = new_binop(classdef, "+", rz3.z3_mk_add)
-    method_gt = new_binop(classdef, "-", rz3.z3_mk_sub)
+    method_pow = new_binop(classdef, "**", rz3.z3_mk_power)
+    method_eq = new_binop(classdef, "==", rz3.z3_mk_eq)
+    method_ge = new_binop(classdef, ">=", rz3.z3_mk_ge)
+    method_le = new_binop(classdef, "<=", rz3.z3_mk_le)
+    method_add = new_binop(classdef, "+", rz3.z3_mk_add)
+    method_sub = new_binop(classdef, "-", rz3.z3_mk_sub)
+    method_div = new_binop(classdef, "/", rz3.z3_mk_div)
+    method_mul = new_binop(classdef, "*", rz3.z3_mk_mul)
 
     @classdef.method("enable")
     def method_enable(self, space):

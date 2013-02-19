@@ -251,4 +251,4 @@ class TestConstraintVariableObject(BaseTopazTest):
         always { h.length >= 100 }
         return h.length
         """)
-        assert self.unwrap(space, w_res) == 100
+        assert self.unwrap(space, w_res) >= 100
