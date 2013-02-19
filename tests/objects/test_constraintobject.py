@@ -185,6 +185,16 @@ class TestConstraintVariableObject(BaseTopazTest):
         """)
         assert self.unwrap(space, w_res) == -5.5
 
+    def test_quadratic_pos_real(self, space):
+        w_res = space.execute("""
+        require "libz3"
+        a = 1.0
+        always { a ** 2.0 == 30.25 }
+        always { a > 0 }
+        return a
+        """)
+        assert self.unwrap(space, w_res) == 5.5
+
     def test_boolean(self, space):
         w_res = space.execute("""
         require "libz3"
