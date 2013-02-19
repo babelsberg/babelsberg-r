@@ -166,3 +166,12 @@ class TestConstraintVariableObject(BaseTopazTest):
         return res
         """)
         assert self.unwrap(space, w_res) == [11, 11, 9]
+
+    def test_quadratic(self, space):
+        w_res = space.execute("""
+        require "libz3"
+        a = 1.0
+        always { a ** 2.0 < 16 }
+        return a
+        """)
+        assert self.unwrap(space, w_res) == "-3"

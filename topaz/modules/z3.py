@@ -8,13 +8,9 @@ from topaz.utils import rz3
 
 class Z3(Module):
     moduledef = ModuleDef("Z3", filepath=__file__)
-
     made_solver = False
     made_context = False
-
-    @moduledef.setup_module
-    def setup_module(space, w_mod):
-        w_mod.enabled_constraints = []
+    enabled_constraints = []
 
     @staticmethod
     def get_solver(ctx):
@@ -79,13 +75,13 @@ class Z3(Module):
 
     @moduledef.function("add_constraint")
     def method_enable(self, space, w_other):
-        self.enabled_constraints.append(w_other)
+        Z3.enabled_constraints.append(w_other)
         return w_other
 
     @moduledef.function("remove_constraint")
     def method_enable(self, space, w_other):
         try:
-            self.enabled_constraints.remove(w_other)
+            Z3.enabled_constraints.remove(w_other)
             return w_other
         except ValueError:
             return space.w_nil
@@ -94,7 +90,7 @@ class Z3(Module):
     def method_solve(self, space):
         self.ctx = Z3.get_context()
         self.solver = Z3.get_solver(self.ctx)
-        for constraint in self.enabled_constraints:
+        for constraint in Z3.enabled_constraints:
             rz3.z3_solver_assert(self.ctx, self.solver, constraint.getast())
         solve_result = rz3.z3_solver_check(self.ctx, self.solver)
         if solve_result < 0:
