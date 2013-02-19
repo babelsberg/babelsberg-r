@@ -1,9 +1,9 @@
 import os
 import sys
 
-from pypy.rpython.tool import rffi_platform
-from pypy.rpython.lltypesystem import rffi, lltype
-from pypy.translator.tool.cbuild import ExternalCompilationInfo
+from rpython.rtyper.tool import rffi_platform
+from rpython.rtyper.lltypesystem import rffi, lltype
+from rpython.translator.tool.cbuild import ExternalCompilationInfo
 
 
 WINNT = os.name == "nt"
@@ -45,7 +45,7 @@ eci = ExternalCompilationInfo(
     includes=["z3.h"],
     include_dirs=[z3_include_path],
     libraries=["z3"],
-    library_dirs=[onig_build_path]
+    library_dirs=[z3_build_path]
     # separate_module_files=["rupypy/utils/re/rffi_helper.c"]
 )
 
@@ -56,7 +56,7 @@ class CConfig:
     else:
         calling_conv = "c"
 
-config = platform.configure(CConfig)
+config = rffi_platform.configure(CConfig)
 
 # Create config
 Z3_config = rffi.COpaquePtr("Z3_config")
@@ -76,13 +76,17 @@ z3_del_context = rffi.llexternal("Z3_del_context", [Z3_context], lltype.Void, co
 
 # AST
 Z3_ast = rffi.COpaquePtr("Z3_ast")
-z3_get_numeral_string = rffi.llexternal(
+Z3_func_decl = rffi.COpaquePtr("Z3_func_decl")
+_z3_get_numeral_string = rffi.llexternal(
     "Z3_get_numeral_string",
     [Z3_context, Z3_ast],
     rffi.CCHARP,
     compilation_info=eci
 )
+def z3_get_numeral_string(ctx, ast):
+    return rffi.charp2str(_z3_get_numeral_string(ctx, ast))
 z3_get_ast_kind = rffi.llexternal("Z3_get_ast_kind", [Z3_context, Z3_ast], rffi.INT, compilation_info=eci)
+z3_get_app_decl = rffi.llexternal("Z3_get_app_decl", [Z3_context, Z3_ast], Z3_func_decl, compilation_info=eci)
 
 # Sorts
 Z3_sort = rffi.COpaquePtr("Z3_sort")
@@ -90,6 +94,7 @@ z3_mk_int_sort = rffi.llexternal("Z3_mk_int_sort", [Z3_context], Z3_sort, compil
 
 # Arithmetic
 z3_mk_lt = rffi.llexternal("Z3_mk_lt", [Z3_context, Z3_ast, Z3_ast], Z3_ast, compilation_info=eci)
+z3_mk_gt = rffi.llexternal("Z3_mk_gt", [Z3_context, Z3_ast, Z3_ast], Z3_ast, compilation_info=eci)
 
 # Numerals
 z3_mk_real = rffi.llexternal("Z3_mk_real", [Z3_context, rffi.INT, rffi.INT], Z3_ast, compilation_info=eci)
@@ -105,7 +110,7 @@ z3_mk_string_symbol = rffi.llexternal(
 )
 
 # Constants
-z3_mk_const = rffi.llexternal("Z3_mk_const", [Z3_context, Z3_symbol, Z3_sort], compilation_info=eci)
+z3_mk_const = rffi.llexternal("Z3_mk_const", [Z3_context, Z3_symbol, Z3_sort], Z3_ast, compilation_info=eci)
 
 # Models
 Z3_model = rffi.COpaquePtr("Z3_model")

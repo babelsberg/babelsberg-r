@@ -1,3 +1,6 @@
+from __future__ import absolute_import
+
+from topaz.coerce import Coerce
 from topaz.module import Module, ModuleDef, ClassDef
 from topaz.objects.objectobject import W_Object
 from topaz.utils import rz3
@@ -5,89 +8,136 @@ from topaz.utils import rz3
 
 class Z3(Module):
     moduledef = ModuleDef("Z3", filepath=__file__)
-    enabled_constraints = []
 
-    def make_solver(self, ctx):
-        return rz3.z3_mk_solver(ctx)
+    made_solver = False
+    made_context = False
 
-    def make_context(self):
-        cfg = rz3.z3_mk_config()
-        rz3.z3_set_param_value(cfg, "MODEL", "true")
-        ctx = rz3.z3_mk_context(cfg)
-        rz3.z3_del_config(cfg)
-        return ctx
+    @moduledef.setup_module
+    def setup_module(space, w_mod):
+        w_mod.enabled_constraints = []
 
-    def make_variable(self, ctx, name, ty):
-        s = rz3.z3_mk_string_symbol(ctx, name)
-        return rz3.z3_mk_const(ctx, s, ty)
+    @staticmethod
+    def get_solver(ctx):
+        if not Z3.made_solver:
+            Z3.solver = rz3.z3_mk_solver(ctx)
+            Z3.made_solver = True
+        return Z3.solver
 
-    def make_int_variable(self, ctx, name):
+    @staticmethod
+    def get_context():
+        if not Z3.made_context:
+            cfg = rz3.z3_mk_config()
+            rz3.z3_set_param_value(cfg, "MODEL", "true")
+            Z3.ctx = rz3.z3_mk_context(cfg)
+            rz3.z3_del_config(cfg)
+            Z3.made_context = True
+        return Z3.ctx
+
+    @staticmethod
+    def make_variable(name, ty):
+        ctx = Z3.get_context()
+        sym = rz3.z3_mk_string_symbol(ctx, name)
+        return rz3.z3_mk_const(ctx, sym, ty)
+
+    @staticmethod
+    def make_int_variable(name):
+        ctx = Z3.get_context()
         ty = rz3.z3_mk_int_sort(ctx)
-        return self.make_variable(ctx, name, ty)
+        return Z3.make_variable(name, ty)
 
-    def make_int(self, ctx, value):
+    @staticmethod
+    def make_int(value):
+        ctx = Z3.get_context()
         ty = rz3.z3_mk_int_sort(ctx)
         return rz3.z3_mk_int(ctx, value, ty)
 
-    @moduledef.function("add_constraint", other="z3ast")
-    def method_enable(self, space, other):
-        self.enabled_constraints.append(other)
-        return other
+    @moduledef.function("add_constraint")
+    def method_enable(self, space, w_other):
+        self.enabled_constraints.append(w_other)
+        return w_other
 
-    @moduledef.function("remove_constraint", other="z3ast")
-    def method_enable(self, space, other):
+    @moduledef.function("remove_constraint")
+    def method_enable(self, space, w_other):
         try:
-            self.enabled_constraints.remove(other)
-            return other
+            self.enabled_constraints.remove(w_other)
+            return w_other
         except ValueError:
             return space.w_nil
 
     @moduledef.function("solve")
     def method_solve(self, space):
-        self.is_solved = True
-        self.ctx = self.make_context()
-        self.solver = self.make_solver(ctx)
+        self.ctx = Z3.get_context()
+        self.solver = Z3.get_solver(self.ctx)
         for constraint in self.enabled_constraints:
-            rz3.z3_solver_assert(ctx, solver, constraint)
-        solve_result = rz3.z3_solver_check(ctx, solver)
+            rz3.z3_solver_assert(self.ctx, self.solver, constraint.getast())
+        solve_result = rz3.z3_solver_check(self.ctx, self.solver)
         if solve_result < 0:
             raise space.error(space.w_RuntimeError, "unsatisfiable constraint system")
         elif solve_result == 0:
             raise space.error(space.w_RuntimeError, "the solver cannot solve this constraint system")
-        self.model = rz3.z3_solver_get_model(ctx, solver)
+        self.model = rz3.z3_solver_get_model(self.ctx, self.solver)
+        self.is_solved = True
+        return space.w_true
 
-    @moduledef.function("get_interpretation", other="z3ast")
-    def method_get_interpretation(self, space, other):
+    @moduledef.function("[]")
+    def method_get_interpretation(self, space, w_ast):
+        if not space.is_kind_of(w_ast, space.w_z3ast):
+            raise space.error(space.w_ArgumentError, "Z3Expression required, got %s" % space.getclass(w_ast).name)
+
         if not self.is_solved:
             return space.w_nil
         else:
-            interp_ast = rz3.z3_model_get_const_interp(self.ctx, self.model, other.getast())
+            interp_ast = rz3.z3_model_get_const_interp(self.ctx, self.model, w_ast.getdecl(self.ctx))
             kind = rz3.z3_get_ast_kind(self.ctx, interp_ast)
             if kind == 0: # Z3_NUMERAL_AST
                 numstr = rz3.z3_get_numeral_string(self.ctx, interp_ast)
             else:
                 raise NotImplementedError("only numeral asts implemented")
+            return space.newstr_fromstr(numstr)
+
 
 class W_Z3AstObject(W_Object):
-    classdef = ClassDef("Z3Expression", filepath=__file__)
+    classdef = ClassDef("Z3Expression", W_Object.classdef, filepath=__file__)
 
-    def __init__(self, space, ctx, ast):
+    def __init__(self, space, ast):
         W_Object.__init__(self, space)
-        self.ctx = ctx
         self.ast = ast
 
     def getast(self):
         return self.ast
 
-    @classdef.method("<", other="z3ast")
-    def method_lt(self, space, other):
-        rz3.z3_mk_lt(self.ctx, self, other)
+    def getdecl(self, ctx):
+        return rz3.z3_get_app_decl(ctx, self.getast())
+
+    @classdef.singleton_method("new")
+    def method_new(self, space, args_w, block):
+        return space.send(self, space.newsymbol("allocate"), args_w, block)
+
+    @classdef.singleton_method("allocate", name="str")
+    def method_allocate(self, space, name):
+        int_ast = Z3.make_int_variable(name)
+        return W_Z3AstObject(space, int_ast)
+
+    def new_binop(classdef, name, func):
+        @classdef.method(name)
+        def method(self, space, w_other):
+            if space.is_kind_of(w_other, space.w_z3ast):
+                other = w_other.getast()
+            else:
+                fixnum = Coerce.int(space, w_other)
+                other = Z3.make_int(fixnum)
+            ast = func(Z3.get_context(), self.getast(), other)
+            return W_Z3AstObject(space, ast)
+        method.__name__ = "method_%s" % func.__name__
+        return method
+    method_lt = new_binop(classdef, "<", rz3.z3_mk_lt)
+    method_gt = new_binop(classdef, ">", rz3.z3_mk_gt)
 
     @classdef.method("enable")
     def method_enable(self, space):
         space.send(
-            space.getmoduleobject(Z3.moduledef),
-            space.newsymbol("add_constraint")
+            space.w_z3,
+            space.newsymbol("add_constraint"),
             [self]
         )
         return self
@@ -95,8 +145,8 @@ class W_Z3AstObject(W_Object):
     @classdef.method("disable")
     def method_enable(self, space):
         space.send(
-            space.getmoduleobject(Z3.moduledef),
-            space.newsymbol("remove_constraint")
+            space.w_z3,
+            space.newsymbol("remove_constraint"),
             [self]
         )
         return self
