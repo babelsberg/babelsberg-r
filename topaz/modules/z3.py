@@ -192,3 +192,7 @@ class W_Z3AstObject(W_Object):
             [self]
         )
         return self
+
+    @classdef.method("value")
+    def method_value(self, space):
+        return space.send(space.w_z3, space.newsymbol("[]"), [self])
