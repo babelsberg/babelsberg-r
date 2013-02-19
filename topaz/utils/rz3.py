@@ -91,20 +91,35 @@ z3_get_app_decl = rffi.llexternal("Z3_get_app_decl", [Z3_context, Z3_ast], Z3_fu
 # Sorts
 Z3_sort = rffi.COpaquePtr("Z3_sort")
 z3_mk_int_sort = rffi.llexternal("Z3_mk_int_sort", [Z3_context], Z3_sort, compilation_info=eci)
+z3_mk_real_sort = rffi.llexternal("Z3_mk_real_sort", [Z3_context], Z3_sort, compilation_info=eci)
+z3_mk_bool_sort = rffi.llexternal("Z3_mk_bool_sort", [Z3_context], Z3_sort, compilation_info=eci)
 
 # Arithmetic
-z3_mk_lt = rffi.llexternal("Z3_mk_lt", [Z3_context, Z3_ast, Z3_ast], Z3_ast, compilation_info=eci)
-z3_mk_gt = rffi.llexternal("Z3_mk_gt", [Z3_context, Z3_ast, Z3_ast], Z3_ast, compilation_info=eci)
+def binop(name):
+    globals()[name.lower()] = rffi.llexternal(name, [Z3_context, Z3_ast, Z3_ast], Z3_ast, compilation_info=eci)
+binop("Z3_mk_lt")
+binop("Z3_mk_gt")
+binop("Z3_mk_power")
 
 # Numerals
 z3_mk_real = rffi.llexternal("Z3_mk_real", [Z3_context, rffi.INT, rffi.INT], Z3_ast, compilation_info=eci)
 z3_mk_int = rffi.llexternal("Z3_mk_int", [Z3_context, rffi.INT, Z3_sort], Z3_ast, compilation_info=eci)
+
+# Propositional Logic
+z3_mk_true = rffi.llexternal("z3_mk_true", [Z3_context], Z3_ast, compilation_info=eci)
+z3_mk_false = rffi.llexternal("z3_mk_false", [Z3_context], Z3_ast, compilation_info=eci)
 
 # Symbols
 Z3_symbol = rffi.COpaquePtr("Z3_symbol")
 z3_mk_string_symbol = rffi.llexternal(
     "Z3_mk_string_symbol",
     [Z3_context, rffi.CCHARP],
+    Z3_symbol,
+    compilation_info=eci
+)
+z3_mk_int_symbol = rffi.llexternal(
+    "Z3_mk_int_symbol",
+    [Z3_context, rffi.INT],
     Z3_symbol,
     compilation_info=eci
 )

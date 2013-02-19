@@ -34,22 +34,48 @@ class Z3(Module):
         return Z3.ctx
 
     @staticmethod
-    def make_variable(name, ty):
+    def make_variable(id, ty):
         ctx = Z3.get_context()
-        sym = rz3.z3_mk_string_symbol(ctx, name)
+        sym = rz3.z3_mk_int_symbol(ctx, id)
         return rz3.z3_mk_const(ctx, sym, ty)
 
     @staticmethod
-    def make_int_variable(name):
+    def make_int_variable(id):
         ctx = Z3.get_context()
         ty = rz3.z3_mk_int_sort(ctx)
-        return Z3.make_variable(name, ty)
+        return Z3.make_variable(id, ty)
 
     @staticmethod
     def make_int(value):
         ctx = Z3.get_context()
         ty = rz3.z3_mk_int_sort(ctx)
         return rz3.z3_mk_int(ctx, value, ty)
+
+    @staticmethod
+    def make_real_variable(id):
+        ctx = Z3.get_context()
+        ty = rz3.z3_mk_real_sort(ctx)
+        return Z3.make_variable(id, ty)
+
+    @staticmethod
+    def make_real(value):
+        ctx = Z3.get_context()
+        num, den = value.as_integer_ratio()
+        return rz3.z3_mk_real(ctx, num, den)
+
+    @staticmethod
+    def make_bool_variable(id):
+        ctx = Z3.get_context()
+        ty = rz3.z3_mk_bool_sort(ctx)
+        return Z3.make_variable(id, ty)
+
+    @staticmethod
+    def make_bool(value):
+        ctx = Z3.get_context()
+        if value:
+            return rz3.mk_true(ctx)
+        else:
+            return rz3.mk_false(ctx)
 
     @moduledef.function("add_constraint")
     def method_enable(self, space, w_other):
@@ -99,8 +125,7 @@ class Z3(Module):
 class W_Z3AstObject(W_Object):
     classdef = ClassDef("Z3Expression", W_Object.classdef, filepath=__file__)
 
-    def __init__(self, space, ast):
-        W_Object.__init__(self, space)
+    def setast(self, ast):
         self.ast = ast
 
     def getast(self):
@@ -109,14 +134,28 @@ class W_Z3AstObject(W_Object):
     def getdecl(self, ctx):
         return rz3.z3_get_app_decl(ctx, self.getast())
 
-    @classdef.singleton_method("new")
-    def method_new(self, space, args_w, block):
-        return space.send(self, space.newsymbol("allocate"), args_w, block)
+    @classdef.singleton_method("allocate")
+    def method_allocate(self, space, args_w):
+        return W_Z3AstObject(space)
 
-    @classdef.singleton_method("allocate", name="str")
-    def method_allocate(self, space, name):
-        int_ast = Z3.make_int_variable(name)
-        return W_Z3AstObject(space, int_ast)
+    # XXX: These should somehow also set the initial value
+    @classdef.method("initialize")
+    def method_initialize(self, space, w_value):
+        w_int = space.convert_type(w_value, space.w_fixnum, "to_int", raise_error=False)
+        if w_int is not space.w_nil and not space.is_kind_of(w_value, space.w_float):
+            self.ast = Z3.make_int_variable(space.int_w(space.send(w_int, space.newsymbol("object_id"))))
+            return self
+
+        w_real = space.convert_type(w_value, space.w_float, "to_f", raise_error=False)
+        if w_real is not space.w_nil:
+            self.ast = Z3.make_real_variable(space.int_w(space.send(w_real, space.newsymbol("object_id"))))
+            return self
+
+        if w_value is space.w_true or w_value is space.w_false or w_value is space.w_nil:
+            self.ast = Z3.make_bool_variable(space.int_w(space.send(w_real, space.newsymbol("object_id"))))
+            return self
+
+        raise space.error(space.w_TypeError, "Z3 can only use Bools, Floats, and Fixnums")
 
     def new_binop(classdef, name, func):
         @classdef.method(name)
@@ -127,11 +166,14 @@ class W_Z3AstObject(W_Object):
                 fixnum = Coerce.int(space, w_other)
                 other = Z3.make_int(fixnum)
             ast = func(Z3.get_context(), self.getast(), other)
-            return W_Z3AstObject(space, ast)
+            w_obj = W_Z3AstObject(space)
+            w_obj.setast(ast)
+            return w_obj
         method.__name__ = "method_%s" % func.__name__
         return method
     method_lt = new_binop(classdef, "<", rz3.z3_mk_lt)
     method_gt = new_binop(classdef, ">", rz3.z3_mk_gt)
+    method_gt = new_binop(classdef, "**", rz3.z3_mk_power)
 
     @classdef.method("enable")
     def method_enable(self, space):
