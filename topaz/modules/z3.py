@@ -57,9 +57,9 @@ class Z3(Module):
     def make_bool(value):
         ctx = Z3.get_context()
         if value:
-            return rz3.mk_true(ctx)
+            return rz3.z3_mk_true(ctx)
         else:
-            return rz3.mk_false(ctx)
+            return rz3.z3_mk_false(ctx)
 
     @moduledef.function("add_constraint")
     def method_enable(self, space, w_other):
@@ -104,6 +104,9 @@ class Z3(Module):
                     return space.newint(rz3.z3_get_numeral_int(self.ctx, interp_ast))
                 except rz3.Z3Error:
                     return space.newfloat(rz3.z3_get_numeral_real(self.ctx, interp_ast))
+            elif kind == 1: # Z3_APP_AST ... XXX: bools, in our case
+                result = rz3.z3_get_bool_value(self.ctx, interp_ast)
+                return space.newbool(result == 1) # 1 is Z3_L_TRUE
             else:
                 raise NotImplementedError("Ast type %d" % kind)
             return space.newstr_fromstr(numstr)
@@ -144,6 +147,8 @@ class W_Z3AstObject(W_Object):
         def method(self, space, w_other):
             if space.is_kind_of(w_other, space.w_z3ast):
                 other = w_other.getast()
+            elif w_other is space.w_nil or w_other is space.w_false or w_other is space.w_true:
+                other = Z3.make_bool(space.is_true(w_other))
             else:
                 float = Coerce.float(space, w_other)
                 other = Z3.make_real(float)

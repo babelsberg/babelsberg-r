@@ -184,3 +184,12 @@ class TestConstraintVariableObject(BaseTopazTest):
         return a
         """)
         assert self.unwrap(space, w_res) == -5.5
+
+    def test_boolean(self, space):
+        w_res = space.execute("""
+        require "libz3"
+        a = false
+        always { a == true }
+        return a
+        """)
+        assert w_res is space.w_true
