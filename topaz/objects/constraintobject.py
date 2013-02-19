@@ -112,40 +112,9 @@ class W_ConstraintVariableObject(W_ConstraintObject):
         self.store_value(space, w_value)
         return w_value
 
-    classdef.app_method("""
-    def suggest_value(val)
-      variable.suggest_value(val)
-    end
-
-    def ==(other)
-      variable == (other.kind_of?(self.class) ? other.variable : other)
-    end
-
-    def method_missing(method, *args, &block)
-      if variable.respond_to? method
-        args = args.map do |arg|
-          arg.kind_of?(self.class) ? arg.variable : arg
-        end
-        variable.send(method, *args, &block)
-      else
-        value.send(method, *args, &block)
-      end
-    end
-    """)
-
 
 class Constraints(Module):
     moduledef = ModuleDef("Constraints", filepath=__file__)
-
-    moduledef.app_method("""
-    def self.variable_handlers
-      @variable_handlers ||= {}
-    end
-
-    def self.for_variables_of_type(klass, &block)
-      variable_handlers[klass] = block
-    end
-    """)
 
     @moduledef.function("register_solver")
     def method_register_solver(self, space, w_solver):
