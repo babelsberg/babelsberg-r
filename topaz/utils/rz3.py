@@ -148,6 +148,7 @@ def binop(name):
 binop("Z3_mk_lt")
 binop("Z3_mk_gt")
 binop("Z3_mk_power")
+binop("Z3_mk_eq")
 
 # Numerals
 z3_mk_real = rffi.llexternal("Z3_mk_real", [Z3_context, rffi.INT, rffi.INT], Z3_ast, compilation_info=eci)

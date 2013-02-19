@@ -1,7 +1,4 @@
-Constraints.for_variables_of_type Fixnum do |name, value|
-  Z3Expression.new(value)
-end
-Constraints.for_variables_of_type Float do |name, value|
+Constraints.for_variables_of_type Numeric do |name, value|
   Z3Expression.new(value)
 end
 Constraints.for_variables_of_type TrueClass do |name, value|

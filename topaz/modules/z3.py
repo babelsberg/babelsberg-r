@@ -36,18 +36,6 @@ class Z3(Module):
         return rz3.z3_mk_const(ctx, sym, ty)
 
     @staticmethod
-    def make_int_variable(id):
-        ctx = Z3.get_context()
-        ty = rz3.z3_mk_int_sort(ctx)
-        return Z3.make_variable(id, ty)
-
-    @staticmethod
-    def make_int(value):
-        ctx = Z3.get_context()
-        ty = rz3.z3_mk_int_sort(ctx)
-        return rz3.z3_mk_int(ctx, value, ty)
-
-    @staticmethod
     def make_real_variable(id):
         ctx = Z3.get_context()
         ty = rz3.z3_mk_real_sort(ctx)
@@ -140,11 +128,6 @@ class W_Z3AstObject(W_Object):
     # XXX: These should somehow also set the initial value
     @classdef.method("initialize")
     def method_initialize(self, space, w_value):
-        w_int = space.convert_type(w_value, space.w_fixnum, "to_int", raise_error=False)
-        if w_int is not space.w_nil and not space.is_kind_of(w_value, space.w_float):
-            self.ast = Z3.make_int_variable(space.int_w(space.send(w_int, space.newsymbol("object_id"))))
-            return self
-
         w_real = space.convert_type(w_value, space.w_float, "to_f", raise_error=False)
         if w_real is not space.w_nil:
             self.ast = Z3.make_real_variable(space.int_w(space.send(w_real, space.newsymbol("object_id"))))
@@ -162,8 +145,8 @@ class W_Z3AstObject(W_Object):
             if space.is_kind_of(w_other, space.w_z3ast):
                 other = w_other.getast()
             else:
-                fixnum = Coerce.int(space, w_other)
-                other = Z3.make_int(fixnum)
+                float = Coerce.float(space, w_other)
+                other = Z3.make_real(float)
             ast = func(Z3.get_context(), self.getast(), other)
             w_obj = W_Z3AstObject(space)
             w_obj.setast(ast)
@@ -173,6 +156,7 @@ class W_Z3AstObject(W_Object):
     method_lt = new_binop(classdef, "<", rz3.z3_mk_lt)
     method_gt = new_binop(classdef, ">", rz3.z3_mk_gt)
     method_gt = new_binop(classdef, "**", rz3.z3_mk_power)
+    method_gt = new_binop(classdef, "==", rz3.z3_mk_eq)
 
     @classdef.method("enable")
     def method_enable(self, space):
