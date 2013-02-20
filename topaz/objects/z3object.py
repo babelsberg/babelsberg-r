@@ -27,13 +27,13 @@ class W_Z3Object(W_RootObject):
         self.next_id = 0
 
     def getsingletonclass(self, space):
-        raise space.error(space.w_TypeError, "can't define singleton")
+        raise space.error(space.w_TypeError, "can't define singleton on Z3")
 
     def find_instance_var(self, space, name):
         return space.w_nil
 
     def set_instance_var(self, space, name, w_value):
-        raise space.error(space.w_TypeError, "can't add instance variables")
+        raise space.error(space.w_TypeError, "can't add instance variables to Z3")
 
     @classdef.setup_class
     def setup_class(cls, space, w_cls):
