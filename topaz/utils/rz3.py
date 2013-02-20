@@ -122,8 +122,8 @@ if _64BIT:
         nom = lltype.malloc(rffi.INTP.TO, 1, flavor='raw', zero=True)
         den = lltype.malloc(rffi.INTP.TO, 1, flavor='raw', zero=True)
         status = _z3_get_numeral_real(ctx, ast, nom, den)
-        fnom = float(nom[0])
-        fden = float(den[0])
+        fnom = float(int(nom[0]))
+        fden = float(int(den[0]))
         lltype.free(nom, flavor='raw')
         lltype.free(den, flavor='raw')
         if status != 1:
@@ -160,21 +160,25 @@ binop("Z3_mk_power")
 binop("Z3_mk_eq")
 
 def multiop(name):
-    globals()["_" + name.lower()] = rffi.llexternal(
-        name,
-        [Z3_context, rffi.UINT, Z3_astP],
-        Z3_ast,
-        compilation_info=eci
+    def create_method(func, name):
+        def method(ctx, left, right):
+            ptr = lltype.malloc(Z3_astP.TO, 2, flavor='raw')
+            ptr[0] = left
+            ptr[1] = right
+            ast = func(ctx, 2, ptr)
+            lltype.free(ptr, flavor='raw')
+            return ast
+        method.__name__ = name.lower()
+        globals()[name.lower()] = method
+    create_method(
+        rffi.llexternal(
+            name,
+            [Z3_context, rffi.UINT, Z3_astP],
+            Z3_ast,
+            compilation_info=eci
+        ),
+        name
     )
-    def method(ctx, left, right):
-        ptr = lltype.malloc(Z3_astP.TO, 2, flavor='raw')
-        ptr[0] = left
-        ptr[1] = right
-        ast = globals()["_" + name.lower()](ctx, 2, ptr)
-        lltype.free(ptr, flavor='raw')
-        return ast
-    method.__name__ = name.lower()
-    globals()[name.lower()] = method
 multiop("Z3_mk_add")
 multiop("Z3_mk_sub")
 multiop("Z3_mk_div")

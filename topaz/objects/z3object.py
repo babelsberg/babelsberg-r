@@ -9,7 +9,7 @@ from topaz.utils import rz3
 
 
 class W_Z3Object(W_RootObject):
-    _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved"]
+    _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved", "next_id"]
     _immutable_fields_ = ["ctx", "solver"]
     classdef = ClassDef("Z3", W_Object.classdef, filepath=__file__)
 
@@ -122,6 +122,7 @@ class W_Z3Object(W_RootObject):
         self.is_solved = False
         rz3.z3_solver_reset(self.ctx, self.solver)
         for constraint in self.enabled_constraints:
+            assert isinstance(constraint, W_Z3Ptr)
             rz3.z3_solver_assert(self.ctx, self.solver, constraint.pointer)
         solve_result = rz3.z3_solver_check(self.ctx, self.solver)
         if solve_result < 0:
@@ -196,6 +197,7 @@ class W_Z3Ptr(W_RootObject):
                     w_z3ptr_cls.name
             ))
         else:
+            assert isinstance(w_other, W_Z3Ptr)
             return w_other.pointer
 
     def new_binop(classdef, name, func):
