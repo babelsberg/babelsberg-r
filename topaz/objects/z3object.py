@@ -45,7 +45,7 @@ class W_Z3Object(W_RootObject):
         sym = rz3.z3_mk_int_symbol(ctx, id)
         return W_Z3Ptr(self, rz3.z3_mk_const(ctx, sym, ty))
 
-    def assert_ptr(self, w_pointer):
+    def assert_ptr(self, space, w_pointer):
         if not isinstance(w_pointer, W_Z3Ptr):
             raise space.error(
                 space.w_TypeError,
@@ -103,13 +103,13 @@ class W_Z3Object(W_RootObject):
 
     @classdef.method("add_constraint")
     def method_enable(self, space, w_other):
-        self.assert_ptr(w_other)
+        self.assert_ptr(space, w_other)
         self.enabled_constraints.append(w_other)
         return w_other
 
     @classdef.method("remove_constraint")
     def method_enable(self, space, w_other):
-        self.assert_ptr(w_other)
+        self.assert_ptr(space, w_other)
         try:
             self.enabled_constraints.remove(w_other)
             return w_other
@@ -132,7 +132,7 @@ class W_Z3Object(W_RootObject):
 
     @classdef.method("[]")
     def method_get_interpretation(self, space, w_ast):
-        self.assert_ptr(w_ast)
+        self.assert_ptr(space, w_ast)
         if not self.is_solved:
             return space.w_nil
         else:
