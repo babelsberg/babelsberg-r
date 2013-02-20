@@ -24,6 +24,7 @@ class W_Z3Object(W_RootObject):
         self.solver = solver
         self.enabled_constraints = []
         self.is_solved = False
+        self.next_id = 0
 
     def getsingletonclass(self, space):
         raise space.error(space.w_TypeError, "can't define singleton")
@@ -41,8 +42,8 @@ class W_Z3Object(W_RootObject):
 
     def make_variable(self, space, w_object, ctx, ty):
         # XXX: This should somehow also set the initial value
-        id = space.int_w(space.send(w_object, space.newsymbol("object_id")))
-        sym = rz3.z3_mk_int_symbol(ctx, id)
+        sym = rz3.z3_mk_int_symbol(ctx, self.next_id)
+        self.next_id += 1
         return W_Z3Ptr(self, rz3.z3_mk_const(ctx, sym, ty))
 
     def assert_ptr(self, space, w_pointer):
