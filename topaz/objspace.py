@@ -35,7 +35,7 @@ from topaz.objects.classobject import W_ClassObject
 from topaz.objects.codeobject import W_CodeObject
 
 from topaz.objects.constraintobject import W_ConstraintObject, W_ConstraintVariableObject, Constraints
-from topaz.modules.z3 import Z3, W_Z3AstObject
+from topaz.objects.z3object import W_Z3Object
 
 from topaz.objects.dirobject import W_DirObject
 from topaz.objects.encodingobject import W_EncodingObject
@@ -146,8 +146,7 @@ class ObjectSpace(object):
         self.w_constraint = self.getclassfor(W_ConstraintObject)
         self.w_constraintvariable = self.getclassfor(W_ConstraintVariableObject)
         self.w_constraints = self.getmoduleobject(Constraints.moduledef)
-        self.w_z3 = self.getmoduleobject(Z3.moduledef)
-        self.w_z3ast = self.getclassfor(W_Z3AstObject)
+        self.w_z3 = self.getclassfor(W_Z3Object)
 
         self.w_topaz = self.getmoduleobject(Topaz.moduledef)
 
@@ -167,7 +166,7 @@ class ObjectSpace(object):
             self.w_kernel, self.w_topaz,
 
             self.w_constraint, self.w_constraints, self.w_constraintvariable,
-            self.w_z3, self.w_z3ast,
+            self.w_z3,
 
             self.getclassfor(W_NilObject),
             self.getclassfor(W_TrueObject),
