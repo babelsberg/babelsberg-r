@@ -1,3 +1,5 @@
+from rpython.rlib import jit
+
 from topaz.objects.objectobject import W_Root
 from topaz.objects.intobject import W_FixnumObject
 
@@ -29,8 +31,6 @@ class LocalCell(BaseCell):
 
 
 class ClosureCell(BaseCell):
-    _immutable_fields_ = ["w_constraint?"]
-
     def __init__(self, w_value):
         self.w_value = w_value
         self.w_constraint = None
@@ -45,7 +45,7 @@ class ClosureCell(BaseCell):
         return self
 
     def get_constraint(self):
-        return self.w_constraint
+        return jit.promote(self.w_constraint)
 
     def set_constraint(self, w_value):
         self.w_constraint = w_value
