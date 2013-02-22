@@ -14,7 +14,6 @@ class W_ConstraintObject(W_Object):
 
 class W_ConstraintVariableObject(W_ConstraintObject):
     _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
-    _attrs_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
 
     classdef = ClassDef("ConstraintVariable", W_ConstraintObject.classdef, filepath=__file__)
 
