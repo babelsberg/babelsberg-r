@@ -29,6 +29,8 @@ class LocalCell(BaseCell):
 
 
 class ClosureCell(BaseCell):
+    _immutable_fields_ = ["w_constraint?"]
+
     def __init__(self, w_value):
         self.w_value = w_value
         self.w_constraint = None

@@ -410,7 +410,7 @@ class ObjectSpace(object):
             w_var = W_ConstraintVariableObject(
                 self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar
             )
-            if not w_var.get_external_variable(self):
+            if not w_var.w_external_variable:
                 # No constraint solver variable available for this object
                 return None
 

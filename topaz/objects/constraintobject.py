@@ -1,3 +1,5 @@
+from rpython.rlib import jit
+
 from topaz.module import ClassDef, Module, ModuleDef
 from topaz.objects.hashobject import W_HashObject
 from topaz.objects.objectobject import W_Object
@@ -11,6 +13,9 @@ class W_ConstraintObject(W_Object):
 
 
 class W_ConstraintVariableObject(W_ConstraintObject):
+    _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
+    _attrs_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
+
     classdef = ClassDef("ConstraintVariable", W_ConstraintObject.classdef, filepath=__file__)
 
     def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None):
@@ -29,7 +34,33 @@ class W_ConstraintVariableObject(W_ConstraintObject):
             self.cvar = cvar
         else:
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
-        self.w_external_variable = None
+
+        w_proc = None
+        w_value = self.load_value(space)
+        w_hash = space.find_instance_var(space.w_constraints, "@variable_handlers")
+        if not isinstance(w_hash, W_HashObject):
+            return None
+        for w_mod in space.getclass(w_value).ancestors(include_singleton=False):
+            try:
+                w_proc = w_hash.contents[w_mod]
+            except KeyError:
+                pass
+            if w_proc:
+                break
+        if w_proc:
+            if not isinstance(w_proc, W_ProcObject):
+                raise space.error(
+                    space.w_TypeError,
+                    "non-proc in constraint variable handlers"
+                )
+            else:
+                with space.normal_execution():
+                    self.w_external_variable = space.invoke_block(
+                        w_proc.block,
+                        [self.get_name(space), w_value]
+                    )
+        else:
+            self.w_external_variable = None
 
     def __del__(self):
         # TODO: remove external variable from solver
@@ -55,34 +86,6 @@ class W_ConstraintVariableObject(W_ConstraintObject):
         else:
             raise NotImplementedError("inconsistent constraint variable")
 
-    def get_external_variable(self, space):
-        if self.w_external_variable is None:
-            w_proc = None
-            w_value = self.load_value(space)
-            w_hash = space.find_instance_var(space.w_constraints, "@variable_handlers")
-            if not isinstance(w_hash, W_HashObject):
-                return None
-            for w_mod in space.getclass(w_value).ancestors(include_singleton=False):
-                try:
-                    w_proc = w_hash.contents[w_mod]
-                except KeyError:
-                    pass
-                if w_proc:
-                    break
-            if w_proc:
-                if not isinstance(w_proc, W_ProcObject):
-                    raise space.error(
-                        space.w_TypeError,
-                        "non-proc in constraint variable handlers"
-                    )
-                else:
-                    with space.normal_execution():
-                        self.w_external_variable = space.invoke_block(
-                            w_proc.block,
-                            [self.get_name(space), w_value]
-                        )
-        return self.w_external_variable
-
     def get_name(self, space):
         clsname = space.getclass(self.load_value(space)).name
         if self.cell:
@@ -103,13 +106,14 @@ class W_ConstraintVariableObject(W_ConstraintObject):
 
     @classdef.method("variable")
     def method_variable(self, space):
-        return self.get_external_variable(space)
+        return self.w_external_variable or space.w_nil
 
     @classdef.method("set!")
     def method_set_i(self, space):
-        w_evar = self.get_external_variable(space)
-        w_value = space.send(w_evar, space.newsymbol("value"))
-        self.store_value(space, w_value)
+        assert self.w_external_variable is not None
+        w_value = space.send(self.w_external_variable, space.newsymbol("value"))
+        if w_value != space.w_nil:
+            self.store_value(space, w_value)
         return w_value
 
 
