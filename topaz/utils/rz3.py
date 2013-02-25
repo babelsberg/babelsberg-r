@@ -158,6 +158,7 @@ binop("Z3_mk_le")
 binop("Z3_mk_ge")
 binop("Z3_mk_power")
 binop("Z3_mk_eq")
+binop("Z3_mk_div")
 
 def multiop(name):
     def create_method(func, name):
@@ -181,7 +182,6 @@ def multiop(name):
     )
 multiop("Z3_mk_add")
 multiop("Z3_mk_sub")
-multiop("Z3_mk_div")
 multiop("Z3_mk_mul")
 
 # Numerals
