@@ -1,5 +1,31 @@
 class Array
-  def to_s()
+  def initialize(size_or_arr = nil, obj = nil, &block)
+    self.clear
+    if size_or_arr.nil?
+      return self
+    end
+    if obj.nil?
+      if size_or_arr.kind_of?(Array)
+        return self.replace(size_or_arr)
+      elsif size_or_arr.respond_to?(:to_ary)
+        return self.replace(size_or_arr.to_ary)
+      end
+    end
+    if !size_or_arr.respond_to?(:to_int)
+      raise TypeError, "can't convert #{size_or_arr.class} into Integer"
+    end
+    length = size_or_arr.to_int
+    raise ArgumentError, "negative array size" if length < 0
+    if block
+      # TODO: Emit "block supersedes default value argument" warning
+      length.times { |i| self << yield(i) }
+    else
+      length.times { self << obj }
+    end
+    return self
+  end
+
+  def to_s
     result = "["
     self.each_with_index do |obj, i|
       if i > 0
@@ -20,7 +46,7 @@ class Array
     res
   end
 
-  def at idx
+  def at(idx)
     self[idx]
   end
 
@@ -32,7 +58,7 @@ class Array
     end
   end
 
-  def zip ary
+  def zip(ary)
     result = []
     self.each_with_index do |obj, idx|
       result << [obj, ary[idx]]
@@ -40,7 +66,7 @@ class Array
     result
   end
 
-  def product ary
+  def product(ary)
     result = []
     self.each do |obj|
       ary.each do |other|
@@ -196,6 +222,12 @@ class Array
       result.concat(self)
     end
     result
+  end
+
+  def map!(&block)
+    raise RuntimeError, "can't modify frozen #{self.class}" if frozen?
+    self.each_with_index { |obj, idx| self[idx] = yield(obj) }
+    self
   end
 
   def max(&block)

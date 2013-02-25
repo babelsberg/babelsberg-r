@@ -1,10 +1,10 @@
 class IO
-  def << s
+  def <<(s)
     write(s)
     return self
   end
 
-  def each_line(sep=$/, limit=nil)
+  def each_line(sep = $/, limit = nil)
     if sep.is_a?(Fixnum) && limit.nil?
       limit = sep
       sep = $/
@@ -23,7 +23,7 @@ class IO
     nxt = read(8192)
     need_read = false
     while nxt || rest
-      if nxt and need_read
+      if nxt && need_read
         rest = rest ? rest + nxt : nxt
         nxt = read(8192)
         need_read = false
@@ -48,7 +48,7 @@ class IO
     self
   end
 
-  def readlines(sep=$/, limit=nil)
+  def readlines(sep = $/, limit = nil)
     lines = []
     each_line(sep, limit) { |line| lines << line }
     return lines
@@ -60,7 +60,7 @@ class IO
     end
   end
 
-  def self.popen(cmd, mode='r', opts={}, &block)
+  def self.popen(cmd, mode = 'r', opts = {}, &block)
     r, w = IO.pipe
     if mode != 'r' && mode != 'w'
       raise NotImplementedError, "mode #{mode} for IO.popen"

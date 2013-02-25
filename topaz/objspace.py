@@ -181,7 +181,6 @@ class ObjectSpace(object):
             self.getclassfor(W_TimeObject),
 
             self.getclassfor(W_ExceptionObject),
-            self.getclassfor(W_StandardError),
             self.getclassfor(W_ThreadError),
 
             self.getmoduleobject(Comparable.moduledef),
@@ -223,12 +222,6 @@ class ObjectSpace(object):
 
         self.w_load_path = self.newarray([])
         self.base_lib_path = os.path.abspath(os.path.join(os.path.join(os.path.dirname(__file__), os.path.pardir), "lib-ruby"))
-        # TODO: this should really go in a better place.
-        self.execute("""
-        def self.include *mods
-            Object.include *mods
-        end
-        """)
 
     def _freeze_(self):
         return True
@@ -496,7 +489,22 @@ class ObjectSpace(object):
             w_res = self.send(w_module, self.newsymbol("const_missing"), [self.newsymbol(name)])
         return w_res
 
+    @jit.elidable
+    def _check_const_name(self, name):
+        valid = name[0].isupper()
+        if valid:
+            for i in range(1, len(name)):
+                ch = name[i]
+                if not (ch.isalnum() or ch == "_" or ord(ch) > 127):
+                    valid = False
+                    break
+        if not valid:
+            raise self.error(self.w_NameError,
+                "wrong constant name %s" % name
+            )
+
     def set_const(self, module, name, w_value):
+        self._check_const_name(name)
         module.set_const(self, name, w_value)
 
     @jit.unroll_safe

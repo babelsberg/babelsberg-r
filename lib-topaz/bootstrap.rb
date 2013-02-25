@@ -1,4 +1,4 @@
-# This file loads all the ruby kernel code in it's directory
+# This file loads all the ruby kernel code in its directory
 
 lib_topaz = File.dirname(__FILE__)
 load_bootstrap = proc do |file|
@@ -19,6 +19,8 @@ load_bootstrap.call("integer.rb")
 load_bootstrap.call("io.rb")
 load_bootstrap.call("kernel.rb")
 load_bootstrap.call("numeric.rb")
+load_bootstrap.call("process.rb")
 load_bootstrap.call("range.rb")
 load_bootstrap.call("string.rb")
 load_bootstrap.call("symbol.rb")
+load_bootstrap.call("top_self.rb")

@@ -88,6 +88,8 @@ class TestKernel(BaseTopazTest):
             end
             raise A.new
             """)
+        with self.raises(space, "RuntimeError"):
+            space.execute("raise")
 
     def test_overriding_raise(self, space):
         w_res = space.execute("""
@@ -258,6 +260,10 @@ class TestKernel(BaseTopazTest):
         return a.frozen?, a.dup.frozen?, a.clone.frozen?
         """)
         assert self.unwrap(space, w_res) == [True, False, True]
+
+    def test_backtick(self, space):
+        w_res = space.execute("return `echo 10`")
+        assert self.unwrap(space, w_res) == "10\n"
 
 
 class TestRequire(BaseTopazTest):

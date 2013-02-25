@@ -46,7 +46,7 @@ class W_ArrayObject(W_Object):
         return self.items_w
 
     @classdef.singleton_method("allocate")
-    def singleton_method_allocate(self, space):
+    def singleton_method_allocate(self, space, args_w):
         return space.newarray([])
 
     @classdef.singleton_method("[]")
@@ -218,6 +218,7 @@ class W_ArrayObject(W_Object):
         return w_obj
 
     @classdef.method("pop")
+    @check_frozen()
     def method_pop(self, space, w_num=None):
         if w_num is None:
             if self.items_w:

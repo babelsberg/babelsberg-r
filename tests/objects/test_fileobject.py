@@ -235,12 +235,6 @@ class TestIO(BaseTopazTest):
         """ % f)
         assert w_res == space.w_true
 
-    def test_reopen_stderr_in_stdout(self, space, monkeypatch):
-        res = []
-        monkeypatch.setattr(os, "dup2", lambda old, new: res.append((old, new)))
-        w_res = space.execute("$stdout.reopen($stderr)")
-        assert res == [(2, 1)]
-
     def test_reopen_stdout_in_closed_io(self, space, tmpdir):
         f = tmpdir.join("file.txt")
         f.write('')
@@ -310,7 +304,7 @@ class TestIO(BaseTopazTest):
 
     @pytest.mark.xfail
     def test_popen_write(self, space, capfd):
-        w_res = space.execute("""
+        space.execute("""
         IO.popen("cat", "w") do |io|
           io.write 'foo\n'
         end
