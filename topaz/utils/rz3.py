@@ -35,7 +35,10 @@ if not os.path.isfile(z3_exe):
         if POSIX:
             os.system("autoconf")
             os.system("./configure")
-        os.system("python scripts/mk_make.py")
+        my_python = sys.executable
+        if not my_python:
+            my_python = "python"
+        os.system("%s scripts/mk_make.py" % my_python)
         os.chdir("build")
         if WINNT:
             os.system("nmake")
