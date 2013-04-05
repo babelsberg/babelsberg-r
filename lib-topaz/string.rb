@@ -59,4 +59,31 @@ class String
     self.dup.succ!
   end
   alias next succ
+
+  def upto(max, exclusive = false, &block)
+    return self.enum_for(:upto, max, exclusive) unless block
+
+    maximum = Topaz.convert_type(max, String, :to_str)
+    return self if self > maximum
+
+    current = self.dup
+    while current <= maximum
+      break if current.length > maximum.length
+      break if exclusive and current == maximum
+      yield current
+      # special handling to use ASCII map for single letters
+      # ("9" followed by ":" not handled by String#succ)
+      if current == "9" && self.length == 1 && maximum.length == 1 then
+        current = ":"
+      elsif current == "Z" && self.length == 1 && maximum.length == 1 then
+        current = "["
+      elsif current == "z" && self.length == 1 && maximum.length == 1 then
+        current = "{"
+      else
+        current = current.succ
+      end
+    end
+
+    return self
+  end
 end

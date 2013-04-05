@@ -7,29 +7,14 @@ class Fixnum < Integer
     self + 1
   end
 
-  def times
-    i = 0
-    while i < self
-      yield i
-      i += 1
-    end
-  end
-
-  def upto(n)
+  def upto(n, &block)
+    return self.enum_for(:upto) if !block
     i = self
     while i <= n
       yield i
       i += 1
     end
     self
-  end
-
-  def zero?
-    self == 0
-  end
-
-  def nonzero?
-    self != 0
   end
 
   def even?

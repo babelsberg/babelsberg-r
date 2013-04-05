@@ -265,6 +265,14 @@ class TestKernel(BaseTopazTest):
         w_res = space.execute("return `echo 10`")
         assert self.unwrap(space, w_res) == "10\n"
 
+    def test_backtick_sets_process_status(self, space):
+        w_res = space.execute("""
+        $? = nil
+        `echo`
+        return $?.class.name
+        """)
+        assert self.unwrap(space, w_res) == "Process::Status"
+
 
 class TestRequire(BaseTopazTest):
     def test_simple(self, space, tmpdir):
@@ -364,6 +372,45 @@ class TestRequire(BaseTopazTest):
         """ % f)
         assert space.int_w(w_res) == 5
 
+    def test_null_bytes(self, space):
+        with self.raises(space, "ArgumentError", "string contains null byte"):
+            space.execute('require "b\\0"')
+        with self.raises(space, "ArgumentError", "string contains null byte"):
+            space.execute("""
+            $LOAD_PATH.unshift "\\0"
+            require 'pp'
+            """)
+
+    def test_load_path_element_coerce(self, space, tmpdir):
+        f = tmpdir.join("t.rb")
+        f.write("""
+        $success = true
+        """)
+        w_res = space.execute("""
+        class A
+          def to_path
+            "%s"
+          end
+        end
+        $LOAD_PATH.unshift A.new
+        require 't'
+        return $success
+        """ % tmpdir)
+        assert w_res is space.w_true
+
+    def test_path_ambigious_directory_file(self, space, tmpdir):
+        f = tmpdir.join("t.rb")
+        f.write("""
+        $success = true
+        """)
+        tmpdir.join("t").ensure(dir=True)
+        w_res = space.execute("""
+        $LOAD_PATH << '%s'
+        require '%s'
+        return $success
+        """ % (tmpdir, tmpdir.join("t")))
+        assert w_res is space.w_true
+
 
 class TestExec(BaseTopazTest):
     def fork_and_wait(self, space, capfd, code):
@@ -394,6 +441,16 @@ class TestExec(BaseTopazTest):
     def test_exec_with_path_search(self, space, capfd):
         out = self.fork_and_wait(space, capfd, "exec 'echo', '$0'")
         assert out == "$0\n"
+
+    def test_exec_with_null_bytes(self, space):
+        with self.raises(space, "ArgumentError", "string contains null byte"):
+            space.execute('exec "\\0"')
+        with self.raises(space, "ArgumentError", "string contains null byte"):
+            space.execute('exec ["\\0", "none"]')
+        with self.raises(space, "ArgumentError", "string contains null byte"):
+            space.execute('exec ["none", "\\0"]')
+        with self.raises(space, "ArgumentError", "string contains null byte"):
+            space.execute('exec "none", "\\0"')
 
 
 class TestSetTraceFunc(BaseTopazTest):

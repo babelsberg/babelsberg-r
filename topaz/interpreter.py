@@ -1,4 +1,4 @@
-from rpython.rlib import jit
+from rpython.rlib import jit, rstackovf
 from rpython.rlib.debug import check_nonneg
 from rpython.rlib.objectmodel import we_are_translated, specialize
 
@@ -71,6 +71,11 @@ class Interpreter(object):
             pc = self.handle_raise_return(space, pc, frame, bytecode, e)
         except RaiseBreak as e:
             pc = self.handle_raise_break(space, pc, frame, bytecode, e)
+        except Throw as e:
+            pc = self.handle_throw(space, pc, frame, bytecode, e)
+        except rstackovf.StackOverflow:
+            rstackovf.check_stack_overflow()
+            pc = self.handle_ruby_error(space, pc, frame, bytecode, space.error(space.w_SystemStackError, "stack level too deep"))
         return pc
 
     def handle_bytecode(self, space, pc, frame, bytecode):
@@ -136,6 +141,13 @@ class Interpreter(object):
         if block is None:
             raise e
         unroller = RaiseBreakValue(e.parent_interp, e.w_value)
+        return block.handle(space, frame, unroller)
+
+    def handle_throw(self, space, pc, frame, bytecode, e):
+        block = frame.unrollstack(ThrowValue.kind)
+        if block is None:
+            raise e
+        unroller = ThrowValue(e.name, e.w_value)
         return block.handle(space, frame, unroller)
 
     def jump(self, space, bytecode, frame, cur_pc, target_pc):
@@ -275,8 +287,9 @@ class Interpreter(object):
             space.send(w_var, space.newsymbol("set!"))
         w_value = space.find_class_var(w_module, name)
         if w_value is None:
+            module_name = space.obj_to_s(w_module)
             raise space.error(space.w_NameError,
-                "uninitialized class variable %s in %s" % (name, w_module.name)
+                "uninitialized class variable %s in %s" % (name, module_name)
             )
         frame.push(w_value)
 
@@ -385,11 +398,12 @@ class Interpreter(object):
             if superclass is space.w_nil:
                 superclass = space.w_object
             if not space.is_kind_of(superclass, space.w_class):
+                cls_name = space.obj_to_s(space.getclass(superclass))
                 raise space.error(space.w_TypeError,
-                    "wrong argument type %s (expected Class)" % space.getclass(superclass).name
+                    "wrong argument type %s (expected Class)" % cls_name
                 )
             assert isinstance(superclass, W_ClassObject)
-            w_cls = space.newclass(name, superclass)
+            w_cls = space.newclass(name, superclass, w_scope=w_scope)
             space.set_const(w_scope, name, w_cls)
         elif not space.is_kind_of(w_cls, space.w_class):
             raise space.error(space.w_TypeError, "%s is not a class" % name)
@@ -398,24 +412,19 @@ class Interpreter(object):
 
     def BUILD_MODULE(self, space, bytecode, frame, pc):
         space.getexecutioncontext().last_instr = pc
-        w_bytecode = frame.pop()
         w_name = frame.pop()
         w_scope = frame.pop()
 
         name = space.symbol_w(w_name)
         w_mod = w_scope.find_const(space, name)
+
         if w_mod is None:
-            w_mod = space.newmodule(name)
+            w_mod = space.newmodule(name, w_scope=w_scope)
             space.set_const(w_scope, name, w_mod)
         elif not space.is_kind_of(w_mod, space.w_module) or space.is_kind_of(w_mod, space.w_class):
             raise space.error(space.w_TypeError, "%s is not a module" % name)
 
-        assert isinstance(w_bytecode, W_CodeObject)
-        sub_frame = space.create_frame(w_bytecode, w_mod, StaticScope(w_mod, frame.lexical_scope))
-        with space.getexecutioncontext().visit_frame(sub_frame):
-            space.execute_frame(sub_frame, w_bytecode)
-
-        frame.push(space.w_nil)
+        frame.push(w_mod)
 
     def BUILD_REGEXP(self, space, bytecode, frame, pc):
         w_flags = frame.pop()
@@ -511,13 +520,15 @@ class Interpreter(object):
         w_obj.attach_method(space, space.symbol_w(w_name), w_func)
         frame.push(space.w_nil)
 
-    def EVALUATE_CLASS(self, space, bytecode, frame, pc):
+    def EVALUATE_MODULE(self, space, bytecode, frame, pc):
         space.getexecutioncontext().last_instr = pc
         w_bytecode = frame.pop()
-        w_cls = frame.pop()
+        w_mod = frame.pop()
         assert isinstance(w_bytecode, W_CodeObject)
-        space.getexecutioncontext().invoke_trace_proc(space, "class", None, None, frame=frame)
-        sub_frame = space.create_frame(w_bytecode, w_cls, StaticScope(w_cls, frame.lexical_scope), block=frame.block)
+
+        event = "class" if space.is_kind_of(w_mod, space.w_class) else "module"
+        space.getexecutioncontext().invoke_trace_proc(space, event, None, None, frame=frame)
+        sub_frame = space.create_frame(w_bytecode, w_mod, StaticScope(w_mod, frame.lexical_scope), block=frame.block)
         with space.getexecutioncontext().visit_frame(sub_frame):
             w_res = space.execute_frame(sub_frame, w_bytecode)
 
@@ -551,9 +562,15 @@ class Interpreter(object):
     def SEND_SPLAT(self, space, bytecode, frame, pc, meth_idx, num_args):
         space.getexecutioncontext().last_instr = pc
         arrays_w = frame.popitemsreverse(num_args)
-        args_w = []
+        length = 0
         for w_array in arrays_w:
-            args_w.extend(space.listview(w_array))
+            length += len(space.listview(w_array))
+        args_w = [None] * length
+        pos = 0
+        for w_array in arrays_w:
+            array_w = space.listview(w_array)
+            args_w[pos:pos + len(array_w)] = array_w
+            pos += len(array_w)
         w_receiver = frame.pop()
         w_res = space.send(w_receiver, bytecode.consts_w[meth_idx], args_w)
         frame.push(w_res)
@@ -771,6 +788,12 @@ class RaiseBreak(RaiseFlow):
     pass
 
 
+class Throw(RaiseFlow):
+    def __init__(self, name, w_value):
+        self.name = name
+        self.w_value = w_value
+
+
 class SuspendedUnroller(W_Root):
     pass
 
@@ -829,6 +852,17 @@ class RaiseBreakValue(SuspendedUnroller):
 
     def nomoreblocks(self):
         raise RaiseBreak(self.parent_interp, self.w_value)
+
+
+class ThrowValue(SuspendedUnroller):
+    kind = 1 << 6
+
+    def __init__(self, name, w_value):
+        self.name = name
+        self.w_value = w_value
+
+    def nomoreblocks(self):
+        raise Throw(self.name, self.w_value)
 
 
 class FrameBlock(object):

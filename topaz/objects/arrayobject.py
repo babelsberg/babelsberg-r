@@ -8,7 +8,6 @@ from topaz.modules.enumerable import Enumerable
 from topaz.objects.objectobject import W_Object
 from topaz.utils.packing.pack import RPacker
 
-
 class RubySorter(TimSort):
     def __init__(self, space, list, listlength=None, sortblock=None):
         TimSort.__init__(self, list, listlength=listlength)
@@ -16,25 +15,15 @@ class RubySorter(TimSort):
         self.sortblock = sortblock
 
     def lt(self, a, b):
-        if self.sortblock is None:
-            w_cmp_res = self.space.send(a, self.space.newsymbol("<=>"), [b])
-        else:
-            w_cmp_res = self.space.invoke_block(self.sortblock, [a, b])
-        if w_cmp_res is self.space.w_nil:
-            raise self.space.error(
-                self.space.w_ArgumentError,
-                "comparison of %s with %s failed" % (self.space.getclass(a).name, self.space.getclass(b).name)
-            )
-        else:
-            return self.space.int_w(w_cmp_res) < 0
-
+        cmp_res = self.space.compare(a, b, self.sortblock)
+        return self.space.int_w(cmp_res) < 0
 
 class W_ArrayObject(W_Object):
     classdef = ClassDef("Array", W_Object.classdef, filepath=__file__)
     classdef.include_module(Enumerable)
 
-    def __init__(self, space, items_w):
-        W_Object.__init__(self, space)
+    def __init__(self, space, items_w, klass=None):
+        W_Object.__init__(self, space, klass)
         self.items_w = items_w
 
     def __deepcopy__(self, memo):
@@ -47,11 +36,7 @@ class W_ArrayObject(W_Object):
 
     @classdef.singleton_method("allocate")
     def singleton_method_allocate(self, space, args_w):
-        return space.newarray([])
-
-    @classdef.singleton_method("[]")
-    def singleton_method_subscript(self, space, args_w):
-        return space.newarray(args_w)
+        return W_ArrayObject(space, [], self)
 
     @classdef.method("initialize_copy", other_w="array")
     @classdef.method("replace", other_w="array")
@@ -61,7 +46,6 @@ class W_ArrayObject(W_Object):
         self.items_w.extend(other_w)
         return self
 
-    @classdef.method("at")
     @classdef.method("[]")
     @classdef.method("slice")
     def method_subscript(self, space, w_idx, w_count=None):
@@ -281,4 +265,27 @@ class W_ArrayObject(W_Object):
     @classdef.method("sort!")
     def method_sort(self, space, block):
         RubySorter(space, self.items_w, sortblock=block).sort()
+        return self
+
+    @classdef.method("reverse!")
+    @check_frozen()
+    def method_reverse_i(self, space):
+        self.items_w.reverse()
+        return self
+
+    @classdef.method("rotate!", n="int")
+    @check_frozen()
+    def method_rotate_i(self, space, n=1): 
+        length = len(self.items_w)
+        if length == 0:
+            return self
+        if abs(n) >= length:
+            n %= length
+        if n < 0:
+            n += length
+        if n == 0: 
+            return self
+        assert n >= 0       
+        self.items_w.extend(self.items_w[:n])
+        del self.items_w[:n]
         return self

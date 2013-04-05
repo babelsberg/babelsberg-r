@@ -348,6 +348,11 @@ class TestParser(BaseTopazTest):
             ))
         ]))
 
+    def test_colon_attr_assignment(self, space):
+        assert space.parse("a::b = nil") == ast.Main(ast.Block([
+            ast.Statement(ast.Assignment(ast.Send(ast.Send(ast.Self(1), "a", [], None, 1), "b", [], None, 1), ast.Nil()))
+        ]))
+
     def test_splat_rhs_assignment(self, space):
         assert space.parse("a,b,c = *[1,2,3]") == ast.Main(ast.Block([
             ast.Statement(ast.MultiAssignment(
@@ -825,6 +830,14 @@ class TestParser(BaseTopazTest):
     def test_subscript_assginment(self, space):
         assert space.parse("x[0] = 5") == ast.Main(ast.Block([
             ast.Statement(ast.Assignment(ast.Subscript(ast.Send(ast.Self(1), "x", [], None, 1), [ast.ConstantInt(0)], 1), ast.ConstantInt(5)))
+        ]))
+        assert space.parse("x[] = 5") == ast.Main(ast.Block([
+            ast.Statement(ast.Assignment(ast.Subscript(ast.Send(ast.Self(1), "x", [], None, 1), [], 1), ast.ConstantInt(5)))
+        ]))
+
+    def test_subscript_augmented_assignment(self, space):
+        assert space.parse("x[] += 5") == ast.Main(ast.Block([
+            ast.Statement(ast.AugmentedAssignment("+", ast.Subscript(ast.Send(ast.Self(1), "x", [], None, 1), [], 1), ast.ConstantInt(5)))
         ]))
 
     def test_def(self, space):
@@ -2666,3 +2679,26 @@ b)
             ast.Statement(ast.Array([ast.ConstantString("a\nb")])),
             ast.Statement(ast.Line(4)),
         ]))
+
+    def test_multiline_comments(self, space):
+        r = space.parse("""
+        1 + 1
+=begin
+foo bar
+=end
+        """)
+        assert r == ast.Main(ast.Block([
+            ast.Statement(ast.Send(ast.ConstantInt(1), "+", [ast.ConstantInt(1)], None, 2))
+        ]))
+
+        with self.raises(space, 'SyntaxError'):
+            space.parse(" =begin\nfoo\n=end")
+
+        with self.raises(space, 'SyntaxError'):
+            space.parse("=begin\nfoo\nbar")
+
+        with self.raises(space, 'SyntaxError'):
+            space.parse("=foo\nbar\n=end")
+
+        with self.raises(space, 'SyntaxError'):
+            space.parse("=begin\nbar\n=foo")

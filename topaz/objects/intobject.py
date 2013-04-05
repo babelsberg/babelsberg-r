@@ -1,3 +1,4 @@
+import math
 import operator
 
 from rpython.rlib.debug import check_regular_int
@@ -6,11 +7,13 @@ from rpython.rlib.rarithmetic import ovfcheck, LONG_BIT
 from rpython.rlib.rbigint import rbigint
 from rpython.rtyper.lltypesystem import lltype, rffi
 
+from topaz.coerce import Coerce
 from topaz.module import ClassDef
 from topaz.objects.floatobject import W_FloatObject
 from topaz.objects.integerobject import W_IntegerObject
 from topaz.objects.numericobject import W_NumericObject
 from topaz.objects.objectobject import W_RootObject
+from topaz.system import IS_WINDOWS
 
 
 class FixnumStorage(object):
@@ -104,6 +107,43 @@ class W_FixnumObject(W_RootObject):
     def method_floor(self, space):
         return self
 
+    def raise_zero_division_error(self, space):
+        raise space.error(space.w_ZeroDivisionError, "divided by 0")
+
+    def divide(self, space, w_other):
+        if space.is_kind_of(w_other, space.w_fixnum):
+            other = space.int_w(w_other)
+            try:
+                return space.newint(self.intvalue / other)
+            except ZeroDivisionError:
+                self.raise_zero_division_error(space)
+        elif space.is_kind_of(w_other, space.w_bignum):
+            return space.send(space.newbigint_fromint(self.intvalue), space.newsymbol("/"), [w_other])
+        elif space.is_kind_of(w_other, space.w_float):
+            return space.send(space.newfloat(space.float_w(self)), space.newsymbol("/"), [w_other])
+        else:
+            return W_NumericObject.retry_binop_coercing(space, self, w_other, "/")
+
+    @classdef.method("/")
+    def method_divide(self, space, w_other):
+        return self.divide(space, w_other)
+
+    @classdef.method("div")
+    def method_div(self, space, w_other):
+        if space.is_kind_of(w_other, space.w_float):
+            if space.float_w(w_other) == 0.0:
+                self.raise_zero_division_error(space)
+            else:
+                w_float = space.send(
+                    space.newfloat(space.float_w(self)),
+                    space.newsymbol("/"),
+                    [w_other]
+                )
+                w_float = space.newfloat(math.floor(Coerce.float(space, w_float)))
+                return space.send(w_float, space.newsymbol("to_i"))
+        else:
+            return self.divide(space, w_other)
+
     @classdef.method("**")
     def method_pow(self, space, w_other):
         if space.is_kind_of(w_other, space.w_fixnum):
@@ -118,9 +158,8 @@ class W_FixnumObject(W_RootObject):
                 [w_other]
             )
         else:
-            raise space.error(
-                space.w_TypeError,
-                "%s can't be coerced into Fixnum" % space.getclass(w_other).name
+            raise space.error(space.w_TypeError,
+                "%s can't be coerced into Fixnum" % space.obj_to_s(space.getclass(w_other))
             )
 
     def method_pow_int_impl(self, space, w_other):
@@ -145,13 +184,6 @@ class W_FixnumObject(W_RootObject):
         else:
             return space.send(space.newfloat(float(temp)), space.newsymbol("**"), [w_other])
 
-    @classdef.method("/", other="int")
-    def method_div(self, space, other):
-        try:
-            return space.newint(self.intvalue / other)
-        except ZeroDivisionError:
-            raise space.error(space.w_ZeroDivisionError, "divided by 0")
-
     @classdef.method("%", other="int")
     def method_mod(self, space, other):
         return space.newint(self.intvalue % other)
@@ -160,7 +192,7 @@ class W_FixnumObject(W_RootObject):
     def method_left_shift(self, space, other):
         if other < 0:
             return space.newint(self.intvalue >> -other)
-        elif other > LONG_BIT:
+        elif other >= LONG_BIT:
             return space.send(
                 space.newbigint_fromint(self.intvalue), space.newsymbol("<<"),
                 [space.newint(other)]
@@ -176,6 +208,13 @@ class W_FixnumObject(W_RootObject):
             else:
                 return space.newint(value)
 
+    @classdef.method(">>", other="int")
+    def method_right_shift(self, space, other):
+        if other < 0:
+            return space.newint(self.intvalue << -other)
+        else:
+            return space.newint(self.intvalue >> other)
+
     @classdef.method("&", other="int")
     def method_and(self, space, other):
         return space.newint(self.intvalue & other)
@@ -187,6 +226,10 @@ class W_FixnumObject(W_RootObject):
     @classdef.method("|", other="int")
     def method_or(self, space, other):
         return space.newint(self.intvalue | other)
+
+    @classdef.method("~")
+    def method_invert(self, space):
+        return space.newint(~self.intvalue)
 
     @classdef.method("==")
     def method_eq(self, space, w_other):
@@ -217,10 +260,6 @@ class W_FixnumObject(W_RootObject):
     method_gt = new_bool_op(classdef, ">", operator.gt)
     method_gte = new_bool_op(classdef, ">=", operator.ge)
 
-    @classdef.method("-@")
-    def method_neg(self, space):
-        return space.newint(-self.intvalue)
-
     @classdef.method("<=>")
     def method_comparator(self, space, w_other):
         if isinstance(w_other, W_FixnumObject):
@@ -244,9 +283,15 @@ class W_FixnumObject(W_RootObject):
     def method_hash(self, space):
         return self
 
-    @classdef.method("size")
-    def method_size(self, space):
-        return space.newint(rffi.sizeof(lltype.typeOf(self.intvalue)))
+    if IS_WINDOWS:
+        @classdef.method("size")
+        def method_size(self, space):
+            # RPython translation is always 32bit on Windows
+            return space.newint(4)
+    else:
+        @classdef.method("size")
+        def method_size(self, space):
+            return space.newint(rffi.sizeof(lltype.typeOf(self.intvalue)))
 
     @classdef.method("coerce")
     def method_coerce(self, space, w_other):
@@ -261,3 +306,9 @@ class W_FixnumObject(W_RootObject):
             raise space.error(space.w_RangeError, "%d out of char range" % self.intvalue)
         else:
             return space.newstr_fromstr(chr(self.intvalue))
+
+    @classdef.method("[]", idx="int")
+    def method_subscript(self, space, idx):
+        if not 0 <= idx < LONG_BIT:
+            return space.newint(0)
+        return space.newint(int(bool(self.intvalue & (1 << idx))))

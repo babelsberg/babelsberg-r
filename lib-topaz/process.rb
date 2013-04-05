@@ -9,7 +9,7 @@ module Process
   end
 
   def self.waitall
-    raise NotImplementedError.new 'Process.waitall'
+    raise NotImplementedError.new("Process.waitall")
   end
 
   class Status
@@ -17,6 +17,12 @@ module Process
       @pid = pid
       @exitstatus = exitstatus
     end
+
+    def success?
+      @exitstatus == 0
+    end
+
+    alias exited? success?
 
     def pid
       @pid
