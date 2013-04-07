@@ -281,3 +281,52 @@ class TestConstraintVariableObject(BaseTopazTest):
         return pt.x, pt.y
         """)
         assert self.unwrap(space, w_res) == [0, 0]
+
+    def test_invalidation_along_path(self, space):
+        w_res = space.execute("""
+        require "libz3"
+
+        $area_executions = 0
+        res = []
+
+        class Point
+          attr_accessor :x, :y
+
+          def initialize(x, y)
+            self.x, self.y = x, y
+          end
+        end
+
+        class Rect
+          attr_accessor :origin, :extent
+
+          def initialize(origin, extent)
+            self.origin, self.extent = origin, extent
+          end
+
+          def area
+            $area_executions += 1
+            extent.x * extent.y
+          end
+        end
+
+        r = Rect.new(Point.new(0, 0), Point.new(10, 10))
+        always { r.area > 100 }
+        res << r.extent.x << r.extent.y
+
+        r.extent.x = 100
+        res << r.extent.x << r.extent.y
+
+        r.extent = Point.new(50, 50)
+        res << r.extent.x << r.extent.y
+
+        return res, $area_executions
+        """)
+        assert self.unwrap(space, w_res) == [
+            [
+                11, 10,
+                100, 10,
+                50, 50
+            ],
+            2
+        ]
