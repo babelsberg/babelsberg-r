@@ -262,3 +262,22 @@ class TestConstraintVariableObject(BaseTopazTest):
         return h.length
         """)
         assert self.unwrap(space, w_res) >= 100
+
+    def test_attr_reader(self, space):
+        w_res = space.execute("""
+        require "libz3"
+        res = []
+        class Point
+          attr_accessor :x, :y
+
+          def initialize(x, y)
+            self.x = x
+            self.y = y
+            always { self.x >= 0 }
+            always { self.y >= 0 }
+          end
+        end
+        pt = Point.new(-10, -10)
+        return pt.x, pt.y
+        """)
+        assert self.unwrap(space, w_res) == [0, 0]

@@ -16,6 +16,10 @@ class AttributeReader(W_FunctionObject):
         self.varname = varname
 
     def call(self, space, w_obj, args_w, block):
+        if space.is_constructing_constraint():
+            w_res = space.newconstraintvariable(w_owner=w_obj, ivar=self.varname)
+            if w_res is not None:
+                return w_res
         return space.find_instance_var(w_obj, self.varname)
 
 
