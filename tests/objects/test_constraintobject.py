@@ -62,11 +62,11 @@ class TestConstraintVariableObject(BaseTopazTest):
           def x
             @x
           end
-        
+
           def y
             @y
           end
-        
+
           def initialize(x, y)
             @x = x
             @y = y
@@ -76,7 +76,7 @@ class TestConstraintVariableObject(BaseTopazTest):
             always { @y < 480 }
           end
         end
-        
+
         pt1 = Point.new(-1, 10)
         pt2 = Point.new(20, 20)
         res << [[pt1.x, pt1.y], [pt2.x, pt2.y]]
@@ -103,11 +103,11 @@ class TestConstraintVariableObject(BaseTopazTest):
           def x
             @x
           end
-        
+
           def y
             @y
           end
-        
+
           def initialize(x, y)
             @x = x
             @y = y
@@ -122,22 +122,22 @@ class TestConstraintVariableObject(BaseTopazTest):
           def start
             @start
           end
-        
+
           def end
             @end
           end
-        
+
           def initialize(pt1, pt2)
             @start = pt1
             @end = pt2
             always { pt1.y == pt2.y }
           end
-        
+
           def length
             @end.x - @start.x
           end
         end
-        
+
         h = HorizontalLine.new(Point.new(1, 1), Point.new(2, 2))
         always { h.length >= 100 }
         return h.length
@@ -222,11 +222,11 @@ class TestConstraintVariableObject(BaseTopazTest):
           def x
             @x
           end
-        
+
           def y
             @y
           end
-        
+
           def initialize(x, y)
             @x = x
             @y = y
@@ -241,22 +241,22 @@ class TestConstraintVariableObject(BaseTopazTest):
           def start
             @start
           end
-        
+
           def end
             @end
           end
-        
+
           def initialize(pt1, pt2)
             @start = pt1
             @end = pt2
             always { pt1.y == pt2.y }
           end
-        
+
           def length
             @end.x - @start.x
           end
         end
-        
+
         h = HorizontalLine.new(Point.new(1, 1), Point.new(2, 2))
         always { h.length >= 100 }
         return h.length
