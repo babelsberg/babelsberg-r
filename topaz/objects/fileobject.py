@@ -117,7 +117,7 @@ class W_FileObject(W_IOObject):
         if path in separators:
             return space.newstr_fromstr("/")
 
-        while path[-1] in separators:
+        while path and path[-1] in separators:
             newlen = len(path) - 1
             assert newlen >= 0
             path = path[:newlen]
@@ -127,7 +127,7 @@ class W_FileObject(W_IOObject):
             idx = max(idx, path.rfind(separator))
         while idx > 0 and path[idx - 1] in separators:
             idx -= 1
-        if idx == 0:
+        if idx <= 0:
             return space.newstr_fromstr("/")
         assert idx >= 0
         return space.newstr_fromstr(path[:idx])
@@ -150,7 +150,8 @@ class W_FileObject(W_IOObject):
             path = dir + "/" + path
 
         items = []
-        path = path.replace("\\", "/")
+        if IS_WINDOWS:
+            path = path.replace("\\", "/")
         parts = path.split("/")
         for part in parts:
             if part == "..":
@@ -292,8 +293,8 @@ class W_FileObject(W_IOObject):
         return stat_obj
 
     if IS_WINDOWS:
-        classdef.s_notimplemented("symlink")
-        classdef.s_notimplemented("link")
+        classdef.singleton_notimplemented("symlink")
+        classdef.singleton_notimplemented("link")
     else:
         @classdef.singleton_method("symlink", old_name="path", new_name="path")
         def singleton_method_symlink(self, space, old_name, new_name):
