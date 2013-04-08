@@ -35,7 +35,11 @@ class AttributeWriter(W_FunctionObject):
 
     def call(self, space, w_obj, args_w, block):
         [w_value] = args_w
-        space.set_instance_var(w_obj, self.varname, w_value)
+        w_var = space.findconstraintvariable(w_owner=w_obj, ivar=self.varname)
+        if w_var:
+            space.suggest_value(w_var, w_value)
+        else:
+            space.set_instance_var(w_obj, self.varname, w_value)
         return w_value
 
     def arity(self, space):
