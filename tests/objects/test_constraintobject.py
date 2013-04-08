@@ -2,25 +2,39 @@ from ..base import BaseTopazTest
 
 
 class TestConstraintVariableObject(BaseTopazTest):
+    def execute(self, space, code, *libs):
+        return [space.execute("""
+                require "%s"
+
+                %s
+                """ % (lib, code)) for lib in libs]
+
     def test_names(self, space):
         space.execute("ConstraintVariable")
         space.execute("Constraints")
 
     def test_local(self, space):
-        w_res = space.execute("""
-        require "libcassowary"
-        a = 1
-        always{ a == 10 }
-        return a
-        """)
-        assert self.unwrap(space, w_res) == 10
-        w_res = space.execute("""
-        b = 1
-        always { b > 10 }
-        b = 11
-        return b
-        """)
-        assert self.unwrap(space, w_res) == 11
+        w_cassowary, w_z3 = self.execute(
+            space,
+            """
+            a = 1
+            always{ a == 10 }
+            return a
+            """,
+            "libz3", "libcassowary")
+        assert self.unwrap(space, w_cassowary) == 10
+        assert self.unwrap(space, w_z3) == 10
+        w_cassowary, w_z3 = self.execute(
+            space,
+            """
+            b = 1
+            always { b > 10 }
+            b = 11
+            return b
+            """,
+            "libz3", "libcassowary")
+        assert self.unwrap(space, w_cassowary) == 11
+        assert self.unwrap(space, w_z3) == 11
 
     def test_ivar(self, space):
         w_res = space.execute("""
@@ -283,9 +297,7 @@ class TestConstraintVariableObject(BaseTopazTest):
         assert self.unwrap(space, w_res) == [0, 0]
 
     def test_invalidation_along_path(self, space):
-        w_res = space.execute("""
-        require "libz3"
-
+        code = """
         $area_executions = 0
         res = []
 
@@ -321,11 +333,12 @@ class TestConstraintVariableObject(BaseTopazTest):
         res << r.extent.x << r.extent.y
 
         return res, $area_executions
-        """)
+        """
+        [w_res] = self.execute(space, code, "libz3")
         assert self.unwrap(space, w_res) == [
             [
-                11, 10,
-                100, 10,
+                101, 1,
+                100, 2,
                 50, 50
             ],
             2
