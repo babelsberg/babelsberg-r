@@ -31,6 +31,12 @@ class W_BaseObject(W_Root):
 
     classdef = ClassDef("BasicObject", filepath=__file__)
 
+    from rpython.rlib.objectmodel import we_are_translated
+    if not if we_are_translated():
+        @classdef.method("pdb")
+        def method_pdb(self, space):
+            import pdb; pdb.set_trace()
+
     def getclass(self, space):
         return space.getclassobject(self.classdef)
 
