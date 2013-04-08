@@ -810,8 +810,12 @@ class ObjectSpace(object):
     def suggest_value(self, w_var, w_value):
         if not self.is_executing_normally():
             return
-        with self.constraint_execution():
-            self.send(w_var, self.newsymbol("suggest_value"), [w_value])
+        # XXX: Proper test method
+        if w_var.w_external_variable:
+            with self.constraint_execution():
+                self.send(w_var, self.newsymbol("suggest_value"), [w_value])
+        else:
+            self.send(w_var, self.newsymbol("recalculate_path"), [w_value])
 
     def is_executing_normally(self):
         return self.execution_mode_stack[-1] == NORMAL_EXECUTION

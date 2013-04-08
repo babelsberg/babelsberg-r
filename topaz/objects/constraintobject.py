@@ -114,11 +114,21 @@ class W_ConstraintVariableObject(W_ConstraintObject):
 
     @classdef.method("set!")
     def method_set_i(self, space):
-        assert self.w_external_variable is not None
-        w_value = space.send(self.w_external_variable, space.newsymbol("value"))
-        if w_value != space.w_nil:
-            self.store_value(space, w_value)
-        return w_value
+        if self.w_external_variable is not None:
+            # This variable is part of the solver. Get the solvers
+            # interpretation and store it
+            w_value = space.send(self.w_external_variable, space.newsymbol("value"))
+            if w_value != space.w_nil:
+                self.store_value(space, w_value)
+            return w_value
+        return space.w_nil
+
+    @classdef.method("recalculate_path")
+    def method_recalculate_path(self, space, w_value):
+        # TODO: Disable the other constraints
+        for block in self.constraint_blocks:
+            space.send(self, space.newsymbol("always"), block=block)
+        self.store_value(space, w_value)
 
 
 class Constraints(Module):
