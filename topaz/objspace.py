@@ -102,6 +102,7 @@ class ObjectSpace(object):
         self.exit_handlers_w = []
 
         self.execution_mode_stack = [NORMAL_EXECUTION]
+        self.constraint_block_stack = []
         self.constraint_solvers = []
 
         self.w_true = W_TrueObject(self)
@@ -449,16 +450,12 @@ class ObjectSpace(object):
 
     def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
         w_var = self.findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar)
-        if w_var:
+        if w_var and w_var.w_external_variable:
             return w_var
         else:
             w_var = W_ConstraintVariableObject(
                 self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar
             )
-            if not w_var.w_external_variable:
-                # No constraint solver variable available for this object
-                return None
-
             if cell:
                 cell.set_constraint(w_var)
             elif w_owner:
@@ -467,7 +464,15 @@ class ObjectSpace(object):
                 elif cvar:
                     assert isinstance(w_owner, W_ModuleObject)
                     w_owner.set_class_constraint_var(self, cvar, w_var)
-            return w_var
+        if not w_var.w_external_variable:
+            # No constraint solver variable available for this object
+            # Only keep the block alive if this is a variable that
+            # will not be registered with a solver. This means this
+            # variable is on the path to a constraint, and the block
+            # will have to be re-evaluated when this variable is set
+            w_var.add_constraint_block(self.constraint_block_stack[-1])
+            return None
+        return w_var
 
     @jit.unroll_safe
     def newbinding_fromframe(self, frame):
@@ -820,17 +825,24 @@ class ObjectSpace(object):
     def constraint_execution(self):
         return _ExecutionModeContextManager(self, EXECUTING_CONSTRAINTS)
 
-    def constraint_construction(self):
-        return _ExecutionModeContextManager(self, CONSTRUCTING_CONSTRAINT)
+    def constraint_construction(self, block):
+        return _ExecutionModeContextManager(
+            self, CONSTRUCTING_CONSTRAINT, block=block
+        )
 
 
 class _ExecutionModeContextManager(object):
-    def __init__(self, space, executiontype):
+    def __init__(self, space, executiontype, block=None):
         self.space = space
         self.executiontype = executiontype
+        self.block = block
 
     def __enter__(self):
+        if self.block:
+            self.space.constraint_block_stack.append(self.block)
         self.space.execution_mode_stack.append(self.executiontype)
 
     def __exit__(self, exc_type, exc_value, tb):
+        if self.block:
+            self.space.constraint_block_stack.pop()
         self.space.execution_mode_stack.pop()

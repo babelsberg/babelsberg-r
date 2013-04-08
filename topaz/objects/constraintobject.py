@@ -13,6 +13,7 @@ class W_ConstraintObject(W_Object):
 
 
 class W_ConstraintVariableObject(W_ConstraintObject):
+    _attrs_ = ["cell", "w_owner", "ivar", "cvar", "constraint_blocks", "w_external_variable"]
     _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
 
     classdef = ClassDef("ConstraintVariable", W_ConstraintObject.classdef, filepath=__file__)
@@ -23,6 +24,7 @@ class W_ConstraintVariableObject(W_ConstraintObject):
         self.w_owner = None
         self.ivar = None
         self.cvar = None
+        self.constraint_blocks = []
         if cell:
             self.cell = cell
         elif w_owner and ivar:
@@ -64,6 +66,9 @@ class W_ConstraintVariableObject(W_ConstraintObject):
     def __del__(self):
         # TODO: remove external variable from solver
         pass
+
+    def add_constraint_block(self, block):
+        self.constraint_blocks.append(block)
 
     def load_value(self, space):
         if self.cell:
