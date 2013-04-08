@@ -329,6 +329,9 @@ class TestConstraintVariableObject(BaseTopazTest):
         r.extent.x = 100
         res << r.extent.x << r.extent.y
 
+        r.extent = Point.new(5, 5)
+        res << r.extent.x << r.extent.y
+
         r.extent = Point.new(50, 50)
         res << r.extent.x << r.extent.y
 
@@ -339,7 +342,8 @@ class TestConstraintVariableObject(BaseTopazTest):
             [
                 101, 1,
                 100, 2,
-                50, 50
+                101, 1,
+                101, 1,
             ],
-            2
+            3
         ]

@@ -125,10 +125,13 @@ class W_ConstraintVariableObject(W_ConstraintObject):
 
     @classdef.method("recalculate_path")
     def method_recalculate_path(self, space, w_value):
-        # TODO: Disable the other constraints
-        for block in self.constraint_blocks:
-            space.send(self, space.newsymbol("always"), block=block)
         self.store_value(space, w_value)
+        for block in self.constraint_blocks:
+            w_constraint = block.get_constraint()
+            assert w_constraint
+            space.send(w_constraint, space.newsymbol("disable"))
+            block.set_constraint(None)
+            space.send(self, space.newsymbol("always"), block=block)
 
 
 class Constraints(Module):

@@ -31,12 +31,6 @@ class W_BaseObject(W_Root):
 
     classdef = ClassDef("BasicObject", filepath=__file__)
 
-    from rpython.rlib.objectmodel import we_are_translated
-    if not we_are_translated():
-        @classdef.method("pdb")
-        def method_pdb(self, space):
-            import pdb; pdb.set_trace()
-
     def getclass(self, space):
         return space.getclassobject(self.classdef)
 
@@ -181,6 +175,8 @@ class W_RootObject(W_BaseObject):
     def method_always(self, space, w_strength=None, block=None):
         if block is None:
             raise space.error(space.w_ArgumentError, "no constraint block given")
+        if block.get_constraint():
+            raise space.error(space.w_ArgumentError, "double-use of same constraint block")
         w_arg = space.send(self, space.newsymbol("__constrain__"), block=block)
         if not space.respond_to(w_arg, space.newsymbol("enable")):
             raise space.error(
@@ -188,6 +184,7 @@ class W_RootObject(W_BaseObject):
                 "constraint block did not return an object that responds to #enable " +
                 "(did you `require' your solver?)"
             )
+        block.set_constraint(w_arg)
         space.send(w_arg, space.newsymbol("enable"), [] if w_strength is None else [w_strength])
         space.send(self, space.newsymbol("__solve_constraints__"))
         return w_arg

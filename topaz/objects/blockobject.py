@@ -11,6 +11,13 @@ class W_BlockObject(W_BaseObject):
         self.block = block
         self.parent_interp = parent_interp
         self.regexp_match_cell = regexp_match_cell
+        self.constraint = None
+
+    def get_constraint(self):
+        return self.constraint
+
+    def set_constraint(self, w_value):
+        self.constraint = w_value
 
     def copy(self, bytecode=None, w_self=None, lexical_scope=None, cells=None,
              block=None, parent_interp=None):
