@@ -322,7 +322,8 @@ class TestConstraintVariableObject(BaseTopazTest):
           end
         end
 
-        r = Rect.new(Point.new(0, 0), Point.new(10, 10))
+        extent_1 = Point.new(10, 10)
+        r = Rect.new(Point.new(0, 0), extent_1)
         always { r.area > 100 }
         res << r.extent.x << r.extent.y
 
@@ -335,15 +336,21 @@ class TestConstraintVariableObject(BaseTopazTest):
         r.extent = Point.new(50, 50)
         res << r.extent.x << r.extent.y
 
+        res << extent_1.x << extent_1.y
+        extent_1.x = 1
+        res << extent_1.x << extent_1.y
+
         return res, $area_executions
         """
         [w_res] = self.execute(space, code, "libz3")
         assert self.unwrap(space, w_res) == [
             [
-                101, 1,
-                100, 2,
-                101, 1,
-                101, 1,
+                101, 1, # invalid point is adjusted
+                100, 2, # Assignment works, adjusts other coordinate
+                101, 1, # Setting a new Point that is too small
+                101, 1, # Setting a new Point that would work
+                100, 2, # point that is no longer constrained keeps last value
+                1, 2,   # subsequent change then works imperatively
             ],
             3
         ]

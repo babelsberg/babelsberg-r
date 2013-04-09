@@ -147,6 +147,8 @@ class W_Z3Object(W_RootObject):
                 decl = w_ast.getdecl(self.ctx)
             except Z3Exception:
                 return space.w_nil
+            if rz3.z3_model_has_interp(self.ctx, model, decl) == 0:
+                return space.w_nil
             interp_ast = rz3.z3_model_get_const_interp(self.ctx, model, decl)
             kind = rz3.z3_get_ast_kind(self.ctx, interp_ast)
             if kind == 0: # Z3_NUMERAL_AST

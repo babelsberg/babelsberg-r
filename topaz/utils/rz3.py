@@ -86,6 +86,7 @@ z3_del_context = rffi.llexternal("Z3_del_context", [Z3_context], lltype.Void, co
 Z3_ast = rffi.COpaquePtr("Z3_ast")
 Z3_astP = rffi.VOIDPP
 Z3_func_decl = rffi.COpaquePtr("Z3_func_decl")
+Z3_bool = rffi.INT
 
 _z3_get_numeral_string = rffi.llexternal(
     "Z3_get_numeral_string",
@@ -222,9 +223,14 @@ z3_model_get_const_interp = rffi.llexternal(
     Z3_ast,
     compilation_info=eci
 )
+z3_model_has_interp = rffi.llexternal(
+    "Z3_model_has_interp",
+    [Z3_context, Z3_model, Z3_func_decl],
+    Z3_bool,
+    compilation_info=eci
+)
 
 # Solvers
-Z3_bool = rffi.INT
 Z3_solver = rffi.COpaquePtr("Z3_solver")
 z3_mk_solver = rffi.llexternal("Z3_mk_solver", [Z3_context], Z3_solver, compilation_info=eci)
 z3_solver_check = rffi.llexternal(
