@@ -450,7 +450,7 @@ class ObjectSpace(object):
 
     def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
         w_var = self.findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar)
-        if w_var and w_var.w_external_variable:
+        if w_var and w_var.is_solveable():
             return w_var
         else:
             w_var = W_ConstraintVariableObject(
@@ -464,7 +464,7 @@ class ObjectSpace(object):
                 elif cvar:
                     assert isinstance(w_owner, W_ModuleObject)
                     w_owner.set_class_constraint_var(self, cvar, w_var)
-        if not w_var.w_external_variable:
+        if not w_var.is_solveable():
             # No constraint solver variable available for this object
             # Only keep the block alive if this is a variable that
             # will not be registered with a solver. This means this
@@ -810,8 +810,7 @@ class ObjectSpace(object):
     def suggest_value(self, w_var, w_value):
         if not self.is_executing_normally():
             return
-        # XXX: Proper test method
-        if w_var.w_external_variable:
+        if w_var.is_solveable():
             with self.constraint_execution():
                 self.send(w_var, self.newsymbol("suggest_value"), [w_value])
         else:

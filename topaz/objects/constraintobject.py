@@ -13,13 +13,13 @@ class W_ConstraintObject(W_Object):
 
 
 class W_ConstraintVariableObject(W_ConstraintObject):
-    _attrs_ = ["cell", "w_owner", "ivar", "cvar", "constraint_blocks", "w_external_variable"]
     _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
 
     classdef = ClassDef("ConstraintVariable", W_ConstraintObject.classdef, filepath=__file__)
 
     def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None):
         W_Object.__init__(self, space)
+        self.w_external_variable = None
         self.cell = None
         self.w_owner = None
         self.ivar = None
@@ -60,12 +60,13 @@ class W_ConstraintVariableObject(W_ConstraintObject):
                         w_proc.block,
                         [self.get_name(space), w_value]
                     )
-        else:
-            self.w_external_variable = None
 
     def __del__(self):
         # TODO: remove external variable from solver
         pass
+
+    def is_solveable(self):
+        return self.w_external_variable is not None
 
     def add_constraint_block(self, block):
         self.constraint_blocks.append(block)
