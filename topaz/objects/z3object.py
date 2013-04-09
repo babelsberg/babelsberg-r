@@ -8,6 +8,10 @@ from topaz.objects.objectobject import W_RootObject, W_Object
 from topaz.utils import rz3
 
 
+class Z3Exception(Exception):
+    pass
+
+
 class W_Z3Object(W_RootObject):
     _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved", "next_id"]
     _immutable_fields_ = ["ctx", "solver"]
@@ -139,7 +143,11 @@ class W_Z3Object(W_RootObject):
             return space.w_nil
         else:
             model = rz3.z3_solver_get_model(self.ctx, self.solver)
-            interp_ast = rz3.z3_model_get_const_interp(self.ctx, model, w_ast.getdecl(self.ctx))
+            try:
+                decl = w_ast.getdecl(self.ctx)
+            except Z3Exception:
+                return space.w_nil
+            interp_ast = rz3.z3_model_get_const_interp(self.ctx, model, decl)
             kind = rz3.z3_get_ast_kind(self.ctx, interp_ast)
             if kind == 0: # Z3_NUMERAL_AST
                 try:
@@ -151,7 +159,6 @@ class W_Z3Object(W_RootObject):
                 return space.newbool(result == 1) # 1 is Z3_L_TRUE
             else:
                 raise NotImplementedError("Ast type %d" % kind)
-            return space.newstr_fromstr(numstr)
 
 
 class W_Z3Ptr(W_RootObject):
@@ -161,6 +168,10 @@ class W_Z3Ptr(W_RootObject):
     def __init__(self, w_z3, pointer):
         self.w_z3 = w_z3
         self.pointer = pointer
+        rz3.z3_ast_inc_ref(self.w_z3.ctx, self.pointer)
+
+    def __del__(self):
+        rz3.z3_ast_dec_ref(self.w_z3.ctx, self.pointer)
 
     def getsingletonclass(self, space):
         raise space.error(space.w_TypeError, "can't define singleton")
@@ -172,7 +183,11 @@ class W_Z3Ptr(W_RootObject):
         raise space.error(space.w_TypeError, "can't add instance variables")
 
     def getdecl(self, ctx):
-        return rz3.z3_get_app_decl(ctx, self.pointer)
+        decl = rz3.z3_get_app_decl(ctx, self.pointer)
+        err = rz3.z3_get_error_code(ctx)
+        if err != 0:
+            raise Z3Exception
+        return decl
 
     classdef.undefine_allocator()
 
