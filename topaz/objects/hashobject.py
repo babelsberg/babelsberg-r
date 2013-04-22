@@ -18,17 +18,11 @@ class W_HashObject(W_Object):
     def method_allocate(self, space, args_w):
         return W_HashObject(space, self)
 
-    @classdef.singleton_method("[]")
-    def singleton_method_subscript(self, space, w_obj=None):
-        if w_obj is None:
-            return W_HashObject(space)
-        w_res = space.convert_type(w_obj, space.w_hash, "to_hash", raise_error=False)
-        if w_res is space.w_nil:
-            raise NotImplementedError
-        assert isinstance(w_res, W_HashObject)
-        result = W_HashObject(space)
-        result.contents.update(w_res.contents)
-        return result
+    @classdef.singleton_method("try_convert")
+    def method_try_convert(self, space, w_obj):
+        if not space.is_kind_of(w_obj, space.w_hash):
+            w_obj = space.convert_type(w_obj, space.w_hash, "to_hash", raise_error=False)
+        return w_obj
 
     @classdef.method("initialize")
     def method_initialize(self, space, w_default=None, block=None):
@@ -39,10 +33,22 @@ class W_HashObject(W_Object):
 
     @classdef.method("default")
     def method_default(self, space, w_key=None):
-        if self.default_proc is not None:
+        if self.default_proc is not None and w_key is not None:
             return space.invoke_block(self.default_proc, [self, w_key])
         else:
             return self.w_default
+
+    @classdef.method("default=")
+    @check_frozen()
+    def method_set_default(self, space, w_defl):
+        self.default_proc = None
+        self.w_default = w_defl
+
+    @classdef.method("default_proc")
+    def method_default_proc(self, space):
+        if self.default_proc is None:
+            return space.w_nil
+        return space.newproc(self.default_proc)
 
     @classdef.method("[]")
     def method_subscript(self, space, w_key):
@@ -65,7 +71,13 @@ class W_HashObject(W_Object):
 
     @classdef.method("store")
     @classdef.method("[]=")
-    def method_subscript_assign(self, w_key, w_value):
+    @check_frozen()
+    def method_subscript_assign(self, space, w_key, w_value):
+        if (space.is_kind_of(w_key, space.w_string) and
+            not space.is_true(space.send(w_key, space.newsymbol("frozen?")))):
+
+            w_key = space.send(w_key, space.newsymbol("dup"))
+            w_key = space.send(w_key, space.newsymbol("freeze"))
         self.contents[w_key] = w_value
         return w_value
 
@@ -98,7 +110,7 @@ class W_HashObject(W_Object):
     @check_frozen()
     def method_shift(self, space):
         if not self.contents:
-            return space.send(self, space.newsymbol("default"))
+            return space.send(self, space.newsymbol("default"), [space.w_nil])
         w_key, w_value = self.contents.popitem()
         return space.newarray([w_key, w_value])
 

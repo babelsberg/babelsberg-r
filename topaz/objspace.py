@@ -268,8 +268,11 @@ class ObjectSpace(object):
         # Fallback to a path relative to the compiled location.
         lib_path = self.base_lib_path
         kernel_path = os.path.join(os.path.join(lib_path, os.path.pardir), "lib-topaz")
-        while path:
-            path = rpath.rabspath(os.path.join(path, os.path.pardir))
+        while True:
+            par_path = rpath.rabspath(os.path.join(path, os.path.pardir))
+            if par_path == path:
+                break
+            path = par_path
             if isdir(os.path.join(path, "lib-ruby")):
                 lib_path = os.path.join(path, "lib-ruby")
                 kernel_path = os.path.join(path, "lib-topaz")
@@ -562,15 +565,17 @@ class ObjectSpace(object):
         return w_res
 
     @jit.elidable
+    def _valid_const_name(self, name):
+        if not name[0].isupper():
+            return False
+        for i in range(1, len(name)):
+            ch = name[i]
+            if not (ch.isalnum() or ch == "_" or ord(ch) > 127):
+                return False
+        return True
+
     def _check_const_name(self, name):
-        valid = name[0].isupper()
-        if valid:
-            for i in range(1, len(name)):
-                ch = name[i]
-                if not (ch.isalnum() or ch == "_" or ord(ch) > 127):
-                    valid = False
-                    break
-        if not valid:
+        if not self._valid_const_name(name):
             raise self.error(self.w_NameError,
                 "wrong constant name %s" % name
             )
@@ -679,7 +684,7 @@ class ObjectSpace(object):
         return self.int_w(self.send(w_obj, self.newsymbol("hash")))
 
     def eq_w(self, w_obj1, w_obj2):
-        return self.is_true(self.send(w_obj1, self.newsymbol("eql?"), [w_obj2]))
+        return self.is_true(self.send(w_obj2, self.newsymbol("eql?"), [w_obj1]))
 
     def register_exit_handler(self, w_proc):
         self.exit_handlers_w.append(w_proc)

@@ -285,6 +285,9 @@ class Character(RegexpBase):
     def rebuild(self, positive, case_insensitive, zerowidth):
         return Character(self.value, positive=positive, case_insensitive=case_insensitive, zerowidth=zerowidth)
 
+    def getwidth(self):
+        return 1, 1
+
     def fix_groups(self):
         pass
 
@@ -801,7 +804,10 @@ class SetIntersection(SetBase):
         ] + [self.items[-1]]).compile(ctx)
 
 
-POSITION_ESCAPES = {}
+POSITION_ESCAPES = {
+    "A": StartOfString(),
+    "z": EndOfString(),
+}
 CHARSET_ESCAPES = {
     "d": Property(CATEGORY_DIGIT),
 }

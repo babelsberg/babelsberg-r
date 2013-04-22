@@ -3,7 +3,7 @@ from __future__ import absolute_import
 from rpython.rlib.rfloat import float_as_rbigint_ratio
 
 from topaz.coerce import Coerce
-from topaz.module import Module, ModuleDef, ClassDef
+from topaz.module import ClassDef
 from topaz.objects.objectobject import W_RootObject, W_Object
 from topaz.utils import rz3
 

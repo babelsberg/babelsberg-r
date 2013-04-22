@@ -1,6 +1,6 @@
 from rpython.rlib import jit
 
-from topaz.module import ClassDef, Module, ModuleDef
+from topaz.module import ClassDef, ModuleDef
 from topaz.objects.hashobject import W_HashObject
 from topaz.objects.objectobject import W_Object
 from topaz.objects.procobject import W_ProcObject
@@ -135,7 +135,7 @@ class W_ConstraintVariableObject(W_ConstraintObject):
             space.send(self, space.newsymbol("always"), block=block)
 
 
-class Constraints(Module):
+class Constraints(object):
     moduledef = ModuleDef("Constraints", filepath=__file__)
 
     @moduledef.function("register_solver")

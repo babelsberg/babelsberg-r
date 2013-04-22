@@ -1,6 +1,6 @@
 import copy
 
-from rpython.rlib.listsort import TimSort
+from rpython.rlib.listsort import make_timsort_class
 
 from topaz.coerce import Coerce
 from topaz.module import ClassDef, check_frozen
@@ -8,15 +8,35 @@ from topaz.modules.enumerable import Enumerable
 from topaz.objects.objectobject import W_Object
 from topaz.utils.packing.pack import RPacker
 
-class RubySorter(TimSort):
+
+BaseRubySorter = make_timsort_class()
+BaseRubySortBy = make_timsort_class()
+
+
+class RubySorter(BaseRubySorter):
     def __init__(self, space, list, listlength=None, sortblock=None):
-        TimSort.__init__(self, list, listlength=listlength)
+        BaseRubySorter.__init__(self, list, listlength=listlength)
         self.space = space
         self.sortblock = sortblock
 
-    def lt(self, a, b):
-        cmp_res = self.space.compare(a, b, self.sortblock)
-        return self.space.int_w(cmp_res) < 0
+    def lt(self, w_a, w_b):
+        w_cmp_res = self.space.compare(w_a, w_b, self.sortblock)
+        return self.space.int_w(w_cmp_res) < 0
+
+
+class RubySortBy(BaseRubySortBy):
+    def __init__(self, space, list, listlength=None, sortblock=None):
+        BaseRubySortBy.__init__(self, list, listlength=listlength)
+        self.space = space
+        self.sortblock = sortblock
+
+    def lt(self, w_a, w_b):
+        w_cmp_res = self.space.compare(
+            self.space.invoke_block(self.sortblock, [w_a]),
+            self.space.invoke_block(self.sortblock, [w_b])
+        )
+        return self.space.int_w(w_cmp_res) < 0
+
 
 class W_ArrayObject(W_Object):
     classdef = ClassDef("Array", W_Object.classdef, filepath=__file__)
@@ -60,6 +80,7 @@ class W_ArrayObject(W_Object):
             return self.items_w[start]
 
     @classdef.method("[]=")
+    @check_frozen()
     def method_subscript_assign(self, space, w_idx, w_count_or_obj, w_obj=None):
         w_count = None
         if w_obj:
@@ -247,10 +268,14 @@ class W_ArrayObject(W_Object):
         else:
             return self.items_w[len(self.items_w) - 1]
 
-    @classdef.method("pack", template="str")
-    def method_pack(self, space, template):
+    @classdef.method("pack")
+    def method_pack(self, space, w_template):
+        template = Coerce.str(space, w_template)
         result = RPacker(template, space.listview(self)).operate(space)
-        return space.newstr_fromchars(result)
+        w_result = space.newstr_fromchars(result)
+        if space.is_true(space.send(w_template, space.newsymbol("tainted?"))):
+            space.send(w_result, space.newsymbol("taint"))
+        return w_result
 
     @classdef.method("to_ary")
     def method_to_ary(self, space):
@@ -263,8 +288,17 @@ class W_ArrayObject(W_Object):
         return self
 
     @classdef.method("sort!")
-    def method_sort(self, space, block):
+    @check_frozen()
+    def method_sort_i(self, space, block):
         RubySorter(space, self.items_w, sortblock=block).sort()
+        return self
+
+    @classdef.method("sort_by!")
+    @check_frozen()
+    def method_sort_by_i(self, space, block):
+        if block is None:
+            return space.send(self, space.newsymbol("enum_for"), [space.newsymbol("sort_by!")])
+        RubySortBy(space, self.items_w, sortblock=block).sort()
         return self
 
     @classdef.method("reverse!")
@@ -275,7 +309,7 @@ class W_ArrayObject(W_Object):
 
     @classdef.method("rotate!", n="int")
     @check_frozen()
-    def method_rotate_i(self, space, n=1): 
+    def method_rotate_i(self, space, n=1):
         length = len(self.items_w)
         if length == 0:
             return self
@@ -283,9 +317,32 @@ class W_ArrayObject(W_Object):
             n %= length
         if n < 0:
             n += length
-        if n == 0: 
+        if n == 0:
             return self
-        assert n >= 0       
+        assert n >= 0
         self.items_w.extend(self.items_w[:n])
         del self.items_w[:n]
+        return self
+
+    @classdef.method("insert", i="int")
+    @check_frozen()
+    def method_insert(self, space, i, args_w):
+        if not args_w:
+            return self
+        length = len(self.items_w)
+        if i > length:
+            for _ in xrange(i - length):
+                self.items_w.append(space.w_nil)
+            self.items_w.extend(args_w)
+            return self
+        if i < 0:
+            if i < -length - 1:
+                 raise space.error(space.w_IndexError,
+                      "index %d too small for array; minimum: %d" % (i + 1, -length)
+                  )
+            i += length + 1
+        assert i >= 0
+        for w_e in args_w:
+            self.items_w.insert(i, w_e)
+            i += 1
         return self

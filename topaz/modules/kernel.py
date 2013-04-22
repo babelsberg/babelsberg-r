@@ -8,17 +8,17 @@ from rpython.rlib.streamio import open_file_as_stream
 
 from topaz.coerce import Coerce
 from topaz.error import RubyError, error_for_oserror
-from topaz.module import Module, ModuleDef
+from topaz.module import ModuleDef
 from topaz.modules.process import Process
 from topaz.objects.bindingobject import W_BindingObject
 from topaz.objects.exceptionobject import W_ExceptionObject
-from topaz.objects.procobject import W_ProcObject
-from topaz.objects.stringobject import W_StringObject
-from topaz.objects.classobject import W_ClassObject
 from topaz.objects.moduleobject import W_ModuleObject
+from topaz.objects.procobject import W_ProcObject
+from topaz.objects.randomobject import W_RandomObject
+from topaz.objects.stringobject import W_StringObject
 
 
-class Kernel(Module):
+class Kernel(object):
     moduledef = ModuleDef("Kernel", filepath=__file__)
 
     @moduledef.method("class")
@@ -44,6 +44,8 @@ class Kernel(Module):
 
     @moduledef.method("proc")
     def function_proc(self, space, block):
+        if block is None:
+            raise space.error(space.w_ArgumentError, "tried to create Proc object without a block")
         return space.newproc(block, False)
 
     @staticmethod
@@ -157,6 +159,12 @@ class Kernel(Module):
     @moduledef.function("binding")
     def method_binding(self, space):
         return space.newbinding_fromframe(space.getexecutioncontext().gettoprubyframe())
+
+    @moduledef.function("__method__")
+    @moduledef.function("__callee__")
+    def method_method(self, space):
+        frame = space.getexecutioncontext().gettoprubyframe()
+        return space.newsymbol(frame.bytecode.name)
 
     @moduledef.function("exec")
     def method_exec(self, space, args_w):
@@ -389,3 +397,9 @@ class Kernel(Module):
                 if e.name == name:
                     return e.w_value
                 raise
+
+    @moduledef.method("srand")
+    def method_srand(self, space, w_seed=None):
+        random_class = space.getclassfor(W_RandomObject)
+        default = space.find_const(random_class, "DEFAULT")
+        return default.srand(space, w_seed)

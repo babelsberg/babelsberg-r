@@ -1,6 +1,6 @@
 class Integer < Numeric
   def downto(limit, &block)
-    return self.enum_for(:downto) unless block
+    return self.enum_for(:downto, limit) unless block
     current = self
     while current >= limit
       yield current
@@ -18,28 +18,20 @@ class Integer < Numeric
     self
   end
 
-  def ceil
-    return self
-  end
-
-  def floor
-    return self
-  end
-
-  def truncate
-    return self
-  end
-
-  def denominator
-    return 1
-  end
-
-  def numerator
-    return self
-  end
-
   def next
     return self + 1
   end
   alias succ next
+
+  def pred
+    return self - 1
+  end
+
+  def even?
+    (self % 2).zero?
+  end
+
+  def odd?
+    !even?
+  end
 end
