@@ -6,6 +6,7 @@ from topaz.celldict import CellDict, VersionTag
 from topaz.module import ClassDef
 from topaz.objects.functionobject import W_FunctionObject
 from topaz.objects.objectobject import W_RootObject
+from topaz.objects.procobject import W_ProcObject
 from topaz.scope import StaticScope
 
 
@@ -65,7 +66,7 @@ class DefineMethodBlock(W_FunctionObject):
         self.block = block
 
     def call(self, space, w_obj, args_w, block):
-        method_block = self.block.copy(w_self=w_obj)
+        method_block = self.block.copy(space, w_self=w_obj)
         return space.invoke_block(method_block, args_w, block)
 
     def arity(self, space):
@@ -253,6 +254,9 @@ class W_ModuleObject(W_RootObject):
     def unset_flag(self, space, name):
         self.flags.set(space, name, space.w_false)
 
+    def get_flag(self, space, name):
+        return self.flags.get(space, name) or space.w_false
+
     def copy_flags(self, space, w_other):
         assert isinstance(w_other, W_ModuleObject)
         for key in w_other.flags:
@@ -326,6 +330,11 @@ class W_ModuleObject(W_RootObject):
     def method_allocate(self, space):
         return W_ModuleObject(space, None)
 
+    @classdef.method("initialize")
+    def method_initialize(self, space, block):
+        if block is not None:
+            space.invoke_block(block.copy(space, w_self=self, lexical_scope=StaticScope(self, block.lexical_scope)), [])
+
     @classdef.method("to_s")
     def method_to_s(self, space):
         name = self.name
@@ -352,7 +361,8 @@ class W_ModuleObject(W_RootObject):
             if space.is_kind_of(w_method, space.w_unbound_method):
                 self.define_method(space, name, DefineMethodMethod(name, w_method))
             elif space.is_kind_of(w_method, space.w_proc):
-                self.define_method(space, name, DefineMethodBlock(name, w_method.get_block()))
+                assert isinstance(w_method, W_ProcObject)
+                self.define_method(space, name, DefineMethodBlock(name, w_method))
         elif block is not None:
             self.define_method(space, name, DefineMethodBlock(name, block))
         else:
@@ -464,7 +474,7 @@ class W_ModuleObject(W_RootObject):
         elif block is None:
             raise space.error(space.w_ArgumentError, "block not supplied")
         else:
-            space.invoke_block(block.copy(w_self=self, lexical_scope=StaticScope(self, block.lexical_scope)), [])
+            space.invoke_block(block.copy(space, w_self=self, lexical_scope=StaticScope(self, block.lexical_scope)), [])
 
     @classdef.method("const_defined?", const="str", inherit="bool")
     def method_const_definedp(self, space, const, inherit=True):

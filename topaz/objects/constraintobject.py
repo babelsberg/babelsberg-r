@@ -57,7 +57,7 @@ class W_ConstraintVariableObject(W_ConstraintObject):
             else:
                 with space.normal_execution():
                     self.w_external_variable = space.invoke_block(
-                        w_proc.block,
+                        w_proc,
                         [self.get_name(space), w_value]
                     )
 
