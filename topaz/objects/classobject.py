@@ -102,8 +102,16 @@ class W_ClassObject(W_ModuleObject):
 
     @classdef.method("class_variables")
     def method_class_variables(self, space):
-        return space.newarray([space.newsymbol(cvar) for cvar in self.class_variables])
+        ary = []
+        for ivar in self.class_variables:
+            assert ivar is not None
+            ary.append(space.newsymbol(ivar))
+        return space.newarray(ary)
 
     @classdef.method("instance_variables")
     def method_instance_variables(self, space):
-        return space.newarray([space.newsymbol(ivar) for ivar in self.instance_variables])
+        ary = []
+        for ivar in self.instance_variables:
+            assert ivar is not None
+            ary.append(space.newsymbol(ivar))
+        return space.newarray(ary)
