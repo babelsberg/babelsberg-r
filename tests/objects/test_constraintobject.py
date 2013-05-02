@@ -1,3 +1,5 @@
+import py
+
 from ..base import BaseTopazTest
 
 
@@ -391,6 +393,26 @@ class TestConstraintVariableObject(BaseTopazTest):
         require "libcassowary"
         raise "Test problem" unless Numeric.for_constraint("name", 1).is_a?(Cassowary::Variable)
 
+        always { a > 9 }  # make sure we don't
+        always { a < 11 } # conflict in this test
+        always { a < b }
+
+        return a, b
+        """)
+        assert self.unwrap(space, w_res) == [10.0, 11]
+
+    def test_constraint_solver_interaction_same_domain_conflict(self, space):
+        w_res = space.execute("""
+        require "libz3"
+
+        a = 20
+        b = 10
+        always { b > 10 }
+
+        require "libcassowary"
+        raise "Test problem" unless Numeric.for_constraint("name", 1).is_a?(Cassowary::Variable)
+
+        always { a > 20}  # make sure we conflict in this case
         always { a < b }
 
         return a, b
