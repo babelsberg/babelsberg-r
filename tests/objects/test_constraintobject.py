@@ -383,6 +383,7 @@ class TestConstraintVariableObject(BaseTopazTest):
         """)
         assert self.unwrap(space, w_res) == [False, 10.0]
 
+    @py.test.mark.xfail
     def test_constraint_solver_interaction_same_domain(self, space):
         w_res = space.execute("""
         require "libz3"
