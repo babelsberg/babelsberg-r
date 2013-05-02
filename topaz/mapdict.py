@@ -75,9 +75,10 @@ class BaseNode(object):
         w_obj.storage[flag_node.pos] = space.w_true
 
     def add_constraint_var(self, space, w_obj, name):
-        var_node = space.fromcache(MapTransitionCache).transition_add_constraint_var(w_obj.map, name, len(w_obj.storage))
+        var_node = space.fromcache(MapTransitionCache).transition_add_constraint_var(w_obj.map, name, self.length())
+        self.update_storage_size(w_obj, var_node)
         w_obj.map = var_node
-        w_obj.storage.append(None)
+        return var_node.pos
 
 
 class ClassNode(BaseNode):
