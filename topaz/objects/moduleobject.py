@@ -25,7 +25,7 @@ class AttributeReader(W_FunctionObject):
         else:
             w_var = space.findconstraintvariable(w_owner=w_obj, ivar=self.varname)
             if w_var:
-                space.send(w_var, space.newsymbol("set!"))
+                return space.get_value(w_var)
         return space.find_instance_var(w_obj, self.varname)
 
 

@@ -11,7 +11,6 @@ class TestConstraintVariableObject(BaseTopazTest):
 
     def test_names(self, space):
         space.execute("ConstraintVariable")
-        space.execute("Constraints")
 
     def test_local(self, space):
         w_cassowary, w_z3 = self.execute(

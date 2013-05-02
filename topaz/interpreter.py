@@ -183,8 +183,9 @@ class Interpreter(object):
         # TODO: think of something to mark these dirty so we don't do
         # this lookup all the time
         if w_var:
-            space.send(w_var, space.newsymbol("set!"))
-        frame.push(frame.cells[idx].get(space, frame, idx) or space.w_nil)
+            frame.push(space.send(w_var, space.newsymbol("get!")))
+        else:
+            frame.push(frame.cells[idx].get(space, frame, idx) or space.w_nil)
 
     def STORE_DEREF(self, space, bytecode, frame, pc, idx):
         w_var = space.findconstraintvariable(cell=frame.cells[idx])
@@ -253,8 +254,9 @@ class Interpreter(object):
         w_obj = frame.pop()
         w_var = space.findconstraintvariable(w_owner=w_obj, ivar=name)
         if w_var:
-            space.send(w_var, space.newsymbol("set!"))
-        w_res = space.find_instance_var(w_obj, name)
+            w_res = space.get_value(w_var)
+        else:
+            w_res = space.find_instance_var(w_obj, name)
         frame.push(w_res)
 
     def STORE_INSTANCE_VAR(self, space, bytecode, frame, pc, idx):
@@ -283,8 +285,9 @@ class Interpreter(object):
         assert isinstance(w_module, W_ModuleObject)
         w_var = space.findconstraintvariable(w_owner=w_module, cvar=name)
         if w_var:
-            space.send(w_var, space.newsymbol("set!"))
-        w_value = space.find_class_var(w_module, name)
+            w_value = space.send(w_var, space.newsymbol("get!"))
+        else:
+            w_value = space.find_class_var(w_module, name)
         frame.push(w_value)
 
     def STORE_CLASS_VAR(self, space, bytecode, frame, pc, idx):

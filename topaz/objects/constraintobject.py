@@ -12,7 +12,7 @@ class W_ConstraintObject(W_Object):
     classdef = ClassDef("ConstraintObject", W_Object.classdef, filepath=__file__)
 
 
-class W_ConstraintVariableObject(W_ConstraintObject):
+class W_ConstraintVariableObject(W_Object):
     _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
 
     classdef = ClassDef("ConstraintVariable", W_ConstraintObject.classdef, filepath=__file__)
@@ -36,30 +36,15 @@ class W_ConstraintVariableObject(W_ConstraintObject):
         else:
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
 
-        w_proc = None
         w_value = self.load_value(space)
-        w_hash = space.find_instance_var(space.w_constraints, "@variable_handlers")
-        if not isinstance(w_hash, W_HashObject):
-            return None
-        for w_mod in space.getclass(w_value).ancestors(include_singleton=False):
-            try:
-                w_proc = w_hash.contents[w_mod]
-            except KeyError:
-                pass
-            if w_proc:
-                break
-        if w_proc:
-            if not isinstance(w_proc, W_ProcObject):
-                raise space.error(
-                    space.w_TypeError,
-                    "non-proc in constraint variable handlers"
+        w_class = space.getclass(w_value)
+        if space.getsingletonclass(w_class).find_method(space, "for_constraint"):
+            with space.normal_execution():
+                self.w_external_variable = space.send(
+                    w_class,
+                    space.newsymbol("for_constraint"),
+                    [self.get_name(space), w_value]
                 )
-            else:
-                with space.normal_execution():
-                    self.w_external_variable = space.invoke_block(
-                        w_proc,
-                        [self.get_name(space), w_value]
-                    )
 
     def __del__(self):
         # TODO: remove external variable from solver
@@ -124,6 +109,11 @@ class W_ConstraintVariableObject(W_ConstraintObject):
             return w_value
         return space.w_nil
 
+    @classdef.method("get!")
+    def method_get_i(self, space):
+        self.method_set_i(space)
+        return self.load_value(space)
+
     @classdef.method("recalculate_path")
     def method_recalculate_path(self, space, w_value):
         self.store_value(space, w_value)
@@ -133,15 +123,3 @@ class W_ConstraintVariableObject(W_ConstraintObject):
             space.send(w_constraint, space.newsymbol("disable"))
             block.set_constraint(None)
             space.send(self, space.newsymbol("always"), block=block)
-
-
-class Constraints(object):
-    moduledef = ModuleDef("Constraints", filepath=__file__)
-
-    @moduledef.function("register_solver")
-    def method_register_solver(self, space, w_solver):
-        return space.newbool(space.add_constraint_solver(w_solver))
-
-    @moduledef.function("deregister_solver")
-    def method_deregister_solver(self, space, w_solver):
-        return space.newbool(space.remove_constraint_solver(w_solver))

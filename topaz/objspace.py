@@ -39,7 +39,7 @@ from topaz.objects.boolobject import W_TrueObject, W_FalseObject
 from topaz.objects.classobject import W_ClassObject
 from topaz.objects.codeobject import W_CodeObject
 
-from topaz.objects.constraintobject import W_ConstraintObject, W_ConstraintVariableObject, Constraints
+from topaz.objects.constraintobject import W_ConstraintObject, W_ConstraintVariableObject
 from topaz.objects.z3object import W_Z3Object
 
 from topaz.objects.dirobject import W_DirObject
@@ -104,7 +104,6 @@ class ObjectSpace(object):
 
         self.execution_mode_stack = [NORMAL_EXECUTION]
         self.constraint_block_stack = []
-        self.constraint_solvers = []
 
         self.w_true = W_TrueObject(self)
         self.w_false = W_FalseObject(self)
@@ -163,7 +162,6 @@ class ObjectSpace(object):
 
         self.w_constraint = self.getclassfor(W_ConstraintObject)
         self.w_constraintvariable = self.getclassfor(W_ConstraintVariableObject)
-        self.w_constraints = self.getmoduleobject(Constraints.moduledef)
         self.w_z3 = self.getclassfor(W_Z3Object)
 
         self.w_topaz = self.getmoduleobject(Topaz.moduledef)
@@ -186,7 +184,7 @@ class ObjectSpace(object):
 
             self.w_kernel, self.w_topaz,
 
-            self.w_constraint, self.w_constraints, self.w_constraintvariable,
+            self.w_constraint, self.w_constraintvariable,
             self.w_z3,
 
             self.getclassfor(W_NilObject),
@@ -804,26 +802,11 @@ class ObjectSpace(object):
         else:
             return w_cmp_res
 
-    def add_constraint_solver(self, w_solver):
-        if not w_solver in self.constraint_solvers:
-            self.constraint_solvers.append(w_solver)
-            return True
+    def get_value(self, w_var):
+        if w_var.is_solveable():
+            return self.send(w_var, self.newsymbol("get!"))
         else:
-            return False
-
-    def remove_constraint_solver(self, w_solver):
-        if w_solver in self.constraint_solvers:
-            self.constraint_solvers.remove(w_solver)
-            return True
-        else:
-            return False
-
-    def ensure_constraints(self):
-        if not self.is_executing_normally():
-            return
-        with self.constraint_execution():
-            for w_solver in self.constraint_solvers:
-                self.send(w_solver, self.newsymbol("solve"))
+            return w_var.load_value(self)
 
     def suggest_value(self, w_var, w_value):
         if not self.is_executing_normally():

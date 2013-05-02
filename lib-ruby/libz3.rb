@@ -12,19 +12,26 @@ class Z3::Z3Pointer
 
   def enable(preference=nil)
     plain_enable
+    Z3::Instance.solve
   end
 end
 
-Constraints.for_variables_of_type Numeric do |name, value|
-  Z3::Instance.make_real_variable(value)
-end
-Constraints.for_variables_of_type TrueClass do |name, value|
-  Z3::Instance.make_bool_variable(value)
-end
-Constraints.for_variables_of_type FalseClass do |name, value|
-  Z3::Instance.make_bool_variable(value)
+class Numeric
+  def self.for_constraint(name, value)
+    Z3::Instance.make_real_variable(value)
+  end
 end
 
-Constraints.register_solver Z3::Instance
+class TrueClass
+  def self.for_constraint(name, value)
+    Z3::Instance.make_bool_variable(value)
+  end
+end
+
+class FalseClass
+  def self.for_constraint(name, value)
+    Z3::Instance.make_bool_variable(value)
+  end
+end
 
 puts "Z3 constraint solver loaded."

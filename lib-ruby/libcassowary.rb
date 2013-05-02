@@ -236,6 +236,7 @@ module Cassowary
           "(expected one of :required, :strong, :medium, :weak"
       end
       SimplexSolver.instance.add_constraint(self)
+      Cassowary::SimplexSolver.instance.solve
     end
 
     def disable
@@ -1389,11 +1390,12 @@ class Numeric
   end
 end
 
-Constraints.for_variables_of_type Numeric do |name, value|
-  v = Cassowary::Variable.new(name: name, value: value)
-  Cassowary::SimplexSolver.instance.add_stay(v)
-  v
+class Numeric
+  def self.for_constraint(name, value)
+    v = Cassowary::Variable.new(name: name, value: value)
+    Cassowary::SimplexSolver.instance.add_stay(v)
+    v
+  end
 end
-Constraints.register_solver Cassowary::SimplexSolver.instance
 
 puts "Cassowary constraint solver loaded."

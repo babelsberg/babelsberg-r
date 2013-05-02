@@ -157,11 +157,6 @@ class W_RootObject(W_BaseObject):
         with space.constraint_construction(block):
             return space.invoke_block(block, [])
 
-    @classdef.method("__solve_constraints__")
-    def method_solve_constraints(self, space):
-        space.ensure_constraints()
-        return space.w_nil
-
     @classdef.method("always")
     def method_always(self, space, w_strength=None, block=None):
         if block is None:
@@ -177,7 +172,6 @@ class W_RootObject(W_BaseObject):
             )
         block.set_constraint(w_arg)
         space.send(w_arg, space.newsymbol("enable"), [] if w_strength is None else [w_strength])
-        space.send(self, space.newsymbol("__solve_constraints__"))
         return w_arg
 
     @classdef.method("hash")

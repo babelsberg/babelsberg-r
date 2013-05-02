@@ -28,4 +28,3 @@ load_bootstrap.call("thread.rb")
 load_bootstrap.call("top_self.rb")
 
 load_bootstrap.call("constraint_variable.rb")
-load_bootstrap.call("constraints.rb")
