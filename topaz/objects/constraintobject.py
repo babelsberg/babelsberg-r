@@ -8,7 +8,7 @@ from topaz.utils.cache import Cache
 
 
 # Marker class for constraint solver objects
-class W_ConstraintObject(W_Object):
+class W_ConstraintObject(W_RootObject):
     classdef = ClassDef("ConstraintObject", W_Object.classdef, filepath=__file__)
 
 
@@ -108,6 +108,11 @@ class W_ConstraintVariableObject(W_RootObject):
         self.supportvariables_w.append(w_supportvar)
         return w_supportvar
 
+    def suggest_value(self, space, w_value):
+        assert self.w_external_variable
+        with space.constraint_execution():
+            space.send(self.w_external_variable, space.newsymbol("suggest_value"), [w_value])
+
     @classdef.method("value")
     def method_value(self, space):
         return self.load_value(space)
@@ -152,18 +157,3 @@ class W_ConstraintVariableObject(W_RootObject):
             space.send(w_constraint, space.newsymbol("disable"))
             block.set_constraint(None)
             space.send(space.w_object, space.newsymbol("always"), block=block)
-
-    @classdef.method("method_missing")
-    def method_method_missing(self, space, w_name, args_w, block):
-        if self.w_external_variable and space.respond_to(self.w_external_variable, w_name):
-            newargs_w = args_w[:]
-            for idx, w_arg in enumerate(args_w):
-                if isinstance(w_arg, W_ConstraintVariableObject):
-                    if self.iscompatible(space, w_arg):
-                        newargs_w[idx] = w_arg.w_external_variable
-                    else:
-                        w_supportvar = w_arg.get_support_variable_for(space, self)
-                        newargs_w[idx] = w_supportvar.w_external_variable
-            return space.send(self.w_external_variable, w_name, newargs_w, block)
-        else:
-            return space.send(self.load_value(space), w_name, args_w, block)

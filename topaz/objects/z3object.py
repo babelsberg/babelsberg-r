@@ -5,6 +5,7 @@ from rpython.rlib.rfloat import float_as_rbigint_ratio
 from topaz.coerce import Coerce
 from topaz.module import ClassDef
 from topaz.objects.objectobject import W_RootObject, W_Object
+from topaz.objects.constraintobject import W_ConstraintObject
 from topaz.utils import rz3
 
 
@@ -165,7 +166,7 @@ class W_Z3Object(W_RootObject):
 
 class W_Z3Ptr(W_RootObject):
     _immutable_fields_ = ["w_z3", "pointer"]
-    classdef = ClassDef("Z3Pointer", W_Object.classdef, filepath=__file__)
+    classdef = ClassDef("Z3Pointer", W_ConstraintObject.classdef, filepath=__file__)
 
     def __init__(self, w_z3, pointer):
         self.w_z3 = w_z3
