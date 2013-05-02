@@ -1,3 +1,5 @@
+import py
+
 from ..base import BaseTopazTest
 
 
@@ -365,6 +367,7 @@ class TestConstraintVariableObject(BaseTopazTest):
         """)
         assert self.unwrap(space, w_res) == [True, 11]
 
+    @py.test.mark.xfail
     def test_constraint_solver_interaction_different_domains(self, space):
         w_res = space.execute("""
         require "libz3"
