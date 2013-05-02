@@ -47,7 +47,7 @@ class ConstraintInterpreter(Interpreter):
 
 
 class ConstrainedVariable(object):
-    _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable", "set_directly"]
+    _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
 
     def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None):
         self.w_external_variable = None
@@ -55,7 +55,6 @@ class ConstrainedVariable(object):
         self.w_owner = None
         self.ivar = None
         self.cvar = None
-        self.set_directly = True
         self.constraint_blocks = []
         if cell:
             self.cell = cell
@@ -74,14 +73,6 @@ class ConstrainedVariable(object):
                 self.w_external_variable = space.send(
                     w_value,
                     space.newsymbol("for_constraint"),
-                    [self.get_name(space)]
-                )
-        elif space.respond_to(w_value, space.newsymbol("constraint_interpretation")):
-            self.set_directly = False
-            with space.normal_execution():
-                self.w_external_variable = space.send(
-                    w_value,
-                    space.newsymbol("constraint_interpretation"),
                     [self.get_name(space)]
                 )
 
