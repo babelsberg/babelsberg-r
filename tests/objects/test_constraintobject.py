@@ -17,7 +17,7 @@ class TestConstraintVariableObject(BaseTopazTest):
             space,
             """
             a = 1
-            always{ a == 10 }
+            always { a == 10 }
             return a
             """,
             "libz3", "libcassowary")
