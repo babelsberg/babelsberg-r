@@ -459,7 +459,7 @@ class ObjectSpace(object):
     def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
         w_var = self.findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar)
         if w_var and w_var.is_solveable():
-            return w_var.w_external_variable
+            return w_var
         else:
             w_var = W_ConstraintVariableObject(
                 self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar
@@ -480,8 +480,7 @@ class ObjectSpace(object):
             # will have to be re-evaluated when this variable is set
             w_var.add_constraint_block(self.constraint_block_stack[-1])
             return None
-        else:
-            return w_var.w_external_variable
+        return w_var
 
     @jit.unroll_safe
     def newbinding_fromframe(self, frame):
@@ -816,7 +815,8 @@ class ObjectSpace(object):
         if not self.is_executing_normally():
             return
         if w_var.is_solveable():
-            w_var.suggest_value(self, w_value)
+            with self.constraint_execution():
+                self.send(w_var, self.newsymbol("suggest_value"), [w_value])
         else:
             self.send(w_var, self.newsymbol("recalculate_path"), [w_value])
 
