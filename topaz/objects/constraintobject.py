@@ -2,7 +2,7 @@ from rpython.rlib import jit
 
 from topaz.module import ClassDef, ModuleDef
 from topaz.objects.hashobject import W_HashObject
-from topaz.objects.objectobject import W_Object
+from topaz.objects.objectobject import W_Object, W_RootObject
 from topaz.objects.procobject import W_ProcObject
 from topaz.utils.cache import Cache
 
@@ -12,13 +12,12 @@ class W_ConstraintObject(W_Object):
     classdef = ClassDef("ConstraintObject", W_Object.classdef, filepath=__file__)
 
 
-class W_ConstraintVariableObject(W_Object):
+class W_ConstraintVariableObject(W_RootObject):
     _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
 
     classdef = ClassDef("ConstraintVariable", W_ConstraintObject.classdef, filepath=__file__)
 
     def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None):
-        W_Object.__init__(self, space)
         self.w_external_variable = None
         self.cell = None
         self.w_owner = None
@@ -122,4 +121,4 @@ class W_ConstraintVariableObject(W_Object):
             assert w_constraint
             space.send(w_constraint, space.newsymbol("disable"))
             block.set_constraint(None)
-            space.send(self, space.newsymbol("always"), block=block)
+            space.send(space.w_object, space.newsymbol("always"), block=block)
