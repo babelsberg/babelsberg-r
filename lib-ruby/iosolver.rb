@@ -1,5 +1,5 @@
 class IOSolver
-  class Variable < BasicObject
+  class Variable < ConstraintObject
     def initialize(name, value)
       @name = name
       @value = value
@@ -14,12 +14,21 @@ class IOSolver
       @value
     end
 
-    def enable
-      TickingSolver.enable(self)
+    def enable(strength = nil)
+      raise NotImplementedError
+      raise "cannot enable constraint twice" if @enabled
+      @enabled = true
+      @strength = strength
+      TickingSolver.instance.enable(self)
     end
 
     def disable
-      TickingSolver.disable(self)
+      @enabled = false
+      TickingSolver.instance.disable(self)
+    end
+
+    def respond_to?(sym, include_private=false)
+      super || @value.respond_to?(sym, include_private)
     end
 
     def method_missing(method, *args, &block)
@@ -28,6 +37,8 @@ class IOSolver
   end
 
   class Ast < Variable
+    attr_reader :ast
+
     def initialize(ast, method, *args, &block)
       @ast = ast
       @method = method
@@ -41,30 +52,45 @@ class IOSolver
 
     def refresh
       result = @ast.refresh
-      # XXX: Should always delegate, but useless until we have String solver otherwise
-      # unless result.is_a?(IO)
-      if result.ancestors.any? { |mod| Constraints.variable_handlers[mod] }
-        constraint = always { result.send(@method, *@args, &@block) }
-        constraint.disable
-      else
-        @ast.send(@method, *@args, &@block)
-      end
+      return result.send(@method, *@args, &@block) unless @enabled # not top-level
+
+      # TODO: try read-only first, fallback to writing into file
+      # constraint = always { result.send(@method, *@args, &@block) }
+      # constraint = always { @args[0] <= c(result) }
+      # constraint.disable
+      c = result.send(@method, *@args, &@block)
+      p result, @args
+      p c
+      p "refreshed"
+      result
+    end
+
+    def inspect
+      "#{super[0..-2]}:#{@method.inspect}(#{@args.inspect})>"
     end
   end
 
   class TickingSolver
+    class << self
+      alias superclass_new new
+    end
+
     def self.new
-      @instance ||= begin
-        TickingSolver.allocate
-        @instance.initialize
-      end
+      raise "#{name} should have only one instance" if @instance
+      @instance = superclass_new
+    end
+
+    def self.instance
+      @instance ||= new
     end
 
     def initialize
       @asts = []
       @ticker = Fiber.new do
-        @asts.each(&:refresh)
-        Fiber.yield
+        loop do
+          @asts.each(&:refresh)
+          Fiber.yield
+        end
       end
     end
 
@@ -82,9 +108,10 @@ class IOSolver
   end
 end
 
-Constraints.for_variables_of_type IO do |name, value|
-  IOSolver::Variable.new(name, value)
+class IO
+  def self.for_constraint(name, value)
+    IOSolver::Variable.new(name, value)
+  end
 end
-Constraints.register_solver IOSolver::TickingSolver.instance
 
 puts "IO constraint solver loaded."
