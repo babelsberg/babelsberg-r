@@ -49,7 +49,7 @@ class W_Z3Object(W_RootObject):
         # XXX: This should somehow also set the initial value
         sym = rz3.z3_mk_int_symbol(ctx, self.next_id)
         self.next_id += 1
-        return W_Z3Ptr(space, self, rz3.z3_mk_const(ctx, sym, ty))
+        return W_Z3Ptr(self, rz3.z3_mk_const(ctx, sym, ty))
 
     def assert_ptr(self, space, w_pointer):
         if not isinstance(w_pointer, W_Z3Ptr):
@@ -91,7 +91,7 @@ class W_Z3Object(W_RootObject):
                     space.send(w_value, space.newsymbol("inspect"))
                 )
             )
-        return W_Z3Ptr(space, self, rz3.z3_mk_real(self.ctx, int_num, int_den))
+        return W_Z3Ptr(self, rz3.z3_mk_real(self.ctx, int_num, int_den))
 
     @classdef.method("make_bool_variable")
     def make_bool_variable(self, space, w_value):
@@ -103,9 +103,9 @@ class W_Z3Object(W_RootObject):
     @classdef.method("make_bool", value="bool")
     def make_bool(self, space, value):
         if value:
-            return W_Z3Ptr(space, self, rz3.z3_mk_true(self.ctx))
+            return W_Z3Ptr(self, rz3.z3_mk_true(self.ctx))
         else:
-            return W_Z3Ptr(space, self, rz3.z3_mk_false(self.ctx))
+            return W_Z3Ptr(self, rz3.z3_mk_false(self.ctx))
 
     @classdef.method("add_constraint")
     def method_enable(self, space, w_other):
@@ -164,18 +164,26 @@ class W_Z3Object(W_RootObject):
                 raise NotImplementedError("Ast type %d" % kind)
 
 
-class W_Z3Ptr(W_Object):
+class W_Z3Ptr(W_RootObject):
     _immutable_fields_ = ["w_z3", "pointer"]
     classdef = ClassDef("Z3Pointer", W_ConstraintObject.classdef, filepath=__file__)
 
-    def __init__(self, space, w_z3, pointer):
-        W_Object.__init__(self, space)
+    def __init__(self, w_z3, pointer):
         self.w_z3 = w_z3
         self.pointer = pointer
         rz3.z3_ast_inc_ref(self.w_z3.ctx, self.pointer)
 
     def __del__(self):
         rz3.z3_ast_dec_ref(self.w_z3.ctx, self.pointer)
+
+    def getsingletonclass(self, space):
+        raise space.error(space.w_TypeError, "can't define singleton")
+
+    def find_instance_var(self, space, name):
+        return space.w_nil
+
+    def set_instance_var(self, space, name, w_value):
+        raise space.error(space.w_TypeError, "can't add instance variables")
 
     def getdecl(self, ctx):
         decl = rz3.z3_get_app_decl(ctx, self.pointer)
@@ -190,40 +198,21 @@ class W_Z3Ptr(W_Object):
     def method_initialize(self, space, args_w):
         return self
 
-    def coerce_constraint_arg(self, space, w_arg):
-        w_cvarobj = space.find_instance_var(w_arg, W_ConstraintObject.backref_var)
-        if not w_cvarobj.is_kind_of(space, space.w_constraintvariable):
-            raise RuntimeError("constraint object without backref") # TODO...
-        w_value = space.get_value(w_cvarobj)
-        if w_value in [space.w_true, space.w_false, space.w_nil]:
-            w_other = space.send(self.w_z3, space.newsymbol("make_bool_variable"), [w_value])
-        elif space.respond_to(w_value, space.newsymbol("to_f")):
-            w_other = space.send(self.w_z3, space.newsymbol("make_real_variable"), [w_value])
-        else:
-            raise space.error(
-                space.w_TypeError,
-                "domain of %s incompatible with Z3" % space.getclass(w_arg).name
-            )
-        return w_cvarobj.get_support_variable_for(space, w_other)
-
     def coerce_constant_arg(self, space, w_arg):
         w_z3ptr_cls = space.getclassfor(W_Z3Ptr)
-
         if not space.is_kind_of(w_arg, w_z3ptr_cls):
             if w_arg in [space.w_true, space.w_false, space.w_nil]:
                 w_other = space.send(self.w_z3, space.newsymbol("make_bool"), [w_arg])
-            elif space.respond_to(w_arg, space.newsymbol("to_f")):
+            else:
                 w_other = space.send(self.w_z3, space.newsymbol("make_real"), [w_arg])
-            elif space.is_kind_of(w_arg, space.w_constraint):
-                w_other = self.coerce_constraint_arg(space, w_arg)
         else:
             w_other = w_arg
 
         if not space.is_kind_of(w_other, w_z3ptr_cls):
             raise space.error(space.w_TypeError, "%s can't be coerced into %s::%s" % (
-                space.getclass(w_arg).name,
-                space.w_z3.name,
-                w_z3ptr_cls.name
+                    space.getclass(w_arg).name,
+                    space.w_z3.name,
+                    w_z3ptr_cls.name
             ))
         else:
             assert isinstance(w_other, W_Z3Ptr)
@@ -234,7 +223,7 @@ class W_Z3Ptr(W_Object):
         def method(self, space, w_other):
             other = self.coerce_constant_arg(space, w_other)
             ast = func(self.w_z3.ctx, self.pointer, other)
-            return W_Z3Ptr(space, self.w_z3, ast)
+            return W_Z3Ptr(self.w_z3, ast)
         method.__name__ = "method_%s" % func.__name__
         return method
     method_lt = new_binop(classdef, "<", rz3.z3_mk_lt)

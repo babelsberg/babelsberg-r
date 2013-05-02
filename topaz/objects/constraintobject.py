@@ -10,19 +10,15 @@ from topaz.utils.cache import Cache
 # Marker class for constraint solver objects
 class W_ConstraintObject(W_RootObject):
     classdef = ClassDef("ConstraintObject", W_Object.classdef, filepath=__file__)
-    backref_var = "@__constraint_variable_object"
-
-    @classdef.setup_class
-    def setup_class(cls, space, w_cls):
-        space.set_const(w_cls, "BackrefVar", space.newstr_fromstr(W_ConstraintObject.backref_var))
 
 
 class W_ConstraintVariableObject(W_RootObject):
     _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
+
     classdef = ClassDef("ConstraintVariable", W_ConstraintObject.classdef, filepath=__file__)
 
-    def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None, w_external_variable=None):
-        self.w_external_variable = w_external_variable
+    def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None):
+        self.w_external_variable = None
         self.cell = None
         self.w_owner = None
         self.ivar = None
@@ -40,20 +36,14 @@ class W_ConstraintVariableObject(W_RootObject):
         else:
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
 
-        if not w_external_variable:
-            w_value = self.load_value(space)
-            w_class = space.getclass(w_value)
-            if space.getsingletonclass(w_class).find_method(space, "for_constraint"):
-                with space.normal_execution():
-                    self.w_external_variable = space.send(
-                        w_class,
-                        space.newsymbol("for_constraint"),
-                        [self.get_name(space), w_value]
-                    )
-                space.set_instance_var(
-                    self.w_external_variable,
-                    W_ConstraintObject.backref_var,
-                    self
+        w_value = self.load_value(space)
+        w_class = space.getclass(w_value)
+        if space.getsingletonclass(w_class).find_method(space, "for_constraint"):
+            with space.normal_execution():
+                self.w_external_variable = space.send(
+                    w_class,
+                    space.newsymbol("for_constraint"),
+                    [self.get_name(space), w_value]
                 )
 
     def __del__(self):
@@ -96,21 +86,27 @@ class W_ConstraintVariableObject(W_RootObject):
             return space.newstr_fromstr("cvar-%s" % clsname)
         return space.w_nil
 
-    def iscompatible(self, space, w_ext):
+    def iscompatible(self, space, w_other):
+        assert isinstance(w_other, W_ConstraintVariableObject)
         return (self.w_external_variable and
-                (w_ext.is_kind_of(space, space.getclass(self.w_external_variable)) or
-                 self.w_external_variable.is_kind_of(space, space.getclass(w_ext))))
+                w_other.w_external_variable and
+                (w_other.w_external_variable.is_kind_of(
+                    space,
+                    space.getclass(self.w_external_variable)) or
+                 self.w_external_variable.is_kind_of(
+                     space,
+                     space.getclass(w_other.w_external_variable))))
 
-    def get_support_variable_for(self, space, w_ext):
+    def get_support_variable_for(self, space, w_var):
         for w_supportvar in self.supportvariables_w:
             if w_supportvar.iscompatible(space, w_var):
-                return w_supportvar.w_external_variable
+                return w_supportvar
+        w_value = self.method_get_i(space)
         w_supportvar = W_ConstraintVariableObject(
-            space, cell=self.cell, w_owner=self.w_owner, ivar=self.ivar, cvar=self.cvar,
-            w_external_variable=w_ext
+            space, cell=self.cell, w_owner=self.w_owner, ivar=self.ivar, cvar=self.cvar
         )
         self.supportvariables_w.append(w_supportvar)
-        return w_ext
+        return w_supportvar
 
     def suggest_value(self, space, w_value):
         assert self.w_external_variable
