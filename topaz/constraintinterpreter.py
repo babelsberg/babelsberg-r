@@ -44,3 +44,111 @@ class ConstraintInterpreter(Interpreter):
         else:
             w_res = space.send(w_receiver, bytecode.consts_w[meth_idx], args_w)
         frame.push(w_res)
+
+
+class ConstrainedVariable(object):
+    _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable", "set_directly"]
+
+    def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None):
+        self.w_external_variable = None
+        self.cell = None
+        self.w_owner = None
+        self.ivar = None
+        self.cvar = None
+        self.set_directly = True
+        self.constraint_blocks = []
+        if cell:
+            self.cell = cell
+        elif w_owner and ivar:
+            self.w_owner = w_owner
+            self.ivar = ivar
+        elif w_owner and cvar:
+            self.w_owner = w_owner
+            self.cvar = cvar
+        else:
+            raise RuntimeError("Invalid ConstraintVariableObject initialization")
+
+        w_value = self.load_value(space)
+        if space.respond_to(w_value, space.newsymbol("for_constraint")):
+            with space.normal_execution():
+                self.w_external_variable = space.send(
+                    w_value,
+                    space.newsymbol("for_constraint"),
+                    [self.get_name(space)]
+                )
+        elif space.respond_to(w_value, space.newsymbol("constraint_interpretation")):
+            self.set_directly = False
+            with space.normal_execution():
+                self.w_external_variable = space.send(
+                    w_value,
+                    space.newsymbol("constraint_interpretation"),
+                    [self.get_name(space)]
+                )
+
+    def __del__(self):
+        # TODO: remove external variable from solver
+        pass
+
+    def is_solveable(self):
+        return self.w_external_variable is not None
+
+    def add_constraint_block(self, block):
+        self.constraint_blocks.append(block)
+
+    def load_value(self, space):
+        if self.cell:
+            return self.cell.get(space, None, 0) or space.w_nil
+        elif self.ivar is not None:
+            return self.w_owner.find_instance_var(space, self.ivar) or space.w_nil
+        elif self.cvar is not None:
+            return self.w_owner.find_class_var(space, self.cvar) or space.w_nil
+        else:
+            raise NotImplementedError("inconsistent constraint variable")
+
+    def store_value(self, space, w_value):
+        if self.cell:
+            self.cell.set(space, None, 0, w_value)
+        elif self.ivar is not None:
+            self.w_owner.set_instance_var(space, self.ivar, w_value)
+        elif self.cvar is not None:
+            self.w_owner.set_class_var(space, self.cvar, w_value)
+        else:
+            raise NotImplementedError("inconsistent constraint variable")
+
+    def get_name(self, space):
+        clsname = space.getclass(self.load_value(space)).name
+        if self.cell:
+            return space.newstr_fromstr("local-%s" % clsname)
+        elif self.ivar is not None:
+            return space.newstr_fromstr("ivar-%s" % clsname)
+        elif self.cvar is not None:
+            return space.newstr_fromstr("cvar-%s" % clsname)
+        return space.w_nil
+
+    def suggest_value(self, space, w_value):
+        assert self.w_external_variable
+        with space.constraint_execution():
+            space.send(self.w_external_variable, space.newsymbol("suggest_value"), [w_value])
+
+    def set_i(self, space):
+        if self.w_external_variable is not None:
+            # This variable is part of the solver. Get the solvers
+            # interpretation and store it
+            w_value = space.send(self.w_external_variable, space.newsymbol("value"))
+            if w_value != space.w_nil:
+                self.store_value(space, w_value)
+            return w_value
+        return space.w_nil
+
+    def get_i(self, space):
+        self.set_i(space)
+        return self.load_value(space)
+
+    def recalculate_path(self, space, w_value):
+        self.store_value(space, w_value)
+        for block in self.constraint_blocks:
+            w_constraint = block.get_constraint()
+            assert w_constraint
+            space.send(w_constraint, space.newsymbol("disable"))
+            block.set_constraint(None)
+            space.send(space.w_object, space.newsymbol("always"), block=block)

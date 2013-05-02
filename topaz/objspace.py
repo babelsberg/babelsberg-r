@@ -17,7 +17,7 @@ from topaz import system
 from topaz.astcompiler import CompilerContext, SymbolTable
 from topaz.celldict import GlobalsDict
 from topaz.closure import ClosureCell
-from topaz.constraintinterpreter import ConstraintInterpreter
+from topaz.constraintinterpreter import ConstraintInterpreter, ConstrainedVariable
 from topaz.error import RubyError, print_traceback
 from topaz.executioncontext import ExecutionContext, ExecutionContextHolder
 from topaz.frame import Frame
@@ -39,7 +39,7 @@ from topaz.objects.boolobject import W_TrueObject, W_FalseObject
 from topaz.objects.classobject import W_ClassObject
 from topaz.objects.codeobject import W_CodeObject
 
-from topaz.objects.constraintobject import W_ConstraintObject, W_ConstraintVariableObject
+from topaz.objects.constraintobject import W_ConstraintObject
 from topaz.objects.z3object import W_Z3Object
 
 from topaz.objects.dirobject import W_DirObject
@@ -161,7 +161,6 @@ class ObjectSpace(object):
         self.w_kernel = self.getmoduleobject(Kernel.moduledef)
 
         self.w_constraint = self.getclassfor(W_ConstraintObject)
-        self.w_constraintvariable = self.getclassfor(W_ConstraintVariableObject)
         self.w_z3 = self.getclassfor(W_Z3Object)
 
         self.w_topaz = self.getmoduleobject(Topaz.moduledef)
@@ -184,7 +183,7 @@ class ObjectSpace(object):
 
             self.w_kernel, self.w_topaz,
 
-            self.w_constraint, self.w_constraintvariable,
+            self.w_constraint,
             self.w_z3,
 
             self.getclassfor(W_NilObject),
@@ -445,43 +444,44 @@ class ObjectSpace(object):
         )
 
     def findconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
-        w_var = None
+        c_var = None
         if cell:
-            w_var = cell.get_constraint()
+            c_var = cell.get_constraint()
         elif w_owner:
             if ivar:
-                w_var = w_owner.find_constraint_var(self, ivar)
+                c_var = w_owner.find_constraint_var(self, ivar)
             elif cvar:
                 assert isinstance(w_owner, W_ModuleObject)
-                w_var = w_owner.find_class_constraint_var(self, cvar)
-        return w_var
+                c_var = w_owner.find_class_constraint_var(self, cvar)
+        assert c_var is None or isinstance(c_var, ConstrainedVariable)
+        return c_var
 
     def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
-        w_var = self.findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar)
-        if w_var and w_var.is_solveable():
-            return w_var.w_external_variable
+        c_var = self.findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar)
+        if c_var and c_var.is_solveable():
+            return c_var.w_external_variable
         else:
-            w_var = W_ConstraintVariableObject(
+            c_var = ConstrainedVariable(
                 self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar
             )
             if cell:
-                cell.set_constraint(w_var)
+                cell.set_constraint(c_var)
             elif w_owner:
                 if ivar:
-                    w_owner.set_constraint_var(self, ivar, w_var)
+                    w_owner.set_constraint_var(self, ivar, c_var)
                 elif cvar:
                     assert isinstance(w_owner, W_ModuleObject)
-                    w_owner.set_class_constraint_var(self, cvar, w_var)
-        if not w_var.is_solveable():
+                    w_owner.set_class_constraint_var(self, cvar, c_var)
+        if not c_var.is_solveable():
             # No constraint solver variable available for this object
             # Only keep the block alive if this is a variable that
             # will not be registered with a solver. This means this
             # variable is on the path to a constraint, and the block
             # will have to be re-evaluated when this variable is set
-            w_var.add_constraint_block(self.constraint_block_stack[-1])
+            c_var.add_constraint_block(self.constraint_block_stack[-1])
             return None
         else:
-            return w_var.w_external_variable
+            return c_var.w_external_variable
 
     @jit.unroll_safe
     def newbinding_fromframe(self, frame):
@@ -806,19 +806,19 @@ class ObjectSpace(object):
         else:
             return w_cmp_res
 
-    def get_value(self, w_var):
-        if w_var.is_solveable():
-            return self.send(w_var, self.newsymbol("get!"))
+    def get_value(self, c_var):
+        if c_var.is_solveable():
+            return c_var.get_i(self)
         else:
-            return w_var.load_value(self)
+            return c_var.load_value(self)
 
-    def suggest_value(self, w_var, w_value):
+    def suggest_value(self, c_var, w_value):
         if not self.is_executing_normally():
             return
-        if w_var.is_solveable():
-            w_var.suggest_value(self, w_value)
+        if c_var.is_solveable():
+            c_var.suggest_value(self, w_value)
         else:
-            self.send(w_var, self.newsymbol("recalculate_path"), [w_value])
+            c_var.recalculate_path(self, w_value)
 
     def is_executing_normally(self):
         return self.execution_mode_stack[-1] == NORMAL_EXECUTION
