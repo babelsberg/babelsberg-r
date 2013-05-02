@@ -37,13 +37,12 @@ class W_ConstraintVariableObject(W_RootObject):
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
 
         w_value = self.load_value(space)
-        w_class = space.getclass(w_value)
-        if space.getsingletonclass(w_class).find_method(space, "for_constraint"):
+        if space.respond_to(w_value, space.newsymbol("for_constraint")):
             with space.normal_execution():
                 self.w_external_variable = space.send(
-                    w_class,
+                    w_value,
                     space.newsymbol("for_constraint"),
-                    [self.get_name(space), w_value]
+                    [self.get_name(space)]
                 )
 
     def __del__(self):

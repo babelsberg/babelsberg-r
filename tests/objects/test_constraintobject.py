@@ -373,7 +373,7 @@ class TestConstraintVariableObject(BaseTopazTest):
         require "libz3"
         require "libcassowary"
 
-        raise "Test problem" unless Numeric.for_constraint("name", 1).is_a?(Cassowary::Variable)
+        raise "Test problem" unless 1.for_constraint("name").is_a?(Cassowary::Variable)
 
         a = true
         b = 10
@@ -392,7 +392,7 @@ class TestConstraintVariableObject(BaseTopazTest):
         always { b > 10 }
 
         require "libcassowary"
-        raise "Test problem" unless Numeric.for_constraint("name", 1).is_a?(Cassowary::Variable)
+        raise "Test problem" unless 1.for_constraint("name").is_a?(Cassowary::Variable)
 
         always { a < b }
 

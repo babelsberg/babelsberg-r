@@ -1391,8 +1391,8 @@ class Numeric
 end
 
 class Numeric
-  def self.for_constraint(name, value)
-    v = Cassowary::Variable.new(name: name, value: value)
+  def for_constraint(name)
+    v = Cassowary::Variable.new(name: name, value: self)
     Cassowary::SimplexSolver.instance.add_stay(v)
     v
   end

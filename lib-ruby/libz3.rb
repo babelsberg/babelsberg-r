@@ -17,20 +17,20 @@ class Z3::Z3Pointer
 end
 
 class Numeric
-  def self.for_constraint(name, value)
-    Z3::Instance.make_real_variable(value)
+  def for_constraint(name)
+    Z3::Instance.make_real_variable(self)
   end
 end
 
 class TrueClass
-  def self.for_constraint(name, value)
-    Z3::Instance.make_bool_variable(value)
+  def for_constraint(name)
+    Z3::Instance.make_bool_variable(self)
   end
 end
 
 class FalseClass
-  def self.for_constraint(name, value)
-    Z3::Instance.make_bool_variable(value)
+  def for_constraint(name)
+    Z3::Instance.make_bool_variable(self)
   end
 end
 
