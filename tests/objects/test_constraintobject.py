@@ -353,3 +353,46 @@ class TestConstraintVariableObject(BaseTopazTest):
             ],
             3
         ]
+
+    def test_mix_bools_and_numbers(self, space):
+        w_res = space.execute("""
+        require "libz3"
+
+        a = true
+        b = 10
+        always { a == b > 10 }
+        return a, b
+        """)
+        assert self.unwrap(space, w_res) == [True, 11]
+
+    def test_constraint_solver_interaction_different_domains(self, space):
+        w_res = space.execute("""
+        require "libz3"
+        require "libcassowary"
+
+        raise "Test problem" unless Numeric.for_constraint("name", 1).is_a?(Cassowary::Variable)
+
+        a = true
+        b = 10
+        always { b < 11 }
+        always { a == b > 10 }
+        return a, b
+        """)
+        assert self.unwrap(space, w_res) == [False, 10.0]
+
+    def test_constraint_solver_interaction_same_domain(self, space):
+        w_res = space.execute("""
+        require "libz3"
+
+        a = 20
+        b = 10
+        always { b > 10 }
+
+        require "libcassowary"
+        raise "Test problem" unless Numeric.for_constraint("name", 1).is_a?(Cassowary::Variable)
+
+        always { a < b }
+
+        return a, b
+        """)
+        assert self.unwrap(space, w_res) == [10.0, 11]

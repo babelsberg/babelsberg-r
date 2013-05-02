@@ -24,6 +24,7 @@ class W_ConstraintVariableObject(W_RootObject):
         self.ivar = None
         self.cvar = None
         self.constraint_blocks = []
+        self.supportvariables_w = []
         if cell:
             self.cell = cell
         elif w_owner and ivar:
@@ -85,6 +86,28 @@ class W_ConstraintVariableObject(W_RootObject):
             return space.newstr_fromstr("cvar-%s" % clsname)
         return space.w_nil
 
+    def iscompatible(self, space, w_other):
+        assert isinstance(w_other, W_ConstraintVariableObject)
+        return (self.w_external_variable and
+                w_other.w_external_variable and
+                (w_other.w_external_variable.is_kind_of(
+                    space,
+                    space.getclass(self.w_external_variable)) or
+                 self.w_external_variable.is_kind_of(
+                     space,
+                     space.getclass(w_other.w_external_variable))))
+
+    def get_support_variable_for(self, space, w_var):
+        for w_supportvar in self.supportvariables_w:
+            if w_supportvar.iscompatible(space, w_var):
+                return w_supportvar
+        w_value = self.method_get_i(space)
+        w_supportvar = W_ConstraintVariableObject(
+            space, cell=self.cell, w_owner=self.w_owner, ivar=self.ivar, cvar=self.cvar
+        )
+        self.supportvariables_w.append(w_supportvar)
+        return w_supportvar
+
     @classdef.method("value")
     def method_value(self, space):
         return self.load_value(space)
@@ -102,7 +125,14 @@ class W_ConstraintVariableObject(W_RootObject):
         if self.w_external_variable is not None:
             # This variable is part of the solver. Get the solvers
             # interpretation and store it
+            w_oldvalue = self.load_value(space)
+            for w_supportvar in self.supportvariables_w:
+                w_supportval = space.send(w_supportvar.w_external_variable, space.newsymbol("value"))
+                if not space.equal_w(w_supportval, w_oldvalue):
+                    raise NotImplementedError("reconciling different solvers' variable assignments")
             w_value = space.send(self.w_external_variable, space.newsymbol("value"))
+            if not space.equal_w(w_value, w_oldvalue) and self.supportvariables_w:
+                raise NotImplementedError("reconciling different solvers' variable assignments")
             if w_value != space.w_nil:
                 self.store_value(space, w_value)
             return w_value
@@ -122,3 +152,18 @@ class W_ConstraintVariableObject(W_RootObject):
             space.send(w_constraint, space.newsymbol("disable"))
             block.set_constraint(None)
             space.send(space.w_object, space.newsymbol("always"), block=block)
+
+    @classdef.method("method_missing")
+    def method_method_missing(self, space, w_name, args_w, block):
+        if self.w_external_variable and space.respond_to(self.w_external_variable, w_name):
+            newargs_w = args_w[:]
+            for idx, w_arg in enumerate(args_w):
+                if isinstance(w_arg, W_ConstraintVariableObject):
+                    if self.iscompatible(space, w_arg):
+                        newargs_w[idx] = w_arg.w_external_variable
+                    else:
+                        w_supportvar = w_arg.get_support_variable_for(space, self)
+                        newargs_w[idx] = w_supportvar.w_external_variable
+            return space.send(self.w_external_variable, w_name, newargs_w, block)
+        else:
+            return space.send(self.load_value(space), w_name, args_w, block)

@@ -697,6 +697,9 @@ class ObjectSpace(object):
     def eq_w(self, w_obj1, w_obj2):
         return self.is_true(self.send(w_obj2, self.newsymbol("eql?"), [w_obj1]))
 
+    def equal_w(self, w_obj1, w_obj2):
+        return self.is_true(self.send(w_obj2, self.newsymbol("=="), [w_obj1]))
+
     def register_exit_handler(self, w_proc):
         self.exit_handlers_w.append(w_proc)
 
