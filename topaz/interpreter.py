@@ -183,7 +183,7 @@ class Interpreter(object):
         # TODO: think of something to mark these dirty so we don't do
         # this lookup all the time
         if w_var:
-            frame.push(w_var.get_value(space))
+            frame.push(space.get_value(w_var))
         else:
             frame.push(frame.cells[idx].get(space, frame, idx) or space.w_nil)
 
@@ -285,7 +285,7 @@ class Interpreter(object):
         assert isinstance(w_module, W_ModuleObject)
         w_var = space.findconstraintvariable(w_owner=w_module, cvar=name)
         if w_var:
-            w_value = w_var.get_value(space)
+            w_value = space.get_value(w_var)
         else:
             w_value = space.find_class_var(w_module, name)
         frame.push(w_value)
