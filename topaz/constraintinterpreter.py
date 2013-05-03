@@ -1,7 +1,7 @@
 from rpython.rlib import jit
 
 from topaz.interpreter import Interpreter
-from topaz.objects.constraintobject import W_ConstraintObject
+from topaz.objects.objectobject import W_Root
 from topaz.objects.moduleobject import W_ModuleObject
 
 
@@ -46,7 +46,7 @@ class ConstraintInterpreter(Interpreter):
         frame.push(w_res)
 
 
-class ConstrainedVariable(object):
+class ConstrainedVariable(W_Root):
     _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
 
     def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None):
