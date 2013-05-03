@@ -127,7 +127,14 @@ class ConstrainedVariable(object):
             # interpretation and store it
             w_value = space.send(self.w_external_variable, space.newsymbol("value"))
             if w_value != space.w_nil:
-                self.store_value(space, w_value)
+                # w_variable_value may not be the same as w_value,
+                # because client code may choose to return a different
+                # variables' value in #for_constraint
+                w_variable_value = self.load_value(space)
+                if space.respond_to(w_variable_value, space.newsymbol("assign_constraint_value")):
+                    space.send(w_variable_value, space.newsymbol("assign_constraint_value"), [w_value])
+                else:
+                    self.store_value(space, w_value)
             return w_value
         return space.w_nil
 

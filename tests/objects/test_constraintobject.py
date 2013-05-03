@@ -402,24 +402,37 @@ class TestConstraintVariableObject(BaseTopazTest):
         assert self.unwrap(space, w_res) == [10.0, 11]
 
     def test_solver_variable_delegation(self, space):
-        w_res = space.execute("""
-        require "libz3"
+        w_cassowary, w_z3 = self.execute(
+            space,
+            """
+            a = 1
+            always { a == 10 }
+            return a
+            """,
+            "libz3", "libcassowary")
+        assert self.unwrap(space, w_cassowary) == 10
+        assert self.unwrap(space, w_z3) == 10
 
-        class FloatString < String
-          def constraint_value=(a_value)
-            @float = a_value
-            self.replace(a_value.to_s)
-          end
+        w_cassowary, w_z3 = self.execute(
+            space,
+            """
+            class FloatString < String
+              def assign_constraint_value(a_value)
+                clear.insert(0, a_value.to_s)
+              end
 
-          def for_constraint(name)
-            @float ||= self.to_f
-          end
-        end
+              def for_constraint(name)
+                @float ||= self.to_f
+                __constrain__ { @float }
+              end
+            end
 
-        a = 1.0
-        b = FloatString.new("2.9")
-        always { a > b }
-        return a, b
-        """)
-        assert (self.unwrap(space, w_res) == [1.0, "0.0"] or
-                self.unwrap(space, w_res) == [3.0, "2.9"])
+            a = 1.0
+            b = FloatString.new("2.9")
+            always { a > b }
+            return a, b
+            """,
+            "libcassowary", "libz3")
+        assert self.unwrap(space, w_cassowary) == [3.9, "2.9"]
+        assert (self.unwrap(space, w_z3) == [0, "-1.0"] or
+                self.unwrap(space, w_z3) == [3.9, "2.9"])
