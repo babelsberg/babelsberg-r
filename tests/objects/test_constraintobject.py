@@ -400,3 +400,26 @@ class TestConstraintVariableObject(BaseTopazTest):
         return a, b
         """)
         assert self.unwrap(space, w_res) == [10.0, 11]
+
+    def test_solver_variable_delegation(self, space):
+        w_res = space.execute("""
+        require "libz3"
+
+        class FloatString < String
+          def constraint_value=(a_value)
+            @float = a_value
+            self.replace(a_value.to_s)
+          end
+
+          def for_constraint(name)
+            @float ||= self.to_f
+          end
+        end
+
+        a = 1.0
+        b = FloatString.new("2.9")
+        always { a > b }
+        return a, b
+        """)
+        assert (self.unwrap(space, w_res) == [1.0, "0.0"] or
+                self.unwrap(space, w_res) == [3.0, "2.9"])
