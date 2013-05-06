@@ -2,6 +2,7 @@ import py
 
 from ..base import BaseTopazTest
 
+E = 0.00000000000001
 
 class TestConstraintVariableObject(BaseTopazTest):
     def execute(self, space, code, *libs):
@@ -405,17 +406,6 @@ class TestConstraintVariableObject(BaseTopazTest):
         w_cassowary, w_z3 = self.execute(
             space,
             """
-            a = 1
-            always { a == 10 }
-            return a
-            """,
-            "libz3", "libcassowary")
-        assert self.unwrap(space, w_cassowary) == 10
-        assert self.unwrap(space, w_z3) == 10
-
-        w_cassowary, w_z3 = self.execute(
-            space,
-            """
             class FloatString < String
               def assign_constraint_value(a_value)
                 clear.insert(0, a_value.to_s)
@@ -436,3 +426,109 @@ class TestConstraintVariableObject(BaseTopazTest):
         assert self.unwrap(space, w_cassowary) == [3.9, "2.9"]
         assert (self.unwrap(space, w_z3) == [0, "-1.0"] or
                 self.unwrap(space, w_z3) == [3.9, "2.9"])
+
+    def test_solver_ro_variable_delegation(self, space):
+        w_cassowary, w_z3 = self.execute(
+            space,
+            """
+            class FloatString < String
+              attr_reader :float
+              def assign_constraint_value(a_value)
+                # raise "shouldn't happen"
+              end
+
+              def for_constraint(name)
+                unless @float
+                  @float = 0
+                  always { @float == self.to_f }
+                end
+                __constrain__ { @float }
+              end
+            end
+
+            a = 1.0
+            b = FloatString.new("2.9")
+            always { a == b }
+            return a, b
+            """,
+            "libcassowary", "libcassowary")
+        res = self.unwrap(space, w_cassowary)
+        assert 2.9 - E <= res[0] <= 2.9 + E
+        assert "2.9" == res[1]
+
+    def test_solver_ro_variable_delegation_w_update(self, space):
+        w_cassowary, w_z3 = self.execute(
+            space,
+            """
+            class FloatString < String
+              def assign_constraint_value(a_value)
+                # raise "shouldn't happen"
+              end
+
+              def for_constraint(name)
+                unless @float
+                  @float = 0
+                  @stay = always { @float == self.to_f }
+                end
+                __constrain__ { @float }
+              end
+
+              def update(float)
+                self.clear.insert(0, float.to_s)
+                if @stay
+                  @stay.disable
+                  @stay = always { @float == self.to_f }
+                end
+              end
+            end
+
+            res = []
+            a = 1.0
+            b = FloatString.new("2.9")
+            always { a == b }
+            res << a << b
+            b.update(1.1)
+            return res << a << b
+            """,
+            "libcassowary", "libcassowary")
+        res = self.unwrap(space, w_cassowary)
+        assert 2.9 - E <= res[0] <= 2.9 + E
+        assert "1.1" == res[1]
+        assert 1.1 - E <= res[2] <= 1.1 + E
+        assert "1.1" == res[3]
+
+    def test_must_not_change_var(self, space):
+        w_cassowary, w_z3 = self.execute(
+            space,
+            """
+            a = 1.0
+            b = "2.0"
+            always { a == b.to_f }
+            return a, b
+            """,
+            "libcassowary", "libz3")
+        assert self.unwrap(space, w_cassowary) == [2.0, "2.0"]
+        assert self.unwrap(space, w_z3) == [2.0, "2.0"]
+
+    def test_path_with_strength(self, space):
+        w_res = space.execute("""
+        require "libcassowary"
+
+        $executions = 0
+
+        content = "100"
+        quality = 50
+        res = []
+
+        stay = always(:strong) { $executions += 1; quality == content.to_f }
+        res << quality
+        always { quality < 100 }
+        always { quality > 0 }
+        res << quality
+        content = "111" # this will re-execute the stay block, and
+                        # if it looses the strength, it will raise
+                        # a RequiredFailure
+        res << quality
+        return res, $executions
+        """)
+        assert self.unwrap(space, w_res) == [[100, 99, 99], 2]
