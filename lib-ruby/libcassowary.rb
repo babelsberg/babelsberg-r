@@ -1383,10 +1383,29 @@ end
 class Numeric
   include Cassowary::Equalities
 
+  alias prev_coerce coerce
+  def coerce(other)
+    if other.kind_of?(Cassowary::AbstractVariable) || other.kind_of?(Cassowary::Constraint)
+      [other, self.as_linear_expression]
+    else
+      prev_coerce(other)
+    end
+  end
+
   def as_linear_expression
     expr = Cassowary::LinearExpression.new
     expr.constant = self.to_f
     expr
+  end
+end
+
+class Fixnum
+  def coerce(other)
+    if other.kind_of?(Cassowary::AbstractVariable) || other.kind_of?(Cassowary::Constraint)
+      [other, self.as_linear_expression]
+    else
+      super(other)
+    end
   end
 end
 
