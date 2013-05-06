@@ -153,8 +153,8 @@ class W_RootObject(W_BaseObject):
         return space.w_false
 
     @classdef.method("__constrain__")
-    def method_constrain(self, space, block):
-        with space.constraint_construction(block):
+    def method_constrain(self, space, block, w_strength=None):
+        with space.constraint_construction(block, w_strength):
             return space.invoke_block(block, [])
 
     @classdef.method("always")
@@ -163,7 +163,8 @@ class W_RootObject(W_BaseObject):
             raise space.error(space.w_ArgumentError, "no constraint block given")
         if block.get_constraint():
             raise space.error(space.w_ArgumentError, "double-use of same constraint block")
-        w_arg = space.send(self, space.newsymbol("__constrain__"), block=block)
+        arg_w = [] if w_strength is None else [w_strength]
+        w_arg = space.send(self, space.newsymbol("__constrain__"), arg_w, block=block)
         if not space.respond_to(w_arg, space.newsymbol("enable")):
             raise space.error(
                 space.w_TypeError,
@@ -171,7 +172,7 @@ class W_RootObject(W_BaseObject):
                 "(did you `require' your solver?)"
             )
         block.set_constraint(w_arg)
-        space.send(w_arg, space.newsymbol("enable"), [] if w_strength is None else [w_strength])
+        space.send(w_arg, space.newsymbol("enable"), arg_w)
         return w_arg
 
     @classdef.method("hash")

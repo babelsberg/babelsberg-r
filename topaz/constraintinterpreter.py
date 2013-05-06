@@ -83,8 +83,8 @@ class ConstrainedVariable(W_Root):
     def is_solveable(self):
         return self.w_external_variable is not None
 
-    def add_constraint_block(self, block):
-        self.constraint_blocks.append(block)
+    def add_constraint_block(self, block, w_strength):
+        self.constraint_blocks.append((block, w_strength))
 
     def load_value(self, space):
         if self.cell:
@@ -144,9 +144,10 @@ class ConstrainedVariable(W_Root):
 
     def recalculate_path(self, space, w_value):
         self.store_value(space, w_value)
-        for block in self.constraint_blocks:
+        for block, w_strength in self.constraint_blocks:
             w_constraint = block.get_constraint()
             assert w_constraint
             space.send(w_constraint, space.newsymbol("disable"))
             block.set_constraint(None)
-            space.send(space.w_object, space.newsymbol("always"), block=block)
+            args_w = [] if w_strength is None else [w_strength]
+            space.send(space.w_object, space.newsymbol("always"), args_w, block=block)
