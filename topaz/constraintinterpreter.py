@@ -38,11 +38,12 @@ class ConstraintInterpreter(Interpreter):
         args_w = frame.popitemsreverse(num_args)
         w_receiver = frame.pop()
         w_res = None
+        method = space.symbol_w(bytecode.consts_w[meth_idx])
         if space.is_kind_of(w_receiver, space.w_constraint):
             with space.normal_execution():
-                w_res = space.send(w_receiver, bytecode.consts_w[meth_idx], args_w)
+                w_res = space.send(w_receiver, method, args_w)
         else:
-            w_res = space.send(w_receiver, bytecode.consts_w[meth_idx], args_w)
+            w_res = space.send(w_receiver, method, args_w)
         frame.push(w_res)
 
 
@@ -68,11 +69,11 @@ class ConstrainedVariable(W_Root):
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
 
         w_value = self.load_value(space)
-        if space.respond_to(w_value, space.newsymbol("for_constraint")):
+        if space.respond_to(w_value, "for_constraint"):
             with space.normal_execution():
                 self.w_external_variable = space.send(
                     w_value,
-                    space.newsymbol("for_constraint"),
+                    "for_constraint",
                     [self.get_name(space)]
                 )
 
@@ -119,20 +120,20 @@ class ConstrainedVariable(W_Root):
     def suggest_value(self, space, w_value):
         assert self.w_external_variable
         with space.constraint_execution():
-            space.send(self.w_external_variable, space.newsymbol("suggest_value"), [w_value])
+            space.send(self.w_external_variable, "suggest_value", [w_value])
 
     def set_i(self, space):
         if self.w_external_variable is not None:
             # This variable is part of the solver. Get the solvers
             # interpretation and store it
-            w_value = space.send(self.w_external_variable, space.newsymbol("value"))
+            w_value = space.send(self.w_external_variable, "value")
             if w_value != space.w_nil:
                 # w_variable_value may not be the same as w_value,
                 # because client code may choose to return a different
                 # variables' value in #for_constraint
                 w_variable_value = self.load_value(space)
-                if space.respond_to(w_variable_value, space.newsymbol("assign_constraint_value")):
-                    space.send(w_variable_value, space.newsymbol("assign_constraint_value"), [w_value])
+                if space.respond_to(w_variable_value, "assign_constraint_value"):
+                    space.send(w_variable_value, "assign_constraint_value", [w_value])
                 else:
                     self.store_value(space, w_value)
             return w_value
@@ -147,7 +148,7 @@ class ConstrainedVariable(W_Root):
         for block, w_strength in self.constraint_blocks:
             w_constraint = block.get_constraint()
             assert w_constraint
-            space.send(w_constraint, space.newsymbol("disable"))
+            space.send(w_constraint, "disable")
             block.set_constraint(None)
             args_w = [] if w_strength is None else [w_strength]
-            space.send(space.w_object, space.newsymbol("always"), args_w, block=block)
+            space.send(space.w_object, "always", args_w, block=block)

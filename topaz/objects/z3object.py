@@ -77,8 +77,8 @@ class W_Z3Object(W_RootObject):
         except OverflowError, ValueError:
             raise space.error(
                 space.w_ArgumentError,
-                "cannot rationalize %s" % (
-                    space.send(w_value, space.newsymbol("inspect"))
+                "cannot rationalize %s" % space.str_w(
+                    space.send(w_value, "inspect")
                 )
             )
         try:
@@ -87,8 +87,8 @@ class W_Z3Object(W_RootObject):
         except OverflowError:
             raise space.error(
                 space.w_ArgumentError,
-                "%s is too large to be a Z3 constant" % (
-                    space.send(w_value, space.newsymbol("inspect"))
+                "%s is too large to be a Z3 constant" % space.str_w(
+                    space.send(w_value, "inspect")
                 )
             )
         return W_Z3Ptr(self, rz3.z3_mk_real(self.ctx, int_num, int_den))
@@ -202,9 +202,9 @@ class W_Z3Ptr(W_RootObject):
         w_z3ptr_cls = space.getclassfor(W_Z3Ptr)
         if not space.is_kind_of(w_arg, w_z3ptr_cls):
             if w_arg in [space.w_true, space.w_false, space.w_nil]:
-                w_other = space.send(self.w_z3, space.newsymbol("make_bool"), [w_arg])
+                w_other = space.send(self.w_z3, "make_bool", [w_arg])
             else:
-                w_other = space.send(self.w_z3, space.newsymbol("make_real"), [w_arg])
+                w_other = space.send(self.w_z3, "make_real", [w_arg])
         else:
             w_other = w_arg
 
@@ -241,7 +241,7 @@ class W_Z3Ptr(W_RootObject):
     def method_enable(self, space):
         space.send(
             self.w_z3,
-            space.newsymbol("add_constraint"),
+            "add_constraint",
             [self]
         )
         return self
@@ -250,11 +250,11 @@ class W_Z3Ptr(W_RootObject):
     def method_enable(self, space):
         space.send(
             self.w_z3,
-            space.newsymbol("remove_constraint"),
+            "remove_constraint",
             [self]
         )
         return self
 
     @classdef.method("value")
     def method_value(self, space):
-        return space.send(self.w_z3, space.newsymbol("[]"), [self])
+        return space.send(self.w_z3, "[]", [self])

@@ -423,8 +423,10 @@ class TestConstraintVariableObject(BaseTopazTest):
             return a, b
             """,
             "libcassowary", "libz3")
-        assert self.unwrap(space, w_cassowary) == [3.9, "2.9"]
+        assert (self.unwrap(space, w_cassowary) == [3.9, "2.9"] or
+                self.unwrap(space, w_cassowary) == [1.0, "0.0"])
         assert (self.unwrap(space, w_z3) == [0, "-1.0"] or
+                self.unwrap(space, w_z3) == [0, "-1"] or
                 self.unwrap(space, w_z3) == [3.9, "2.9"])
 
     def test_solver_ro_variable_delegation(self, space):
