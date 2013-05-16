@@ -34,6 +34,16 @@ class ConstraintInterpreter(Interpreter):
                 )
         frame.push(w_res)
 
+    def JUMP_AND(self, space, bytecode, frame, pc, target_pc):
+        w_lhs = frame.peek()
+        if space.is_kind_of(w_lhs, space.w_constraint):
+            # XXX: does this need strength?
+            space.enable_constraint(w_lhs)
+            frame.pop()
+            return pc
+        else:
+            return Interpreter.JUMP_AND(self, space, bytecode, frame, pc, target_pc)
+
     def SEND(self, space, bytecode, frame, pc, meth_idx, num_args):
         args_w = frame.popitemsreverse(num_args)
         w_receiver = frame.pop()

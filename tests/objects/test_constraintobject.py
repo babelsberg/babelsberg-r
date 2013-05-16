@@ -534,3 +534,31 @@ class TestConstraintVariableObject(BaseTopazTest):
         return res, $executions
         """)
         assert self.unwrap(space, w_res) == [[100, 99, 99], 2]
+
+    def test_and(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            quality = -1
+            always { quality > 0 && quality < 100 }
+            return quality
+            """,
+            "libcassowary", "libz3")
+        assert self.unwrap(space, w_ca) == 1
+        assert self.unwrap(space, w_z3) == 1
+        with self.raises(space, "RuntimeError"):
+            space.execute("""
+            require "libcassowary"
+            qual = -1
+            always { qual > 0 && qual < 100 }
+            qual = 1000
+            return qual
+            """)
+        with self.raises(space, "RuntimeError"):
+            space.execute("""
+            require "libz3"
+            quali = -1
+            always { quali > 0 && quali < 100 }
+            quali = 1000
+            return quali
+            """)
