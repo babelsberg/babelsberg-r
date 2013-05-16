@@ -832,7 +832,7 @@ class ObjectSpace(object):
                 c_var.recalculate_path(self, w_value)
             return True
         elif self.is_constructing_constraint() and c_var.is_solveable():
-            w_constraint = self.send(c_var, "==", frame.peek())
+            w_constraint = self.send(c_var.w_external_variable, "==", [w_value])
             self.enable_constraint(
                 w_constraint,
                 w_strength=self.current_constraint_strength(),
