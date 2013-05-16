@@ -445,7 +445,7 @@ class ObjectSpace(object):
             regexp_match_cell, is_lambda=False
         )
 
-    def findconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
+    def _findconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
         c_var = None
         if cell:
             c_var = cell.get_constraint()
@@ -459,10 +459,10 @@ class ObjectSpace(object):
         return c_var
 
     def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
-        c_var = self.findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar)
-        if c_var and c_var.is_solveable():
-            return c_var.w_external_variable
-        else:
+        c_var = self._findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar)
+        if c_var:
+            return c_var
+        elif self.is_constructing_constraint():
             c_var = ConstrainedVariable(
                 self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar
             )
@@ -474,16 +474,18 @@ class ObjectSpace(object):
                 elif cvar:
                     assert isinstance(w_owner, W_ModuleObject)
                     w_owner.set_class_constraint_var(self, cvar, c_var)
-        if not c_var.is_solveable():
-            # No constraint solver variable available for this object
-            # Only keep the block alive if this is a variable that
-            # will not be registered with a solver. This means this
-            # variable is on the path to a constraint, and the block
-            # will have to be re-evaluated when this variable is set
-            c_var.add_constraint_block(self.constraint_block_stack[-1], self.constraint_strength_stack[-1])
-            return None
+            if not c_var.is_solveable():
+                # No constraint solver variable available for this object
+                # Only keep the block alive if this is a variable that
+                # will not be registered with a solver. This means this
+                # variable is on the path to a constraint, and the block
+                # will have to be re-evaluated when this variable is set
+                c_var.add_constraint_block(self.current_constraint_block(), self.current_constraint_strength())
+                return c_var
+            else:
+                return c_var
         else:
-            return c_var.w_external_variable
+            return None
 
     @jit.unroll_safe
     def newbinding_fromframe(self, frame):
@@ -806,13 +808,45 @@ class ObjectSpace(object):
         else:
             return c_var.load_value(self)
 
+    def enable_constraint(self, w_constraint, w_strength=None, block=None):
+        if not self.respond_to(w_constraint, "enable"):
+            raise self.error(
+                self.w_TypeError,
+                ("constraint block did an object (%s:%s) that doesn't respond to #enable " +
+                 "(did you `require' your solver?)") % (
+                     self.any_to_s(w_constraint),
+                     self.getclass(w_constraint).name
+                 )
+            )
+        if block:
+            block.add_constraint(w_constraint) # XXX: TODO: support more than one constraint per constraint block
+        arg_w = [] if w_strength is None else [w_strength]
+        with self.normal_execution():
+            self.send(w_constraint, "enable", arg_w) # XXX: TODO: propagate strength properly
+
     def suggest_value(self, c_var, w_value):
-        if not self.is_executing_normally():
-            return
-        if c_var.is_solveable():
-            c_var.suggest_value(self, w_value)
+        if self.is_executing_normally():
+            if c_var.is_solveable():
+                c_var.suggest_value(self, w_value)
+            else:
+                c_var.recalculate_path(self, w_value)
+            return True
+        elif self.is_constructing_constraint() and c_var.is_solveable():
+            w_constraint = self.send(c_var, "==", frame.peek())
+            self.enable_constraint(
+                w_constraint,
+                w_strength=self.current_constraint_strength(),
+                block=self.current_constraint_block()
+            )
+            return True
         else:
-            c_var.recalculate_path(self, w_value)
+            return False
+
+    def current_constraint_block(self):
+        return self.constraint_block_stack[-1]
+
+    def current_constraint_strength(self):
+        return self.constraint_strength_stack[-1]
 
     def is_executing_normally(self):
         return self.execution_mode_stack[-1] == NORMAL_EXECUTION

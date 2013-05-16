@@ -18,14 +18,12 @@ class AttributeReader(W_FunctionObject):
         self.varname = varname
 
     def call(self, space, w_obj, args_w, block):
-        if space.is_constructing_constraint():
-            w_res = space.newconstraintvariable(w_owner=w_obj, ivar=self.varname)
-            if w_res is not None:
-                return w_res
-        else:
-            w_var = space.findconstraintvariable(w_owner=w_obj, ivar=self.varname)
-            if w_var:
-                return space.get_value(w_var)
+        c_var = space.newconstraintvariable(w_owner=w_obj, ivar=self.varname)
+        if c_var and c_var.is_solveable():
+            if space.is_constructing_constraint():
+                return c_var.w_external_variable
+            else:
+                return space.get_value(c_var)
         return space.find_instance_var(w_obj, self.varname)
 
 
@@ -37,10 +35,8 @@ class AttributeWriter(W_FunctionObject):
 
     def call(self, space, w_obj, args_w, block):
         [w_value] = args_w
-        w_var = space.findconstraintvariable(w_owner=w_obj, ivar=self.varname)
-        if w_var:
-            space.suggest_value(w_var, w_value)
-        else:
+        c_var = space.newconstraintvariable(w_owner=w_obj, ivar=self.varname)
+        if not c_var or not space.suggest_value(c_var, w_value):
             space.set_instance_var(w_obj, self.varname, w_value)
         return w_value
 

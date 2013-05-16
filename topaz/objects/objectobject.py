@@ -186,19 +186,12 @@ class W_RootObject(W_BaseObject):
     def method_always(self, space, w_strength=None, block=None):
         if block is None:
             raise space.error(space.w_ArgumentError, "no constraint block given")
-        if block.get_constraint():
+        if block.has_constraint():
             raise space.error(space.w_ArgumentError, "double-use of same constraint block")
         arg_w = [] if w_strength is None else [w_strength]
-        w_arg = space.send(self, "__constrain__", arg_w, block=block)
-        if not space.respond_to(w_arg, "enable"):
-            raise space.error(
-                space.w_TypeError,
-                "constraint block did not return an object that responds to #enable " +
-                "(did you `require' your solver?)"
-            )
-        block.set_constraint(w_arg)
-        space.send(w_arg, "enable", arg_w)
-        return w_arg
+        w_constraint = space.send(self, "__constrain__", arg_w, block=block)
+        space.enable_constraint(w_constraint, w_strength=w_strength, block=block)
+        return w_constraint
 
     @classdef.method("hash")
     def method_hash(self, space):

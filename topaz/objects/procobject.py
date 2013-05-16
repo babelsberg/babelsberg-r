@@ -16,13 +16,19 @@ class W_ProcObject(W_Object):
         self.parent_interp = parent_interp
         self.regexp_match_cell = regexp_match_cell
         self.is_lambda = is_lambda
-        self.constraint = None
+        self.constraints = []
 
-    def get_constraint(self):
-        return self.constraint
+    def get_constraints(self):
+        return self.constraints
 
-    def set_constraint(self, w_value):
-        self.constraint = w_value
+    def add_constraint(self, w_value):
+        self.constraints.append(w_value)
+
+    def remove_constraints(self):
+        del self.constraints[:]
+
+    def has_constraint(self):
+        return len(self.constraints) > 0
 
     def copy(self, space, w_self=None, lexical_scope=None, is_lambda=False):
         return W_ProcObject(

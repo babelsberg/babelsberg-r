@@ -8,16 +8,20 @@ from topaz.objects.moduleobject import W_ModuleObject
 class ConstraintInterpreter(Interpreter):
     def LOAD_DEREF(self, space, bytecode, frame, pc, idx):
         frame.cells[idx].upgrade_to_closure(space, frame, idx)
-        w_res = space.newconstraintvariable(cell=frame.cells[idx])
-        if w_res is None:
+        c_var = space.newconstraintvariable(cell=frame.cells[idx])
+        if c_var and c_var.is_solveable():
+            w_res = c_var.w_external_variable
+        else:
             w_res = frame.cells[idx].get(space, frame, idx) or space.w_nil
         frame.push(w_res)
 
     def LOAD_INSTANCE_VAR(self, space, bytecode, frame, pc, idx):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_obj = frame.pop()
-        w_res = space.newconstraintvariable(w_owner=w_obj, ivar=name)
-        if w_res is None:
+        c_var = space.newconstraintvariable(w_owner=w_obj, ivar=name)
+        if c_var and c_var.is_solveable():
+            w_res = c_var.w_external_variable
+        else:
             w_res = space.find_instance_var(w_obj, name)
         frame.push(w_res)
 
@@ -25,8 +29,10 @@ class ConstraintInterpreter(Interpreter):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_module = frame.pop()
         assert isinstance(w_module, W_ModuleObject)
-        w_res = space.newconstraintvariable(w_owner=w_module, cvar=name)
-        if w_res is None:
+        c_var = space.newconstraintvariable(w_owner=w_module, cvar=name)
+        if c_var and c_var.is_solveable():
+            w_res = c_var.w_external_variable
+        else:
             w_res = space.find_class_var(w_module, name)
             if w_res is None:
                 raise space.error(space.w_NameError,
@@ -156,9 +162,8 @@ class ConstrainedVariable(W_Root):
     def recalculate_path(self, space, w_value):
         self.store_value(space, w_value)
         for block, w_strength in self.constraint_blocks:
-            w_constraint = block.get_constraint()
-            assert w_constraint
-            space.send(w_constraint, "disable")
-            block.set_constraint(None)
+            for w_constraint in block.get_constraints():
+                space.send(w_constraint, "disable")
+            block.remove_constraints()
             args_w = [] if w_strength is None else [w_strength]
             space.send(space.w_object, "always", args_w, block=block)

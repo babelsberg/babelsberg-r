@@ -179,20 +179,18 @@ class Interpreter(object):
         frame.push(bytecode.consts_w[idx])
 
     def LOAD_DEREF(self, space, bytecode, frame, pc, idx):
-        w_var = space.findconstraintvariable(cell=frame.cells[idx])
+        c_var = space.newconstraintvariable(cell=frame.cells[idx])
         # TODO: think of something to mark these dirty so we don't do
         # this lookup all the time
-        if w_var:
-            frame.push(space.get_value(w_var))
+        if c_var and c_var.is_solveable():
+            frame.push(space.get_value(c_var))
         else:
             frame.push(frame.cells[idx].get(space, frame, idx) or space.w_nil)
 
     def STORE_DEREF(self, space, bytecode, frame, pc, idx):
-        w_var = space.findconstraintvariable(cell=frame.cells[idx])
-        if w_var:
-            space.suggest_value(w_var, frame.peek())
-        else:
-            frame.cells[idx].set(space, frame, idx, frame.peek())
+        c_var = space.newconstraintvariable(cell=frame.cells[idx])
+        if c_var:
+            space.suggest_value(c_var, frame.peek())
         frame.cells[idx].set(space, frame, idx, frame.peek())
 
     def LOAD_CLOSURE(self, space, bytecode, frame, pc, idx):
@@ -255,9 +253,9 @@ class Interpreter(object):
     def LOAD_INSTANCE_VAR(self, space, bytecode, frame, pc, idx):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_obj = frame.pop()
-        w_var = space.findconstraintvariable(w_owner=w_obj, ivar=name)
-        if w_var:
-            w_res = space.get_value(w_var)
+        c_var = space.newconstraintvariable(w_owner=w_obj, ivar=name)
+        if c_var and c_var.is_solveable():
+            w_res = space.get_value(c_var)
         else:
             w_res = space.find_instance_var(w_obj, name)
         frame.push(w_res)
@@ -266,10 +264,8 @@ class Interpreter(object):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_value = frame.pop()
         w_obj = frame.pop()
-        w_var = space.findconstraintvariable(w_owner=w_obj, ivar=name)
-        if w_var:
-            space.suggest_value(w_var, w_value)
-        else:
+        c_var = space.newconstraintvariable(w_owner=w_obj, ivar=name)
+        if not c_var or not space.suggest_value(c_var, w_value):
             space.set_instance_var(w_obj, name, w_value)
         frame.push(w_value)
 
@@ -286,9 +282,9 @@ class Interpreter(object):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_module = frame.pop()
         assert isinstance(w_module, W_ModuleObject)
-        w_var = space.findconstraintvariable(w_owner=w_module, cvar=name)
-        if w_var:
-            w_value = space.get_value(w_var)
+        c_var = space.newconstraintvariable(w_owner=w_module, cvar=name)
+        if c_var and c_var.is_solveable():
+            w_value = space.get_value(c_var)
         else:
             w_value = space.find_class_var(w_module, name)
         frame.push(w_value)
@@ -298,10 +294,8 @@ class Interpreter(object):
         w_value = frame.pop()
         w_module = frame.pop()
         assert isinstance(w_module, W_ModuleObject)
-        w_var = space.findconstraintvariable(w_owner=w_module, cvar=name)
-        if w_var:
-            space.suggest_value(w_var, w_value)
-        else:
+        c_var = space.newconstraintvariable(w_owner=w_module, cvar=name)
+        if not c_var or not space.suggest_value(c_var, w_value):
             space.set_class_var(w_module, name, w_value)
         frame.push(w_value)
 
