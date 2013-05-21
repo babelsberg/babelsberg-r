@@ -113,9 +113,6 @@ class ClassNode(BaseNode):
     def copy_attrs(self, space, w_obj, w_target):
         pass
 
-    def copy_flags(self, space, w_obj, w_target):
-        pass
-
     def copy_constraint_vars(self, space, w_obj, w_target):
         pass
 
@@ -200,12 +197,6 @@ class FlagNode(StorageNode):
     def change_class(self, space, w_cls):
         prev = self.prev.change_class(space, w_cls)
         return space.fromcache(MapTransitionCache).transition_add_flag(prev, self.name, self.pos)
-
-    def copy_flags(self, space, w_obj, w_target):
-        self.prev.copy_flags(space, w_obj, w_target)
-        if w_obj.storage[self.pos] is space.w_true:
-            # Only copy flags that are still set
-            w_target.set_flag(space, self.name)
 
 
 class ConstraintVarNode(StorageNode):

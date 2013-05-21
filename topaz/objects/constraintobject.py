@@ -9,4 +9,4 @@ from topaz.utils.cache import Cache
 
 # Marker class for constraint solver objects
 class W_ConstraintObject(W_RootObject):
-    classdef = ClassDef("ConstraintObject", W_Object.classdef, filepath=__file__)
+    classdef = ClassDef("ConstraintObject", W_Object.classdef)
