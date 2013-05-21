@@ -1480,7 +1480,7 @@ class TestCompiler(object):
         LOAD_CONST 1
         SEND 2 1
         DUP_TOP
-        JUMP_IF_FALSE 27
+        JUMP_AND 27
         DISCARD_TOP
         LOAD_CONST 3
         LOAD_CONST 4
