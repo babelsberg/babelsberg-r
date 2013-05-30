@@ -223,12 +223,16 @@ class TestConstraintVariableObject(BaseTopazTest):
     def test_div(self, space):
         w_res = space.execute("""
         require "libz3"
-        x = 5
-        y = 1
+        x = 5.0
+        y = 1.0
         always { x / y == 2 }
-        return x, y
+
+        a = 5
+        b = 1
+        always { a / b == 2 }
+        return x, y, a, b
         """)
-        assert self.unwrap(space, w_res) == [1, 0]
+        assert self.unwrap(space, w_res) == [-1, 0, 38, 0]
 
     def test_complex_path_with_z3(self, space):
         w_res = space.execute("""
@@ -362,11 +366,15 @@ class TestConstraintVariableObject(BaseTopazTest):
         require "libz3"
 
         a = true
-        b = 10
+        b = 10.0
+
+        x = true
+        y = 10
         always { a == b > 10 }
-        return a, b
+        always { x == y > 10 }
+        return a, b, x, y
         """)
-        assert self.unwrap(space, w_res) == [True, 11]
+        assert self.unwrap(space, w_res) == [True, 11, True, 11]
 
     @py.test.mark.xfail
     def test_constraint_solver_interaction_different_domains(self, space):
@@ -545,7 +553,7 @@ class TestConstraintVariableObject(BaseTopazTest):
             """,
             "libcassowary", "libz3")
         assert self.unwrap(space, w_ca) == 1
-        assert self.unwrap(space, w_z3) == 1
+        assert self.unwrap(space, w_z3) > 0 and self.unwrap(space, w_z3) < 100
         with self.raises(space, "RuntimeError"):
             space.execute("""
             require "libcassowary"
