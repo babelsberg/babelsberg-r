@@ -7,11 +7,17 @@ from topaz.objects.moduleobject import W_ModuleObject
 
 class ConstraintInterpreter(Interpreter):
     def LOAD_DEREF(self, space, bytecode, frame, pc, idx):
-        frame.cells[idx].upgrade_to_closure(space, frame, idx)
-        c_var = space.newconstraintvariable(cell=frame.cells[idx])
-        if c_var and c_var.is_solveable():
-            w_res = c_var.w_external_variable
-        else:
+        # This must be normal LOAD_DEREF for the arguments of frames
+        # below the primitive call to __constraint__. If the arguments
+        # are derived from variables, they are already wrapped with
+        # constraintvariables, otherwise they are constant
+        w_res = None
+        if frame.backref().get_code_name() == "__constraint__" or idx not in frame.bytecode.arg_pos:
+            frame.cells[idx].upgrade_to_closure(space, frame, idx)
+            c_var = space.newconstraintvariable(cell=frame.cells[idx])
+            if c_var and c_var.is_solveable():
+                w_res = c_var.w_external_variable
+        if not w_res:
             w_res = frame.cells[idx].get(space, frame, idx) or space.w_nil
         frame.push(w_res)
 
