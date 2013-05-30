@@ -1417,4 +1417,12 @@ class Numeric
   end
 end
 
+class NilClass
+  def for_constraint(name)
+    v = Cassowary::Variable.new(name: name, value: 0)
+    Cassowary::SimplexSolver.instance.add_stay(v)
+    v
+  end
+end
+
 puts "Cassowary constraint solver loaded."
