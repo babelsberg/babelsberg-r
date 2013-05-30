@@ -129,16 +129,17 @@ class ConstrainedVariable(W_Root):
             self.w_owner.set_class_var(space, self.cvar, w_value)
         else:
             raise NotImplementedError("inconsistent constraint variable")
-
     def get_name(self, space):
-        clsname = space.getclass(self.load_value(space)).name
+        inspectstr = space.any_to_s(self.load_value(space))
         if self.cell:
-            return space.newstr_fromstr("local-%s" % clsname)
+            storagestr = "local"
         elif self.ivar is not None:
-            return space.newstr_fromstr("ivar-%s" % clsname)
+            storagestr = "ivar"
         elif self.cvar is not None:
-            return space.newstr_fromstr("cvar-%s" % clsname)
-        return space.w_nil
+            storagestr = "cvar"
+        else:
+            storagestr = "unknown"
+        return space.newstr_fromstr("%s-%s" % (storagestr, inspectstr))
 
     def suggest_value(self, space, w_value):
         assert self.w_external_variable
