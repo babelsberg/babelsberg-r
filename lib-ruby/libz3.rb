@@ -18,7 +18,13 @@ end
 
 class Numeric
   def for_constraint(name)
-    Z3::Instance.make_real_variable(self)
+    Z3::Instance.make_real_variable(self.to_f)
+  end
+end
+
+class Fixnum
+  def for_constraint(name)
+    Z3::Instance.make_int_variable(self)
   end
 end
 

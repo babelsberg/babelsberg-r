@@ -93,6 +93,18 @@ class W_Z3Object(W_RootObject):
             )
         return W_Z3Ptr(self, rz3.z3_mk_real(self.ctx, int_num, int_den))
 
+    @classdef.method("make_int_variable")
+    def make_real_variable(self, space, w_value):
+        space.convert_type(w_value, space.w_fixnum, "to_int") # Just for the error raising
+        ty = rz3.z3_mk_int_sort(self.ctx)
+        return self.make_variable(space, w_value, self.ctx, ty)
+
+    @classdef.method("make_int")
+    def make_real(self, space, w_value):
+        value = space.int_w(space.convert_type(w_value, space.w_fixnum, "to_int"))
+        ty = rz3.z3_mk_int_sort(self.ctx)
+        return W_Z3Ptr(self, rz3.z3_mk_int(self.ctx, value, ty))
+
     @classdef.method("make_bool_variable")
     def make_bool_variable(self, space, w_value):
         if w_value is not space.w_true and w_value is not space.w_false and w_value is not space.w_nil:
@@ -203,6 +215,8 @@ class W_Z3Ptr(W_RootObject):
         if not space.is_kind_of(w_arg, w_z3ptr_cls):
             if w_arg in [space.w_true, space.w_false, space.w_nil]:
                 w_other = space.send(self.w_z3, "make_bool", [w_arg])
+            elif space.is_kind_of(w_arg, space.w_fixnum):
+                w_other = space.send(self.w_z3, "make_int", [w_arg])
             else:
                 w_other = space.send(self.w_z3, "make_real", [w_arg])
         else:
