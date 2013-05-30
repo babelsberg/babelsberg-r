@@ -72,22 +72,16 @@ class ConstraintInterpreter(Interpreter):
 class ConstrainedVariable(W_Root):
     _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
 
-    def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None):
+    def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
         self.w_external_variable = None
-        self.cell = None
-        self.w_owner = None
-        self.ivar = None
-        self.cvar = None
+        self.cell = cell
+        self.w_owner = w_owner
+        self.ivar = ivar
+        self.cvar = cvar
+        self.idx = idx
+        self.w_key = w_key
         self.constraint_blocks = []
-        if cell:
-            self.cell = cell
-        elif w_owner and ivar:
-            self.w_owner = w_owner
-            self.ivar = ivar
-        elif w_owner and cvar:
-            self.w_owner = w_owner
-            self.cvar = cvar
-        else:
+        if not cell and not (w_owner and (ivar or cvar or idx >= 0 or w_key)):
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
 
         w_value = self.load_value(space)
@@ -116,6 +110,8 @@ class ConstrainedVariable(W_Root):
             return self.w_owner.find_instance_var(space, self.ivar) or space.w_nil
         elif self.cvar is not None:
             return self.w_owner.find_class_var(space, self.cvar) or space.w_nil
+        elif self.idx >= 0:
+            return space.listview(self.w_owner)[self.idx] or space.w_nil
         else:
             raise NotImplementedError("inconsistent constraint variable")
 
@@ -126,8 +122,11 @@ class ConstrainedVariable(W_Root):
             self.w_owner.set_instance_var(space, self.ivar, w_value)
         elif self.cvar is not None:
             self.w_owner.set_class_var(space, self.cvar, w_value)
+        elif self.idx >= 0:
+            space.listview(self.w_owner)[self.idx] = w_value
         else:
             raise NotImplementedError("inconsistent constraint variable")
+
     def get_name(self, space):
         inspectstr = space.any_to_s(self.load_value(space))
         if self.cell:
@@ -136,6 +135,8 @@ class ConstrainedVariable(W_Root):
             storagestr = "ivar"
         elif self.cvar is not None:
             storagestr = "cvar"
+        elif self.idx > 0:
+            storagestr = "aryitem"
         else:
             storagestr = "unknown"
         return space.newstr_fromstr("%s-%s" % (storagestr, inspectstr))

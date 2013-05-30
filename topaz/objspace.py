@@ -447,7 +447,7 @@ class ObjectSpace(object):
             regexp_match_cell, is_lambda=False
         )
 
-    def _findconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
+    def _findconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
         c_var = None
         if cell:
             c_var = cell.get_constraint()
@@ -457,16 +457,22 @@ class ObjectSpace(object):
             elif cvar:
                 assert isinstance(w_owner, W_ModuleObject)
                 c_var = w_owner.find_class_constraint_var(self, cvar)
+            elif idx >= 0:
+                assert isinstance(w_owner, W_ArrayObject)
+                c_var = w_owner.find_constraint_on_idx(self, idx)
+            else:
+                # TODO: Dictionary constraints
+                raise NotImplementedError
         assert c_var is None or isinstance(c_var, ConstrainedVariable)
         return c_var
 
-    def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None):
-        c_var = self._findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar)
+    def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
+        c_var = self._findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar, idx=idx, w_key=w_key)
         if c_var:
             return c_var
         elif self.is_constructing_constraint():
             c_var = ConstrainedVariable(
-                self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar
+                self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar, idx=idx, w_key=w_key
             )
             if cell:
                 cell.set_constraint(c_var)
@@ -476,6 +482,12 @@ class ObjectSpace(object):
                 elif cvar:
                     assert isinstance(w_owner, W_ModuleObject)
                     w_owner.set_class_constraint_var(self, cvar, c_var)
+                elif idx >= 0:
+                    assert isinstance(w_owner, W_ArrayObject)
+                    w_owner.set_constraint_on_idx(self, idx, c_var)
+                else:
+                    # TODO: dictionary constraints
+                    raise NotImplementedError
             if not c_var.is_solveable():
                 # No constraint solver variable available for this object
                 # Only keep the block alive if this is a variable that

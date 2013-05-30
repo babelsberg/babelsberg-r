@@ -1,6 +1,7 @@
 import copy
 
 from rpython.rlib.listsort import make_timsort_class
+from rpython.rlib.objectmodel import newlist_hint
 
 from topaz.coerce import Coerce
 from topaz.module import ClassDef, check_frozen
@@ -45,14 +46,27 @@ class W_ArrayObject(W_Object):
     def __init__(self, space, items_w, klass=None):
         W_Object.__init__(self, space, klass)
         self.items_w = items_w
+        self.constraint_items_w = newlist_hint(len(items_w))
 
     def __deepcopy__(self, memo):
         obj = super(W_ArrayObject, self).__deepcopy__(memo)
         obj.items_w = copy.deepcopy(self.items_w, memo)
+        obj.constraint_items_w = copy.deepcopy(self.constraint_items_w, memo)
         return obj
 
     def listview(self, space):
         return self.items_w
+
+    def find_constraint_on_idx(self, space, idx):
+        if idx >= len(self.constraint_items_w):
+            return None
+        else:
+            return self.constraint_items_w[idx]
+
+    def set_constraint_on_idx(self, space, idx, c_var):
+        if idx >= len(self.constraint_items_w):
+            self.constraint_items_w += [None] * (len(self.items_w) - len(self.constraint_items_w))
+        self.constraint_items_w[idx] = c_var
 
     @classdef.singleton_method("allocate")
     def singleton_method_allocate(self, space, args_w):
@@ -77,6 +91,15 @@ class W_ArrayObject(W_Object):
             assert end >= 0
             return W_ArrayObject(space, self.items_w[start:end], space.getnonsingletonclass(self))
         else:
+            # TODO: Make this work for the whole thing
+            if space.is_constructing_constraint():
+                c_var = space.newconstraintvariable(w_owner=self, idx=start)
+                if c_var and c_var.is_solveable():
+                    return c_var.w_external_variable
+            elif space.is_executing_normally():
+                c_var = space.newconstraintvariable(w_owner=self, idx=start)
+                if c_var:
+                    return space.get_value(c_var)
             return self.items_w[start]
 
     @classdef.method("[]=")
@@ -106,7 +129,10 @@ class W_ArrayObject(W_Object):
         elif as_range:
             self._subscript_assign_range(space, start, end, w_obj)
         else:
-            self.items_w[start] = w_obj
+            # TODO: See comment in "[]"
+            c_var = space.newconstraintvariable(w_owner=self, idx=start)
+            if not c_var or not space.suggest_value(c_var, w_obj):
+                self.items_w[start] = w_obj
         return w_obj
 
     def _subscript_assign_range(self, space, start, end, w_obj):
