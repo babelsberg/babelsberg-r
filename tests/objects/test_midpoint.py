@@ -17,13 +17,8 @@ class TestConstraintVariableObject(BaseTopazTest):
         require "libcassowary"
         res = []
         class Point
-          def x
-            @x
-          end
-
-          def y
-            @y
-          end
+          def x; @x; end
+          def y; @y; end
 
           def + q
             Point.new(x+q.x,y+q.y)
@@ -37,6 +32,10 @@ class TestConstraintVariableObject(BaseTopazTest):
             Point.new(x/n, y/n)
           end
 
+          def == o
+            o.x == self.x && o.y == self.y
+          end
+
           def initialize(x, y)
             @x = x
             @y = y
@@ -44,17 +43,7 @@ class TestConstraintVariableObject(BaseTopazTest):
         end
 
         class MidpointLine
-          def end1
-            @end1
-          end
-
-          def end2
-            @end2
-          end
-
-          def midpoint
-            @midpoint
-          end
+          attr_reader :end1, :end2, :midpoint
 
           def initialize(pt1, pt2)
             @end1 = pt1
