@@ -18,14 +18,12 @@ class AttributeReader(W_FunctionObject):
         self.varname = varname
 
     def call(self, space, w_obj, args_w, block):
-        if space.is_constructing_constraint():
-            w_res = space.newconstraintvariable(w_owner=w_obj, ivar=self.varname)
-            if w_res is not None:
-                return w_res
-        else:
-            w_var = space.findconstraintvariable(w_owner=w_obj, ivar=self.varname)
-            if w_var:
-                return space.get_value(w_var)
+        c_var = space.newconstraintvariable(w_owner=w_obj, ivar=self.varname)
+        if c_var and c_var.is_solveable():
+            if space.is_constructing_constraint():
+                return c_var.w_external_variable
+            else:
+                return space.get_value(c_var)
         return space.find_instance_var(w_obj, self.varname)
 
 
@@ -37,10 +35,8 @@ class AttributeWriter(W_FunctionObject):
 
     def call(self, space, w_obj, args_w, block):
         [w_value] = args_w
-        w_var = space.findconstraintvariable(w_owner=w_obj, ivar=self.varname)
-        if w_var:
-            space.suggest_value(w_var, w_value)
-        else:
+        c_var = space.newconstraintvariable(w_owner=w_obj, ivar=self.varname)
+        if not c_var or not space.suggest_value(c_var, w_value):
             space.set_instance_var(w_obj, self.varname, w_value)
         return w_value
 
@@ -76,11 +72,7 @@ class DefineMethodBlock(W_FunctionObject):
             return e.w_value
 
     def arity(self, space):
-        args_count = len(self.block.bytecode.arg_pos) - len(self.block.bytecode.defaults)
-        if len(self.block.bytecode.defaults) > 0 or self.block.bytecode.splat_arg_pos != -1:
-            args_count = -(args_count + 1)
-
-        return space.newint(args_count)
+        return space.newint(self.block.bytecode.arity(negative_defaults=True))
 
 
 class DefineMethodMethod(W_FunctionObject):
@@ -98,7 +90,7 @@ class DefineMethodMethod(W_FunctionObject):
 class W_ModuleObject(W_RootObject):
     _immutable_fields_ = ["version?", "included_modules?[*]", "klass?", "name?"]
 
-    classdef = ClassDef("Module", W_RootObject.classdef, filepath=__file__)
+    classdef = ClassDef("Module", W_RootObject.classdef)
 
     def __init__(self, space, name, klass=None):
         self.name = name
@@ -175,9 +167,25 @@ class W_ModuleObject(W_RootObject):
     def _find_method_pure(self, space, method, version):
         return self.methods_w.get(method, None)
 
+    def methods(self, space, inherit=True):
+        methods = {}
+        for name, method in self.methods_w.iteritems():
+            if not isinstance(method, UndefMethod):
+                methods[name] = None
+
+        if inherit:
+            for w_mod in self.included_modules:
+                for name in w_mod.methods(space, inherit):
+                    method = self._find_method_pure(space, name, self.version)
+                    if method is None or not isinstance(method, UndefMethod):
+                        methods[name] = None
+        return methods.keys()
+
     def set_const(self, space, name, w_obj):
         self.mutated()
         self.constants_w[name] = w_obj
+        if isinstance(w_obj, W_ModuleObject) and w_obj.name is None and self.name is not None:
+            w_obj.set_name_in_scope(space, name, self)
 
     def find_const(self, space, name):
         w_res = self.find_included_const(space, name)
@@ -198,12 +206,31 @@ class W_ModuleObject(W_RootObject):
 
     def included_constants(self, space):
         consts = {}
-        for const in self.constants_w.keys():
+        for const in self.constants_w:
             consts[const] = None
         for w_mod in self.included_modules:
             for const in w_mod.included_constants(space):
                 consts[const] = None
         return consts.keys()
+
+    def lexical_constants(self, space):
+        consts = {}
+        frame = space.getexecutioncontext().gettoprubyframe()
+        scope = frame.lexical_scope
+
+        while scope is not None:
+            assert isinstance(scope, W_ModuleObject)
+            for const in scope.w_mod.constants_w:
+                consts[const] = None
+            scope = scope.backscope
+
+        return consts.keys()
+
+    def local_constants(self, space):
+        return self.constants_w.keys()
+
+    def inherited_constants(self, space):
+        return self.local_constants(space)
 
     def find_local_const(self, space, name):
         return self._find_const_pure(name, self.version)
@@ -274,13 +301,6 @@ class W_ModuleObject(W_RootObject):
 
     def get_flag(self, space, name):
         return self.flags.get(space, name) or space.w_false
-
-    def copy_flags(self, space, w_other):
-        assert isinstance(w_other, W_ModuleObject)
-        for key in w_other.flags:
-            w_value = w_other.flags.get(space, key)
-            if w_value is space.w_true:
-                self.set_flag(space, key)
 
     def ancestors(self, include_singleton=True, include_self=True):
         if include_self:
@@ -403,6 +423,7 @@ class W_ModuleObject(W_RootObject):
             w_mod.include_module(space, module)
 
     @classdef.method("define_method", name="symbol")
+    @check_frozen()
     def method_define_method(self, space, name, w_method=None, block=None):
         if w_method is not None:
             if space.is_kind_of(w_method, space.w_method):
@@ -410,11 +431,18 @@ class W_ModuleObject(W_RootObject):
 
             if space.is_kind_of(w_method, space.w_unbound_method):
                 self.define_method(space, name, DefineMethodMethod(name, w_method))
+                return w_method
             elif space.is_kind_of(w_method, space.w_proc):
                 assert isinstance(w_method, W_ProcObject)
                 self.define_method(space, name, DefineMethodBlock(name, w_method))
+                return w_method.copy(space, is_lambda=True)
+            else:
+                raise space.error(space.w_TypeError,
+                    "wrong argument type %s (expected Proc/Method)" % space.obj_to_s(space.getclass(w_method))
+                )
         elif block is not None:
             self.define_method(space, name, DefineMethodBlock(name, block))
+            return block.copy(space, is_lambda=True)
         else:
             raise space.error(space.w_ArgumentError, "tried to create Proc object without a block")
 
@@ -507,12 +535,27 @@ class W_ModuleObject(W_RootObject):
         pass
 
     @classdef.method("constants")
-    def method_constants(self, space):
-        return space.newarray([space.newsymbol(n) for n in self.included_constants(space)])
+    def method_constants(self, space, w_inherit=None):
+        if self is space.w_module and w_inherit is None:
+            consts = {}
+            for const in self.lexical_constants(space):
+                consts[const] = None
+            for const in self.inherited_constants(space):
+                consts[const] = None
+            return space.newarray([space.newsymbol(n) for n in consts])
+
+        if w_inherit is None or space.is_true(w_inherit):
+            return space.newarray([space.newsymbol(n) for n in self.included_constants(space)])
+        else:
+            return space.newarray([space.newsymbol(n) for n in self.constants_w])
 
     @classdef.method("const_missing", name="symbol")
     def method_const_missing(self, space, name):
-        raise space.error(space.w_NameError, "uninitialized constant %s" % name)
+        if self is space.w_object:
+            raise space.error(space.w_NameError, "uninitialized constant %s" % (name))
+        else:
+            self_name = space.obj_to_s(self)
+            raise space.error(space.w_NameError, "uninitialized constant %s::%s" % (self_name, name))
 
     @classdef.method("class_eval", string="str", filename="str")
     @classdef.method("module_eval", string="str", filename="str")
@@ -548,16 +591,26 @@ class W_ModuleObject(W_RootObject):
         else:
             w_res = self.find_local_const(space, const)
         if w_res is None:
-            name = space.obj_to_s(self)
-            raise space.error(space.w_NameError,
-                "uninitialized constant %s::%s" % (name, const)
-            )
+            return space.send(self, "const_missing", [space.newsymbol(const)])
         return w_res
 
     @classdef.method("const_set", const="symbol")
     def method_const_set(self, space, const, w_value):
         space.set_const(self, const, w_value)
         return w_value
+
+    @classdef.method("remove_const", name="str")
+    def method_remove_const(self, space, name):
+        space._check_const_name(name)
+        w_res = self.find_local_const(space, name)
+        if w_res is None:
+            self_name = space.obj_to_s(self)
+            raise space.error(space.w_NameError,
+                "uninitialized constant %s::%s" % (self_name, name)
+            )
+        del self.constants_w[name]
+        self.mutated()
+        return w_res
 
     @classdef.method("class_variable_defined?", name="symbol")
     def method_class_variable_definedp(self, space, name):

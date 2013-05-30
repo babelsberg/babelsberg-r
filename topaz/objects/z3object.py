@@ -16,7 +16,7 @@ class Z3Exception(Exception):
 class W_Z3Object(W_RootObject):
     _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved", "next_id"]
     _immutable_fields_ = ["ctx", "solver"]
-    classdef = ClassDef("Z3", W_Object.classdef, filepath=__file__)
+    classdef = ClassDef("Z3", W_Object.classdef)
 
     def __init__(self):
         cfg = rz3.z3_mk_config()
@@ -166,7 +166,7 @@ class W_Z3Object(W_RootObject):
 
 class W_Z3Ptr(W_RootObject):
     _immutable_fields_ = ["w_z3", "pointer"]
-    classdef = ClassDef("Z3Pointer", W_ConstraintObject.classdef, filepath=__file__)
+    classdef = ClassDef("Z3Pointer", W_ConstraintObject.classdef)
 
     def __init__(self, w_z3, pointer):
         self.w_z3 = w_z3

@@ -659,7 +659,7 @@ class And(Node):
 
         self.lhs.compile(ctx)
         ctx.emit(consts.DUP_TOP)
-        ctx.emit_jump(consts.JUMP_IF_FALSE, end)
+        ctx.emit_jump(consts.JUMP_AND, end)
         ctx.use_next_block(otherwise)
         ctx.emit(consts.DISCARD_TOP)
         self.rhs.compile(ctx)

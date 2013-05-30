@@ -300,7 +300,7 @@ class TestConstraintVariableObject(BaseTopazTest):
 
     def test_invalidation_along_path(self, space):
         code = """
-        $area_executions = 0
+        $area_executions = []
         res = []
 
         class Point
@@ -319,7 +319,7 @@ class TestConstraintVariableObject(BaseTopazTest):
           end
 
           def area
-            $area_executions += 1
+            $area_executions << 1
             extent.x * extent.y
           end
         end
@@ -354,7 +354,7 @@ class TestConstraintVariableObject(BaseTopazTest):
                 100, 2, # point that is no longer constrained keeps last value
                 1, 2,   # subsequent change then works imperatively
             ],
-            3
+            [1, 1, 1]
         ]
 
     def test_mix_bools_and_numbers(self, space):
@@ -534,3 +534,68 @@ class TestConstraintVariableObject(BaseTopazTest):
         return res, $executions
         """)
         assert self.unwrap(space, w_res) == [[100, 99, 99], 2]
+
+    def test_and(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            quality = -1
+            always { quality > 0 && quality < 100 }
+            return quality
+            """,
+            "libcassowary", "libz3")
+        assert self.unwrap(space, w_ca) == 1
+        assert self.unwrap(space, w_z3) == 1
+        with self.raises(space, "RuntimeError"):
+            space.execute("""
+            require "libcassowary"
+            qual = -1
+            always { qual > 0 && qual < 100 }
+            qual = 1000
+            return qual
+            """)
+        with self.raises(space, "RuntimeError"):
+            space.execute("""
+            require "libz3"
+            quali = -1
+            always { quali > 0 && quali < 100 }
+            quali = 1000
+            return quali
+            """)
+
+    def test_multiple_constraints_out_of_one(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            class Point
+              attr_accessor :x, :y
+
+              def initialize(x, y)
+                self.x = x
+                self.y = y
+              end
+
+              def +(pt)
+                Point.new(x + pt.x, y + pt.y)
+              end
+
+              def ==(pt)
+                x == pt.x && y == pt.y
+              end
+            end
+
+            a = Point.new(1, 1)
+            b = Point.new(1, 1)
+            c = Point.new(1, 1)
+            always { a + b == c }
+            return [a.x, a.y], [b.x, b.y], [c.x, c.y]
+            """,
+            "libcassowary", "libz3")
+        ca = self.unwrap(space, w_ca)
+        z3 = self.unwrap(space, w_z3)
+
+        assert ca[0][0] + ca[1][0] == ca[2][0]
+        assert ca[0][1] + ca[1][1] == ca[2][1]
+
+        assert z3[0][0] + z3[1][0] == z3[2][0]
+        assert z3[0][1] + z3[1][1] == z3[2][1]

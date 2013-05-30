@@ -1,0 +1,3 @@
+* change ||, &&, if-then etc interpretation so we can add them to a solver (Z3)
+* allow variables to be shared between solvers
+* allow constraintvariables specialization (e.g. when they're used in a constructor and are still nil, but should be a Fixnum)
