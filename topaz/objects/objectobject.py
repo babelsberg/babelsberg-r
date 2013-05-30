@@ -232,7 +232,7 @@ class W_Object(W_RootObject):
     def set_constraint_var(self, space, name, w_value):
         idx = jit.promote(self.map).find_constraint_var(space, name)
         if idx == -1:
-            self.map.add_constraint_var(space, self, name)
+            idx = self.map.add_constraint_var(space, self, name)
         self.storage[idx] = w_value
 
     def copy_constraint_vars(self, space, w_other):
