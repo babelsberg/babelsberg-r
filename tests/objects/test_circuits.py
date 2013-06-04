@@ -51,7 +51,7 @@ class Battery < TwoLeadedObject
   def initialize(supply_voltage)
     super()
     @supply_voltage = supply_voltage
-    always { lead1.voltage - lead2.voltage == supply_voltage }
+    always { lead1.voltage - lead2.voltage == supply_voltage.stay }
   end
 end
 
@@ -138,12 +138,20 @@ class TestCircuits(BaseTopazTest):
           return [ t.lead1.voltage, t.lead1.current, t.lead2.current, ] """)
         assert self.unwrap(space, w_res) == [20.0, 12.0, -12.0]
 
-    def test_battery(self, space):
+    def test_battery_setup(self, space):
+        w_res = space.execute(CircuitClasses + """
+          b = Battery.new(5.0)
+          return [ b.lead1.voltage, b.lead1.current,
+                   b.lead2.voltage, b.lead2.current ] """)
+        assert (self.unwrap(space, w_res) == [5.0, 0.0, 0.0, 0.0] or
+                self.unwrap(space, w_res) == [0.0, 0.0, -5.0, 0.0])
+
+    def test_battery_simple(self, space):
         w_res = space.execute(CircuitClasses + """
           b = Battery.new(5.0)
           always { b.lead1.voltage == 20.0 }
           always { b.lead1.current == 12.0 }
-          return [ b.lead1.voltage, b.lead1.current, 
+          return [ b.lead1.voltage, b.lead1.current,
                    b.lead2.voltage, b.lead2.current ] """)
         assert self.unwrap(space, w_res) == [20.0, 12.0, 15.0, -12.0]
 

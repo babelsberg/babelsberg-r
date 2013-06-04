@@ -185,6 +185,11 @@ module Cassowary
       "#{super}[#{value.inspect}]"
     end
 
+    def stay(strength = :strong)
+      Cassowary::SimplexSolver.instance.add_stay(self)
+      self
+    end
+
     def suggest_value(v)
       # SimplexSolver.instance.add_edit_var(self, Strength::StrongStrength)
       # SimplexSolver.instance.begin_edit
