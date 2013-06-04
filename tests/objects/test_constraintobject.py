@@ -168,10 +168,6 @@ class TestConstraintVariableObject(BaseTopazTest):
     def test_errors(self, space):
         with self.raises(space, "ArgumentError"):
             space.execute("always")
-        with self.raises(space, "TypeError"):
-            space.execute("always { true }")
-        with self.raises(space, "TypeError"):
-            space.execute("always { true }")
 
     def test_preferences(self, space):
         w_res = space.execute("""
