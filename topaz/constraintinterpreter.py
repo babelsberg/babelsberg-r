@@ -80,6 +80,8 @@ class ConstrainedVariable(W_Root):
         self.cvar = None
         self.constraint_blocks = []
         if cell:
+            from topaz.closure import ClosureCell
+            assert isinstance(cell, ClosureCell)
             self.cell = cell
         elif w_owner and ivar:
             self.w_owner = w_owner
