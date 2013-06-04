@@ -231,8 +231,6 @@ class TestCircuits(BaseTopazTest):
           connect [g.lead, r.lead1, b.lead1]
           connect [r.lead2, b.lead2]
           return [ r.lead1.voltage, r.lead1.current, r.lead2.voltage, r.lead2.current,
-                   b.lead1.voltage, b.lead1.current, b.lead2.voltage, b.lead2.current,
+                   b.lead1.voltage, b.lead1.current, b.lead2.voltage, b.lead2.current, b.supply_voltage,
                    g.lead.voltage, g.lead.current] """)
-        assert self.unwrap(space, w_res) == [0.0, 0.05, 5.0, -0.05, 0.0, -0.05, 5.0, 0.05, 0.0, 0.0]
-
-   
+        assert self.unwrap(space, w_res) == [0.0, 0.05, -5.0, -0.05, 0.0, -0.05, -5.0, 0.05, 5.0, 0.0, 0.0]
