@@ -51,7 +51,7 @@ class Battery < TwoLeadedObject
   def initialize(supply_voltage)
     super()
     @supply_voltage = supply_voltage
-    always { lead1.voltage - lead2.voltage == supply_voltage.stay }
+    always { lead1.voltage - lead2.voltage == @supply_voltage.stay(:required) }
   end
 end
 
