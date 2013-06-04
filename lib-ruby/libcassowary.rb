@@ -186,7 +186,7 @@ module Cassowary
     end
 
     def stay(strength = :strong)
-      Cassowary::SimplexSolver.instance.add_stay(self)
+      Cassowary::SimplexSolver.instance.add_stay(self, Cassowary.symbolic_strength(strength))
       self
     end
 
@@ -204,6 +204,21 @@ module Cassowary
 end
 
 module Cassowary
+  def self.symbolic_strength(strength)
+    if strength == :required
+      Strength::RequiredStrength
+    elsif strength == :strong
+      Strength::StrongStrength
+    elsif strength == :medium
+      Strength::MediumStrength
+    elsif strength == :weak
+      Strength::WeakStrength
+    else
+      raise ArgumentError, "Unsupported symbolic strength #{strength} " +
+        "(expected one of :required, :strong, :medium, :weak"
+    end
+  end
+
   class Constraint < ConstraintObject
     attr_accessor :strength, :weight
 
@@ -228,18 +243,7 @@ module Cassowary
     end
 
     def enable(strength=:required)
-      if strength == :required
-        self.strength = Strength::RequiredStrength
-      elsif strength == :strong
-        self.strength = Strength::StrongStrength
-      elsif strength == :medium
-        self.strength = Strength::MediumStrength
-      elsif strength == :weak
-        self.strength = Strength::WeakStrength
-      else
-        raise ArgumentError, "Unsupported symbolic strength #{strength} " +
-          "(expected one of :required, :strong, :medium, :weak"
-      end
+      self.strength = Cassowary.symbolic_strength(strength)
       SimplexSolver.instance.add_constraint(self)
       Cassowary::SimplexSolver.instance.solve
     end
