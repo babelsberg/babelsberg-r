@@ -15,6 +15,11 @@ class TestConstraintVariableObject(BaseTopazTest):
     def test_names(self, space):
         space.execute("ConstraintVariable")
 
+    def test_nothing(self, space, capfd):
+        space.execute("always { true }")
+        out, err = capfd.readouterr()
+        assert err.startswith("Warning")
+
     def test_local(self, space):
         w_cassowary, w_z3 = self.execute(
             space,

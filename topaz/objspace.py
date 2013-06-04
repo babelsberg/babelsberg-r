@@ -864,6 +864,13 @@ class ObjectSpace(object):
             return c_var.load_value(self)
 
     def enable_constraint(self, w_constraint, w_strength=None, block=None):
+        if w_constraint is self.w_true:
+            self.send(
+                self.globals.get(self, "$stderr"),
+                "puts",
+                [self.newstr_fromstr("Warning: Constraint expression returned true, ignoring")]
+            )
+            return
         if not self.respond_to(w_constraint, "enable"):
             raise self.error(
                 self.w_TypeError,
