@@ -8,7 +8,7 @@ require "libcassowary"
 class Lead
   attr_reader :voltage, :current
   def initialize
-    # set voltage and current to 0 for now (constraints may change it later)
+    # set voltage and current to 0.0 for now so that they are of type Float (constraints may change it later)
     @voltage = 0.0
     @current = 0.0
   end
@@ -30,19 +30,9 @@ class Resistor < TwoLeadedObject
     super()
     @resistance = resistance
     # Ohm's Law constraint
-    print "INITIALIZING RESISTOR \n\n\n"
-    print "lead1.voltage = " + lead1.voltage.to_s + "\n"
-    print "lead2.voltage = " + lead2.voltage.to_s + "\n"
-    print "lead1.current = " + lead1.current.to_s + "\n"
-    print "lead2.current = " + lead2.current.to_s + "\n"
     # temporarily use a fixed value for the resistance to avoid getting a nonlinear constraint error
     # always { lead1.voltage - lead2.voltage == resistance*lead1.current }
     always { lead1.voltage - lead2.voltage == 100*lead1.current }
-    print "after adding the constraint\n"
-    print "lead1.voltage = " + lead1.voltage.to_s + "\n"
-    print "lead2.voltage = " + lead2.voltage.to_s + "\n"
-    print "lead1.current = " + lead1.current.to_s + "\n"
-    print "lead2.current = " + lead2.current.to_s + "\n"
   end
 end
 
@@ -126,8 +116,7 @@ class TestCircuits(BaseTopazTest):
     def test_ground(self, space):
         w_res = space.execute(CircuitClasses + """
           g = Ground.new
-          return [ g.lead.voltage, g.lead.current]
-""")
+          return [ g.lead.voltage, g.lead.current] """)
         assert self.unwrap(space, w_res) == [0.0, 0.0]
 
     def test_twoleadedobject(self, space):
