@@ -188,6 +188,8 @@ class Interpreter(object):
             frame.push(frame.cells[idx].get(space, frame, idx) or space.w_nil)
 
     def STORE_DEREF(self, space, bytecode, frame, pc, idx):
+        if space.is_constructing_constraint():
+            frame.cells[idx].upgrade_to_closure(space, frame, idx)
         c_var = space.newconstraintvariable(cell=frame.cells[idx])
         if c_var:
             space.suggest_value(c_var, frame.peek())
