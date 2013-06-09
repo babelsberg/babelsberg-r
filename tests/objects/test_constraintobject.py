@@ -664,3 +664,18 @@ class TestConstraintVariableObject(BaseTopazTest):
             """)
         # This results in a RequiredFailure if it doesn't work correctly
         assert [10, 15, 10, 5] == self.unwrap(space, w_ca)
+
+    def test_once(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            a = 10
+            b = 10
+            always { b == a * 2 }
+            once { a == 100 }
+            return a, b, a = 10
+            """,
+            "libcassowary", "libz3")
+        # raises a RequiredFailure if once does not disable the block
+        assert self.unwrap(space, w_ca) == [100, 200, 10]
+        assert self.unwrap(space, w_z3) == [100, 200, 10]

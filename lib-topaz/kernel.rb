@@ -1,4 +1,9 @@
 module Kernel
+  def once(*args, &block)
+    constraint = always(*args, &block)
+    constraint.disable
+  end
+
   def puts(*args)
     $stdout.puts(*args)
   end
