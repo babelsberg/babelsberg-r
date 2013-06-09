@@ -103,7 +103,9 @@ end
 
 class Array
   def for_constraint(name)
-    ArrayConstraintVariable.new(self)
+    if self.all? { |e| e.is_a? Numeric }
+      ArrayConstraintVariable.new(self)
+    end
   end
 
   def assign_constraint_value(val)

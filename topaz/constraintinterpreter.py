@@ -93,12 +93,14 @@ class ConstrainedVariable(W_Root):
         w_value = self.load_value(space)
         if space.respond_to(w_value, "for_constraint"):
             with space.normal_execution():
-                self.w_external_variable = space.send(
+                w_external_variable = space.send(
                     w_value,
                     "for_constraint",
                     [self.get_name(space)]
                 )
-                space.set_instance_var(self.w_external_variable, self.CONSTRAINT_IVAR, self)
+                if w_external_variable is not space.w_nil:
+                    self.w_external_variable = w_external_variable
+                    space.set_instance_var(self.w_external_variable, self.CONSTRAINT_IVAR, self)
 
     def __del__(self):
         # TODO: remove external variable from solver

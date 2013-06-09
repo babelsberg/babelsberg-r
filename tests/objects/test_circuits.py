@@ -63,12 +63,12 @@ class Wire < TwoLeadedObject
 end
 
 def connect(leads)
+  return if leads.empty?
   # all voltages should be equal
   leads[1..-1].each { |a| always { a.voltage == leads[0].voltage } }
   # sum of currents has to be 0
-  first_current = __constrain__ { leads[0].current }
-  sum = leads[1..-1].inject(first_current) do |memo, lead|
-    memo + __constrain__ { lead.current }
+  sum = leads.inject(0) do |memo, lead|
+    __constrain__ { lead.current } + memo
   end
   always { sum == 0 }
 end
