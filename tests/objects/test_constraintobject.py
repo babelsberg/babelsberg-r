@@ -609,18 +609,6 @@ class TestConstraintVariableObject(BaseTopazTest):
         assert z3[0][0] + z3[1][0] == z3[2][0]
         assert z3[0][1] + z3[1][1] == z3[2][1]
 
-    def test_simple_array(self, space):
-        w_ca, w_z3 = self.execute(
-            space,
-            """
-            ary = [1, 2, 3]
-            always { ary[0] == 10 }
-            return ary[0]
-            """,
-            "libcassowary", "libz3")
-        assert self.unwrap(space, w_ca) == 10
-        assert self.unwrap(space, w_z3) == 10
-
     def test_readonly(self, space):
         w_ca, w_z3 = self.execute(
             space,
