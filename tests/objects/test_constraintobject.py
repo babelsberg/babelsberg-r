@@ -646,3 +646,21 @@ class TestConstraintVariableObject(BaseTopazTest):
         # This results in a RequiredFailure if it doesn't work correctly
         assert [10, 15, 10, 5] == self.unwrap(space, w_ca)
         assert [10, 15, 10, 5] == self.unwrap(space, w_z3)
+
+    def test_changing_strength(self, space):
+        w_ca = space.execute("""
+            require "libcassowary"
+            res = []
+            a = 0
+            b = 0
+            c = always { a == 10 && b == 15 }
+            res << a << b
+            c.strength = :weak
+            b = 10
+            res << b
+            a = 5
+            res << a
+            return res
+            """)
+        # This results in a RequiredFailure if it doesn't work correctly
+        assert [10, 15, 10, 5] == self.unwrap(space, w_ca)

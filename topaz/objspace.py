@@ -877,7 +877,12 @@ class ObjectSpace(object):
                 [self.newstr_fromstr("Warning: Constraint expression returned true, ignoring")]
             )
             return
-        if not self.respond_to(w_constraint, "enable"):
+        elif w_constraint is self.w_false or w_constraint is self.w_nil:
+            raise self.error(
+                self.w_ArgumentError,
+                "constraint block returned false-y, cannot assert that (did you `require' your solver?)"
+            )
+        elif not self.respond_to(w_constraint, "enable"):
             raise self.error(
                 self.w_TypeError,
                 ("constraint block did an object (%s:%s) that doesn't respond to #enable " +
