@@ -679,3 +679,23 @@ class TestConstraintVariableObject(BaseTopazTest):
         # raises a RequiredFailure if once does not disable the block
         assert self.unwrap(space, w_ca) == [100, 200, 10]
         assert self.unwrap(space, w_z3) == [100, 200, 10]
+
+    def test_during(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            $res = []
+            a = 10
+            b = 200
+            always { a >= 100 && b == a * 2 }.during do
+              $res << a << b
+              a = 200
+              $res << a << b
+            end
+            # now the constraint should have been disabled
+            a = 10
+            return $res << a << b
+            """,
+            "libcassowary", "libz3")
+        assert self.unwrap(space, w_ca) == [100, 200, 200, 400, 10, 400]
+        assert self.unwrap(space, w_z3) == [100, 200, 200, 400, 10, 400]
