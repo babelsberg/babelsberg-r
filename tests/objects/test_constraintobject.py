@@ -625,3 +625,24 @@ class TestConstraintVariableObject(BaseTopazTest):
             "libcassowary", "libz3")
         assert [10, 0, 15, 5] == self.unwrap(space, w_ca)
         assert [10, 0, 15, 5] == self.unwrap(space, w_z3)
+
+    def test_multiple_constraints_disable(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            res = []
+            a = 0
+            b = 0
+            c = always { a == 10 && b == 15 }
+            res << a << b
+            c.disable
+            b = 10
+            res << b
+            a = 5
+            res << a
+            return res
+            """,
+            "libcassowary", "libz3")
+        # This results in a RequiredFailure if it doesn't work correctly
+        assert [10, 15, 10, 5] == self.unwrap(space, w_ca)
+        assert [10, 15, 10, 5] == self.unwrap(space, w_z3)

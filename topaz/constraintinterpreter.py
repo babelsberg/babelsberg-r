@@ -48,8 +48,7 @@ class ConstraintInterpreter(Interpreter):
 
     def JUMP_AND(self, space, bytecode, frame, pc, target_pc):
         w_lhs = frame.peek()
-        if space.is_kind_of(w_lhs, space.w_constraint):
-            # XXX: does this need strength?
+        if space.is_kind_of(w_lhs, space.w_constraintobject):
             space.enable_constraint(w_lhs)
             frame.pop()
             return pc
@@ -61,7 +60,7 @@ class ConstraintInterpreter(Interpreter):
         w_receiver = frame.pop()
         w_res = None
         method = space.symbol_w(bytecode.consts_w[meth_idx])
-        if space.is_kind_of(w_receiver, space.w_constraint):
+        if space.is_kind_of(w_receiver, space.w_constraintobject):
             with space.normal_execution():
                 w_res = space.send(w_receiver, method, args_w)
         else:

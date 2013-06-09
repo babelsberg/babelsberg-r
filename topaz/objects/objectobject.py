@@ -158,7 +158,7 @@ class W_RootObject(W_BaseObject):
         arg_w = [] if w_strength is None else [w_strength]
         w_constraint = space.send(self, "__constrain__", arg_w, block=block)
         space.enable_constraint(w_constraint, w_strength=w_strength, block=block)
-        return w_constraint
+        return space.newconstraintobject(w_strength, block)
 
 
 class W_Object(W_RootObject):
