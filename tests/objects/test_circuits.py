@@ -41,7 +41,7 @@ class Battery < TwoLeadedObject
   def initialize(supply_voltage)
     super()
     @supply_voltage = supply_voltage
-    always { lead1.voltage - lead2.voltage == @supply_voltage.stay(:required) }
+    always { lead1.voltage - lead2.voltage == @supply_voltage.? }
   end
 end
 
@@ -63,45 +63,15 @@ class Wire < TwoLeadedObject
 end
 
 def connect(leads)
-  # all voltages should be equal, and the sum of the currents should be 0
-  case leads.length
-  when 0
-    true
-  when 1
-    always { leads[0].current == 0 }
-  when 2
-    always { leads[0].voltage == leads[1].voltage }
-    always { leads[0].current + leads[1].current == 0 }
-  when 3
-    always { leads[0].voltage == leads[1].voltage }
-    always { leads[0].voltage == leads[2].voltage }
-    always { leads[0].current + leads[1].current + leads[2].current == 0 }
-  when 4
-    always { leads[0].voltage == leads[1].voltage }
-    always { leads[0].voltage == leads[2].voltage }
-    always { leads[0].voltage == leads[3].voltage }
-    always { leads[0].current + leads[1].current + leads[2].current + leads[3].current == 0 }
-  else
-    error "too many leads"
+  # all voltages should be equal
+  leads[1..-1].each { |a| always { a.voltage == leads[0].voltage } }
+  # sum of currents has to be 0
+  first_current = __constrain__ { leads[0].current }
+  sum = leads[1..-1].inject(first_current) do |memo, lead|
+    memo + __constrain__ { lead.current }
   end
+  always { sum == 0 }
 end
-
-# version with arrays ....
-# def connect(leads)
-#   # all voltages should be equal
-#   leads[1..-1].each { |a| always { a.voltage == leads[0].voltage } }
-#   always { currents_sum(leads) == 0 }
-# end
-
-# def currents_sum(leads)
-#   if leads.empty?
-#     0
-#   else
-#     ans = 0
-#     always { ans == leads[0].current + currents_sum(leads[1..-1]) }
-#     ans
-#   end
-# end
 
 """
 
