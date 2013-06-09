@@ -699,3 +699,48 @@ class TestConstraintVariableObject(BaseTopazTest):
             "libcassowary", "libz3")
         assert self.unwrap(space, w_ca) == [100, 200, 200, 400, 10, 400]
         assert self.unwrap(space, w_z3) == [100, 200, 200, 400, 10, 400]
+
+    # from Cassowary tests test_edit1
+    def test_edit_var_stream(self, space):
+        w_ca = space.execute("""
+        require "libcassowary"
+        $res = []
+        $top_self = self
+        $top_self.singleton_class.send(:attr_reader, :x, :y)
+
+        class Stream
+          def initialize(ary)
+            @ary = ary
+          end
+
+          def next
+            ($res << $top_self.x << $top_self.y) if @ary.size > 0
+            @ary.pop
+          end
+        end
+
+        @x = 20
+        @y = 30
+        always { @x >= 10 }
+        always { @x <= 100 }
+        always { @x == @y * 2 }
+        $res << @x << @y
+
+        edit_stream = Stream.new([25, 80, 35])
+        edit(edit_stream) { @y }
+
+        $res << @x << @y
+
+        edit_stream = Stream.new([44])
+        edit(edit_stream) { @x }
+
+        return $res
+        """)
+        assert self.unwrap(space, w_ca) == [
+            20, 10,
+            70, 35,
+            100, 50,
+            50, 25,
+            50, 25, # after edit, variables keep their last values
+            44, 22
+        ]

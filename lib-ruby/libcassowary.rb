@@ -1426,4 +1426,30 @@ class Numeric
   end
 end
 
+class Object
+  def edit(stream, strength = Cassowary::Strength::StrongStrength, &block)
+    unless stream.respond_to? :next
+      raise ArgumentError, "#{stream} does not respond to `next'"
+    end
+    unless block
+      raise(ArgumentError, "No variable binding given")
+    end
+    vars = [*__constrain__(&block)]
+    unless vars.all? { |o| o.is_a? Cassowary::Variable }
+      raise ArgumentError, "Block did not return a Cassowary::Variable or array of Cassowary::Variables, cannot create edit constraint"
+    end
+    Cassowary::SimplexSolver.instance.tap do |solver|
+      vars.each do |var|
+        solver.add_edit_var var, strength
+      end
+      solver.begin_edit
+      while next_vals = stream.next
+        solver.resolve [*next_vals]
+        p "Suggested #{next_vals}, got #{vars.collect(&:value)}"
+      end
+      solver.end_edit
+    end
+  end
+end
+
 puts "Cassowary constraint solver loaded."
