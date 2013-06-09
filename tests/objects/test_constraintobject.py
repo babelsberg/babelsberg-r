@@ -15,6 +15,11 @@ class TestConstraintVariableObject(BaseTopazTest):
     def test_names(self, space):
         space.execute("ConstraintVariable")
 
+    def test_nothing(self, space, capfd):
+        space.execute("always { true }")
+        out, err = capfd.readouterr()
+        assert err.startswith("Warning")
+
     def test_local(self, space):
         w_cassowary, w_z3 = self.execute(
             space,
@@ -163,10 +168,6 @@ class TestConstraintVariableObject(BaseTopazTest):
     def test_errors(self, space):
         with self.raises(space, "ArgumentError"):
             space.execute("always")
-        with self.raises(space, "TypeError"):
-            space.execute("always { true }")
-        with self.raises(space, "TypeError"):
-            space.execute("always { true }")
 
     def test_preferences(self, space):
         w_res = space.execute("""
@@ -619,3 +620,139 @@ class TestConstraintVariableObject(BaseTopazTest):
             "libcassowary", "libz3")
         assert self.unwrap(space, w_ca) == 10
         assert self.unwrap(space, w_z3) == 10
+
+    def test_readonly(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            res = []
+            a = 10
+            b = 20
+            always { a.? == b + 10 }
+            res << a << b
+            a = 15
+            res << a << b
+            return res
+            """,
+            "libcassowary", "libz3")
+        assert [10, 0, 15, 5] == self.unwrap(space, w_ca)
+        assert [10, 0, 15, 5] == self.unwrap(space, w_z3)
+
+    def test_multiple_constraints_disable(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            res = []
+            a = 0
+            b = 0
+            c = always { a == 10 && b == 15 }
+            res << a << b
+            c.disable
+            b = 10
+            res << b
+            a = 5
+            res << a
+            return res
+            """,
+            "libcassowary", "libz3")
+        # This results in a RequiredFailure if it doesn't work correctly
+        assert [10, 15, 10, 5] == self.unwrap(space, w_ca)
+        assert [10, 15, 10, 5] == self.unwrap(space, w_z3)
+
+    def test_changing_strength(self, space):
+        w_ca = space.execute("""
+            require "libcassowary"
+            res = []
+            a = 0
+            b = 0
+            c = always { a == 10 && b == 15 }
+            res << a << b
+            c.strength = :weak
+            b = 10
+            res << b
+            a = 5
+            res << a
+            return res
+            """)
+        # This results in a RequiredFailure if it doesn't work correctly
+        assert [10, 15, 10, 5] == self.unwrap(space, w_ca)
+
+    def test_once(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            a = 10
+            b = 10
+            always { b == a * 2 }
+            once { a == 100 }
+            return a, b, a = 10
+            """,
+            "libcassowary", "libz3")
+        # raises a RequiredFailure if once does not disable the block
+        assert self.unwrap(space, w_ca) == [100, 200, 10]
+        assert self.unwrap(space, w_z3) == [100, 200, 10]
+
+    def test_during(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            $res = []
+            a = 10
+            b = 200
+            always { a >= 100 && b == a * 2 }.during do
+              $res << a << b
+              a = 200
+              $res << a << b
+            end
+            # now the constraint should have been disabled
+            a = 10
+            return $res << a << b
+            """,
+            "libcassowary", "libz3")
+        assert self.unwrap(space, w_ca) == [100, 200, 200, 400, 10, 400]
+        assert self.unwrap(space, w_z3) == [100, 200, 200, 400, 10, 400]
+
+    # from Cassowary tests test_edit1
+    def test_edit_var_stream(self, space):
+        w_ca = space.execute("""
+        require "libcassowary"
+        $res = []
+        $top_self = self
+        $top_self.singleton_class.send(:attr_reader, :x, :y)
+
+        class Stream
+          def initialize(ary)
+            @ary = ary
+          end
+
+          def next
+            ($res << $top_self.x << $top_self.y) if @ary.size > 0
+            @ary.pop
+          end
+        end
+
+        @x = 20
+        @y = 30
+        always { @x >= 10 }
+        always { @x <= 100 }
+        always { @x == @y * 2 }
+        $res << @x << @y
+
+        edit_stream = Stream.new([25, 80, 35])
+        edit(edit_stream) { @y }
+
+        $res << @x << @y
+
+        edit_stream = Stream.new([44])
+        edit(edit_stream) { @x }
+
+        return $res
+        """)
+        assert self.unwrap(space, w_ca) == [
+            20, 10,
+            70, 35,
+            100, 50,
+            50, 25,
+            50, 25, # after edit, variables keep their last values
+            44, 22
+        ]

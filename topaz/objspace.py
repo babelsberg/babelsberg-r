@@ -39,7 +39,7 @@ from topaz.objects.boolobject import W_TrueObject, W_FalseObject
 from topaz.objects.classobject import W_ClassObject
 from topaz.objects.codeobject import W_CodeObject
 
-from topaz.objects.constraintobject import W_ConstraintObject
+from topaz.objects.constraintobject import W_ConstraintObject, W_ConstraintMarkerObject
 from topaz.objects.z3object import W_Z3Object
 
 from topaz.objects.dirobject import W_DirObject
@@ -162,6 +162,7 @@ class ObjectSpace(object):
         self.w_ZeroDivisionError = self.getclassfor(W_ZeroDivisionError)
         self.w_kernel = self.getmoduleobject(Kernel.moduledef)
 
+        self.w_constraintobject = self.getclassfor(W_ConstraintMarkerObject)
         self.w_constraint = self.getclassfor(W_ConstraintObject)
         self.w_z3 = self.getclassfor(W_Z3Object)
 
@@ -186,6 +187,7 @@ class ObjectSpace(object):
             self.w_kernel, self.w_topaz,
 
             self.w_constraint,
+            self.w_constraintobject,
             self.w_z3,
 
             self.getclassfor(W_NilObject),
@@ -876,7 +878,23 @@ class ObjectSpace(object):
             return c_var.load_value(self)
 
     def enable_constraint(self, w_constraint, w_strength=None, block=None):
-        if not self.respond_to(w_constraint, "enable"):
+        if w_strength is None:
+            w_strength = self.current_constraint_strength()
+        if block is None:
+            block = self.current_constraint_block()
+        if w_constraint is self.w_true:
+            self.send(
+                self.globals.get(self, "$stderr"),
+                "puts",
+                [self.newstr_fromstr("Warning: Constraint expression returned true, ignoring")]
+            )
+            return
+        elif w_constraint is self.w_false or w_constraint is self.w_nil:
+            raise self.error(
+                self.w_ArgumentError,
+                "constraint block returned false-y, cannot assert that (did you `require' your solver?)"
+            )
+        elif not self.respond_to(w_constraint, "enable"):
             raise self.error(
                 self.w_TypeError,
                 ("constraint block did an object (%s:%s) that doesn't respond to #enable " +
@@ -886,7 +904,7 @@ class ObjectSpace(object):
                  )
             )
         if block:
-            block.add_constraint(w_constraint) # XXX: TODO: support more than one constraint per constraint block
+            block.add_constraint(w_constraint)
         arg_w = [] if w_strength is None else [w_strength]
         with self.normal_execution():
             self.send(w_constraint, "enable", arg_w) # XXX: TODO: propagate strength properly
@@ -909,10 +927,17 @@ class ObjectSpace(object):
         else:
             return False
 
+    def newconstraintobject(self, w_strength, block):
+        return W_ConstraintObject(self, block.get_constraints(), w_strength, block)
+
     def current_constraint_block(self):
+        if not self.constraint_block_stack:
+            return None
         return self.constraint_block_stack[-1]
 
     def current_constraint_strength(self):
+        if not self.constraint_strength_stack:
+            return None
         return self.constraint_strength_stack[-1]
 
     def is_executing_normally(self):

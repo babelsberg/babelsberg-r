@@ -48,8 +48,7 @@ class ConstraintInterpreter(Interpreter):
 
     def JUMP_AND(self, space, bytecode, frame, pc, target_pc):
         w_lhs = frame.peek()
-        if space.is_kind_of(w_lhs, space.w_constraint):
-            # XXX: does this need strength?
+        if space.is_kind_of(w_lhs, space.w_constraintobject):
             space.enable_constraint(w_lhs)
             frame.pop()
             return pc
@@ -61,7 +60,7 @@ class ConstraintInterpreter(Interpreter):
         w_receiver = frame.pop()
         w_res = None
         method = space.symbol_w(bytecode.consts_w[meth_idx])
-        if space.is_kind_of(w_receiver, space.w_constraint):
+        if space.is_kind_of(w_receiver, space.w_constraintobject):
             with space.normal_execution():
                 w_res = space.send(w_receiver, method, args_w)
         else:
@@ -70,6 +69,7 @@ class ConstraintInterpreter(Interpreter):
 
 
 class ConstrainedVariable(W_Root):
+    CONSTRAINT_IVAR = "__constrained_variable__"
     _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
 
     def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
@@ -81,6 +81,12 @@ class ConstrainedVariable(W_Root):
         self.idx = idx
         self.w_key = w_key
         self.constraint_blocks = []
+        self.w_equality_constraint = None
+
+        if cell:
+            from topaz.closure import ClosureCell
+            assert isinstance(cell, ClosureCell)
+
         if not cell and not (w_owner and (ivar or cvar or idx >= 0 or w_key)):
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
 
@@ -92,10 +98,27 @@ class ConstrainedVariable(W_Root):
                     "for_constraint",
                     [self.get_name(space)]
                 )
+                space.set_instance_var(self.w_external_variable, self.CONSTRAINT_IVAR, self)
 
     def __del__(self):
         # TODO: remove external variable from solver
         pass
+
+    def make_readonly(self, space):
+        if not self.is_readonly():
+            self.w_equality_constraint = space.send(self.w_external_variable, "==", [self.get_i(space)])
+            space.send(self.w_equality_constraint, "enable")
+
+    def make_writable(self, space):
+        if not self.is_writable():
+            space.send(self.w_equality_constraint, "disable")
+            self.w_equality_constraint = None
+
+    def is_readonly(self):
+        return not self.is_writable()
+
+    def is_writable(self):
+        return self.is_solveable() and self.w_equality_constraint is None
 
     def is_solveable(self):
         return self.w_external_variable is not None
@@ -132,19 +155,24 @@ class ConstrainedVariable(W_Root):
         if self.cell:
             storagestr = "local"
         elif self.ivar is not None:
-            storagestr = "ivar"
+            storagestr = "ivar(%s)" % self.ivar
         elif self.cvar is not None:
-            storagestr = "cvar"
+            storagestr = "cvar(%s)" % self.cvar
         elif self.idx > 0:
-            storagestr = "aryitem"
+            storagestr = "item(%d)" % self.idx
         else:
             storagestr = "unknown"
         return space.newstr_fromstr("%s-%s" % (storagestr, inspectstr))
 
     def suggest_value(self, space, w_value):
         assert self.w_external_variable
+        readonly = self.is_readonly()
+        if readonly:
+            self.make_writable(space)
         with space.constraint_execution():
             space.send(self.w_external_variable, "suggest_value", [w_value])
+        if readonly:
+            self.make_readonly(space)
 
     def set_i(self, space):
         if self.w_external_variable is not None:

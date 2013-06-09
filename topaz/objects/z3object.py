@@ -5,7 +5,7 @@ from rpython.rlib.rfloat import float_as_rbigint_ratio
 from topaz.coerce import Coerce
 from topaz.module import ClassDef
 from topaz.objects.objectobject import W_RootObject, W_Object
-from topaz.objects.constraintobject import W_ConstraintObject
+from topaz.objects.constraintobject import W_ConstraintMarkerObject
 from topaz.utils import rz3
 
 
@@ -49,7 +49,7 @@ class W_Z3Object(W_RootObject):
         # XXX: This should somehow also set the initial value
         sym = rz3.z3_mk_int_symbol(ctx, self.next_id)
         self.next_id += 1
-        return W_Z3Ptr(self, rz3.z3_mk_const(ctx, sym, ty))
+        return W_Z3Ptr(space, self, rz3.z3_mk_const(ctx, sym, ty))
 
     def assert_ptr(self, space, w_pointer):
         if not isinstance(w_pointer, W_Z3Ptr):
@@ -91,7 +91,7 @@ class W_Z3Object(W_RootObject):
                     space.send(w_value, "inspect")
                 )
             )
-        return W_Z3Ptr(self, rz3.z3_mk_real(self.ctx, int_num, int_den))
+        return W_Z3Ptr(space, self, rz3.z3_mk_real(self.ctx, int_num, int_den))
 
     @classdef.method("make_int_variable")
     def make_real_variable(self, space, w_value):
@@ -103,7 +103,7 @@ class W_Z3Object(W_RootObject):
     def make_real(self, space, w_value):
         value = space.int_w(space.convert_type(w_value, space.w_fixnum, "to_int"))
         ty = rz3.z3_mk_int_sort(self.ctx)
-        return W_Z3Ptr(self, rz3.z3_mk_int(self.ctx, value, ty))
+        return W_Z3Ptr(space, self, rz3.z3_mk_int(self.ctx, value, ty))
 
     @classdef.method("make_bool_variable")
     def make_bool_variable(self, space, w_value):
@@ -115,9 +115,9 @@ class W_Z3Object(W_RootObject):
     @classdef.method("make_bool", value="bool")
     def make_bool(self, space, value):
         if value:
-            return W_Z3Ptr(self, rz3.z3_mk_true(self.ctx))
+            return W_Z3Ptr(space, self, rz3.z3_mk_true(self.ctx))
         else:
-            return W_Z3Ptr(self, rz3.z3_mk_false(self.ctx))
+            return W_Z3Ptr(space, self, rz3.z3_mk_false(self.ctx))
 
     @classdef.method("add_constraint")
     def method_enable(self, space, w_other):
@@ -176,11 +176,12 @@ class W_Z3Object(W_RootObject):
                 raise NotImplementedError("Ast type %d" % kind)
 
 
-class W_Z3Ptr(W_RootObject):
+class W_Z3Ptr(W_Object):
     _immutable_fields_ = ["w_z3", "pointer"]
-    classdef = ClassDef("Z3Pointer", W_ConstraintObject.classdef)
+    classdef = ClassDef("Z3Pointer", W_ConstraintMarkerObject.classdef)
 
-    def __init__(self, w_z3, pointer):
+    def __init__(self, space, w_z3, pointer):
+        W_Object.__init__(self, space, space.getclassfor(W_Z3Ptr))
         self.w_z3 = w_z3
         self.pointer = pointer
         rz3.z3_ast_inc_ref(self.w_z3.ctx, self.pointer)
@@ -191,12 +192,6 @@ class W_Z3Ptr(W_RootObject):
     def getsingletonclass(self, space):
         raise space.error(space.w_TypeError, "can't define singleton")
 
-    def find_instance_var(self, space, name):
-        return space.w_nil
-
-    def set_instance_var(self, space, name, w_value):
-        raise space.error(space.w_TypeError, "can't add instance variables")
-
     def getdecl(self, ctx):
         decl = rz3.z3_get_app_decl(ctx, self.pointer)
         err = rz3.z3_get_error_code(ctx)
@@ -205,10 +200,6 @@ class W_Z3Ptr(W_RootObject):
         return decl
 
     classdef.undefine_allocator()
-
-    @classdef.method("initialize")
-    def method_initialize(self, space, args_w):
-        return self
 
     def coerce_constant_arg(self, space, w_arg):
         w_z3ptr_cls = space.getclassfor(W_Z3Ptr)
@@ -237,7 +228,7 @@ class W_Z3Ptr(W_RootObject):
         def method(self, space, w_other):
             other = self.coerce_constant_arg(space, w_other)
             ast = func(self.w_z3.ctx, self.pointer, other)
-            return W_Z3Ptr(self.w_z3, ast)
+            return W_Z3Ptr(space, self.w_z3, ast)
         method.__name__ = "method_%s" % func.__name__
         return method
     method_lt = new_binop(classdef, "<", rz3.z3_mk_lt)

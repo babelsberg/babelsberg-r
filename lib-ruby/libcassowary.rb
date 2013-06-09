@@ -185,6 +185,11 @@ module Cassowary
       "#{super}[#{value.inspect}]"
     end
 
+    def stay(strength = :strong)
+      Cassowary::SimplexSolver.instance.add_stay(self, Cassowary.symbolic_strength(strength))
+      self
+    end
+
     def suggest_value(v)
       # SimplexSolver.instance.add_edit_var(self, Strength::StrongStrength)
       # SimplexSolver.instance.begin_edit
@@ -199,6 +204,21 @@ module Cassowary
 end
 
 module Cassowary
+  def self.symbolic_strength(strength)
+    if strength == :required
+      Strength::RequiredStrength
+    elsif strength == :strong
+      Strength::StrongStrength
+    elsif strength == :medium
+      Strength::MediumStrength
+    elsif strength == :weak
+      Strength::WeakStrength
+    else
+      raise ArgumentError, "Unsupported symbolic strength #{strength} " +
+        "(expected one of :required, :strong, :medium, :weak"
+    end
+  end
+
   class Constraint < ConstraintObject
     attr_accessor :strength, :weight
 
@@ -223,18 +243,7 @@ module Cassowary
     end
 
     def enable(strength=:required)
-      if strength == :required
-        self.strength = Strength::RequiredStrength
-      elsif strength == :strong
-        self.strength = Strength::StrongStrength
-      elsif strength == :medium
-        self.strength = Strength::MediumStrength
-      elsif strength == :weak
-        self.strength = Strength::WeakStrength
-      else
-        raise ArgumentError, "Unsupported symbolic strength #{strength} " +
-          "(expected one of :required, :strong, :medium, :weak"
-      end
+      self.strength = Cassowary.symbolic_strength(strength)
       SimplexSolver.instance.add_constraint(self)
       Cassowary::SimplexSolver.instance.solve
     end
@@ -1414,6 +1423,32 @@ class Numeric
     v = Cassowary::Variable.new(name: name, value: self)
     Cassowary::SimplexSolver.instance.add_stay(v)
     v
+  end
+end
+
+class Object
+  def edit(stream, strength = Cassowary::Strength::StrongStrength, &block)
+    unless stream.respond_to? :next
+      raise ArgumentError, "#{stream} does not respond to `next'"
+    end
+    unless block
+      raise(ArgumentError, "No variable binding given")
+    end
+    vars = [*__constrain__(&block)]
+    unless vars.all? { |o| o.is_a? Cassowary::Variable }
+      raise ArgumentError, "Block did not return a Cassowary::Variable or array of Cassowary::Variables, cannot create edit constraint"
+    end
+    Cassowary::SimplexSolver.instance.tap do |solver|
+      vars.each do |var|
+        solver.add_edit_var var, strength
+      end
+      solver.begin_edit
+      while next_vals = stream.next
+        solver.resolve [*next_vals]
+        p "Suggested #{next_vals}, got #{vars.collect(&:value)}"
+      end
+      solver.end_edit
+    end
   end
 end
 
