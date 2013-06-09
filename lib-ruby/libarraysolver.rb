@@ -33,6 +33,10 @@ class ArrayConstraintVariable < ConstraintObject
     @constraint_variables[0] + self[1..-1].sum
   end
 
+  def __size
+    @ary.size
+  end
+
   def length
     @length = @ary.size unless @length
     __constrain__ { @length }
@@ -43,6 +47,10 @@ class ArrayConstraintVariable < ConstraintObject
     idx, l = args
     if idx.is_a? Numeric and (l.nil? or l == 1)
       idx = idx + @ary.size if idx < 0
+      if idx >= @ary.size
+        a = 0
+        @constraint_variables[idx] = __constrain__ { a }
+      end
       @constraint_variables[idx]
     else
       var = ArrayConstraintVariable.new(@ary[*args])
@@ -53,11 +61,15 @@ class ArrayConstraintVariable < ConstraintObject
 
   def ==(other)
     return false unless other.is_a?(Array) || other.is_a?(self.class)
-    equality_constraints = [length == other.length]
-    @constraint_variables.each_with_index do |cv, idx|
-      equality_constraints << (cv == other[idx])
+    equality_constraints = [self.length == other.length]
+    os = other.is_a?(self.class) ? other.__size : other.size
+
+    (0...(@ary.size > os ? @ary.size : os)).each do |idx|
+      equality_constraints << (self[idx] == (other[idx] || 0))
     end
-    RangeConstraint.new(equality_constraints)
+    r = RangeConstraint.new(equality_constraints)
+    r.enable
+    r
   end
 
   # VM interface
@@ -75,7 +87,7 @@ class ArrayConstraintVariable < ConstraintObject
     end
 
     @constraint_variables.each_with_index do |cv, idx|
-      result[idx] = cv.value if cv.value
+      result[idx] = cv.value if cv && cv.value
     end
     result
   end
@@ -95,7 +107,6 @@ class Array
   end
 
   def assign_constraint_value(val)
-    p "Replacing array with #{val.inspect}"
     replace(val)
   end
 end
