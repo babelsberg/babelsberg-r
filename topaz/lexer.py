@@ -863,6 +863,13 @@ class Lexer(object):
             self.add(ch)
             self.state = self.EXPR_VALUE
             yield self.emit("LITERAL_QUESTION_MARK")
+            return
+        if self.state == self.EXPR_DOT and not self.current_value:
+            # added for Loci readonly variables
+            ch2 = self.peek()
+            if ch2.isspace() or ch2 == self.EOF:
+                self.add(ch)
+                yield self.emit_identifier(False)
         else:
             ch2 = self.read()
             if ch2.isspace():

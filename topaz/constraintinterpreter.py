@@ -70,6 +70,7 @@ class ConstraintInterpreter(Interpreter):
 
 
 class ConstrainedVariable(W_Root):
+    CONSTRAINT_IVAR = "__constrained_variable__"
     _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
 
     def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None):
@@ -79,6 +80,7 @@ class ConstrainedVariable(W_Root):
         self.ivar = None
         self.cvar = None
         self.constraint_blocks = []
+        self.w_equality_constraint = None
         if cell:
             from topaz.closure import ClosureCell
             assert isinstance(cell, ClosureCell)
@@ -100,10 +102,27 @@ class ConstrainedVariable(W_Root):
                     "for_constraint",
                     [self.get_name(space)]
                 )
+                space.set_instance_var(self.w_external_variable, self.CONSTRAINT_IVAR, self)
 
     def __del__(self):
         # TODO: remove external variable from solver
         pass
+
+    def make_readonly(self, space):
+        if not self.is_readonly():
+            self.w_equality_constraint = space.send(self.w_external_variable, "==", [self.get_i(space)])
+            space.send(self.w_equality_constraint, "enable")
+
+    def make_writable(self, space):
+        if not self.is_writable():
+            space.send(self.w_equality_constraint, "disable")
+            self.w_equality_constraint = None
+
+    def is_readonly(self):
+        return not self.is_writable()
+
+    def is_writable(self):
+        return self.is_solveable() and self.w_equality_constraint is None
 
     def is_solveable(self):
         return self.w_external_variable is not None
@@ -145,8 +164,13 @@ class ConstrainedVariable(W_Root):
 
     def suggest_value(self, space, w_value):
         assert self.w_external_variable
+        readonly = self.is_readonly()
+        if readonly:
+            self.make_writable(space)
         with space.constraint_execution():
             space.send(self.w_external_variable, "suggest_value", [w_value])
+        if readonly:
+            self.make_readonly(space)
 
     def set_i(self, space):
         if self.w_external_variable is not None:

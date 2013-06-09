@@ -608,3 +608,20 @@ class TestConstraintVariableObject(BaseTopazTest):
 
         assert z3[0][0] + z3[1][0] == z3[2][0]
         assert z3[0][1] + z3[1][1] == z3[2][1]
+
+    def test_readonly(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            res = []
+            a = 10
+            b = 20
+            always { a.? == b + 10 }
+            res << a << b
+            a = 15
+            res << a << b
+            return res
+            """,
+            "libcassowary", "libz3")
+        assert [10, 0, 15, 5] == self.unwrap(space, w_ca)
+        assert [10, 0, 15, 5] == self.unwrap(space, w_z3)

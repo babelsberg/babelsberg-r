@@ -138,6 +138,17 @@ class W_RootObject(W_BaseObject):
         with space.constraint_construction(block, w_strength):
             return space.invoke_block(block, [])
 
+    @classdef.method("?")
+    def method_readonly(self, space, block, w_strength=None):
+        from topaz.constraintinterpreter import ConstrainedVariable
+        w_res = space.find_instance_var(self, ConstrainedVariable.CONSTRAINT_IVAR)
+        if w_res is not space.w_nil:
+            assert isinstance(w_res, ConstrainedVariable)
+            w_res.make_readonly(space)
+        else:
+            raise space.error(space.w_SyntaxError, "unexpected '?'")
+        return self
+
     @classdef.method("always")
     def method_always(self, space, w_strength=None, block=None):
         if block is None:
