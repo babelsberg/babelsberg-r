@@ -701,6 +701,7 @@ class TestConstraintVariableObject(BaseTopazTest):
         assert self.unwrap(space, w_z3) == [100, 200, 200, 400, 10, 400]
 
     # from Cassowary tests test_edit1
+    @py.test.mark.xfail
     def test_edit_var_stream(self, space):
         w_ca = space.execute("""
         require "libcassowary"

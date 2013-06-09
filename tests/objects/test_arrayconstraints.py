@@ -75,6 +75,7 @@ class TestArrayConstraints(BaseTopazTest):
         assert self.unwrap(space, w_ca)[0] == self.unwrap(space, w_ca)[1]
         assert self.unwrap(space, w_z3)[0] == self.unwrap(space, w_z3)[1]
 
+    @py.test.mark.xfail
     def test_complex_equality(self, space):
         w_ca, w_z3 = self.execute(
             space,
