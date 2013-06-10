@@ -44,7 +44,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
 
     @classdef.method("solver_constraints")
     def method_solver_constraints(self, space):
-        return space.newarray(self.constraints_w)
+        return space.newarray(self.constraints_w[:])
 
     @classdef.method("constraint_block")
     def method_constraint_block(self, space):
