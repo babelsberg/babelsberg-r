@@ -792,8 +792,8 @@ module Cassowary
       edit_vars.each_with_index do |v, idx|
         if v == var
           new_edit_constants[idx] = val
+          return self
         end
-        return self
       end
       raise InternalError, "variable not currently being edited"
     end
