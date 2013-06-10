@@ -11,8 +11,8 @@ from topaz.utils.cache import Cache
 class W_ConstraintMarkerObject(W_Object):
     classdef = ClassDef("ConstraintObject", W_Object.classdef)
 
+
 class W_ConstraintObject(W_ConstraintMarkerObject):
-    _immutable_fields_ = ["constraints_w[*]"]
     classdef = ClassDef("Constraint", W_ConstraintMarkerObject.classdef)
 
     def __init__(self, space, constraints_w, w_strength, block):
