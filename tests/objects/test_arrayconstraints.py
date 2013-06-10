@@ -50,6 +50,52 @@ class TestArrayConstraints(BaseTopazTest):
         assert self.unwrap(space, w_ca) == [1, 0, 0]
         assert self.unwrap(space, w_z3) == [1, 0, 0]
 
+    def test_linear_constraints(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            a = [0.0, 0.0]
+            always { a[0] * 2 + a[1] == 20.0 }
+            always { a[0] + a[1] + a[2] * 2 == 38.0 }
+            always { a.sum == 18 }
+            return a
+            """,
+            "libcassowary", "libz3")
+        assert self.unwrap(space, w_ca) == [22, -24, 20]
+        assert self.unwrap(space, w_z3) == [22, -24, 20]
+
+    def test_sum_as_element(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            a = [0, 10]
+            always { a.sum == 18 }
+            always { a[0] == a.sum }
+            return a
+            """,
+            "libcassowary", "libz3")
+        assert self.unwrap(space, w_ca) == [18, 0]
+        assert self.unwrap(space, w_z3) == [18, 0]
+
+    def test_progression(self, space):
+        w_ca = space.execute(
+            """
+            require 'libcassowary'
+            require 'libarraysolver'
+
+            a = [0, 10, 20, 30, 40]
+            (0...(a.size - 1)).each do |i|
+              always { a[i.value] > a[i.value + 1] }
+            end
+            always { a.sum == 50 }
+            return a
+            """)
+        result = self.unwrap(space, w_ca)
+        import operator
+        assert reduce(operator.add, result) == 50
+        for i in xrange(len(result) - 1):
+            assert result[i] > result[i + 1]
+
     def test_equality(self, space):
         w_ca, w_z3 = self.execute(
             space,
