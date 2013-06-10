@@ -29,31 +29,32 @@ class ArrayConstraintVariable < ConstraintObject
   end
 
   def sum
-    return 0 if @ary.empty?
+    return 0 if value.empty?
     @constraint_variables[0] + self[1..-1].sum
   end
 
   def __size
-    @ary.size
+    value.size
   end
 
   def length
-    @length = @ary.size unless @length
+    @length = value.size unless @length
     __constrain__ { @length }
   end
   alias size length
 
   def [](*args)
     idx, l = args
+    ary = value
     if idx.is_a? Numeric and (l.nil? or l == 1)
-      idx = idx + @ary.size if idx < 0
-      if idx >= @ary.size
+      idx = idx + ary.size if idx < 0
+      if idx >= ary.size
         a = 0
         @constraint_variables[idx] = __constrain__ { a }
       end
       @constraint_variables[idx]
     else
-      var = ArrayConstraintVariable.new(@ary[*args])
+      var = ArrayConstraintVariable.new(ary[*args])
       var.constraint_variables = @constraint_variables[*args]
       var
     end
@@ -61,10 +62,11 @@ class ArrayConstraintVariable < ConstraintObject
 
   def ==(other)
     return false unless other.is_a?(Array) || other.is_a?(self.class)
+    ary = value
     equality_constraints = [self.length == other.length]
     os = other.is_a?(self.class) ? other.__size : other.size
 
-    (0...(@ary.size > os ? @ary.size : os)).each do |idx|
+    (0...(ary.size > os ? ary.size : os)).each do |idx|
       equality_constraints << (self[idx] == (other[idx] || 0))
     end
     r = RangeConstraint.new(equality_constraints)
