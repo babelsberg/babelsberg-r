@@ -85,7 +85,7 @@ class TestArrayConstraints(BaseTopazTest):
 
             a = [0, 10, 20, 30, 40]
             (0...(a.size - 1)).each do |i|
-              always { a[i.value] > a[i.value + 1] }
+              always { a[i] > a[i + 1] }
             end
             always { a.sum == 50 }
             return a
