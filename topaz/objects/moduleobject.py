@@ -273,7 +273,7 @@ class W_ModuleObject(W_RootObject):
         return self.instance_variables.set(space, name, w_value)
 
     def find_instance_var(self, space, name):
-        return self.instance_variables.get(space, name) or space.w_nil
+        return self.instance_variables.get(space, name)
 
     def set_constraint_var(self, space, name, w_value):
         return self.instance_variable_constraints.set(space, name, w_value)
@@ -701,6 +701,21 @@ class W_ModuleObject(W_RootObject):
     @classdef.method("instance_method", name="symbol")
     def method_instance_method(self, space, name):
         return space.newmethod(name, self)
+
+    def instance_methods(self):
+        return self.methods_w.keys()
+
+    @classdef.method("public_instance_methods", include_super="bool")
+    @classdef.method("instance_methods", include_super="bool")
+    def method_instance_methods(self, space, include_super=True):
+        methods = {}
+        for module in self.included_modules:
+            for method in module.instance_methods():
+                methods[method] = None
+        for method in self.instance_methods():
+            if not isinstance(self.methods_w[method], UndefMethod):
+                methods[method] = None
+        return space.newarray([space.newsymbol(sym) for sym in methods])
 
     @classdef.method("undef_method", name="symbol")
     def method_undef_method(self, space, name):

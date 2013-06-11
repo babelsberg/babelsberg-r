@@ -69,7 +69,7 @@ class W_ArrayObject(W_Object):
         self.constraint_items_w[idx] = c_var
 
     @classdef.singleton_method("allocate")
-    def singleton_method_allocate(self, space, args_w):
+    def singleton_method_allocate(self, space):
         return W_ArrayObject(space, [], self)
 
     @classdef.method("initialize_copy", other_w="array")

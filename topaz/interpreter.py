@@ -250,7 +250,7 @@ class Interpreter(object):
         if c_var and c_var.is_solveable():
             w_res = space.get_value(c_var)
         else:
-            w_res = space.find_instance_var(w_obj, name)
+            w_res = space.find_instance_var(w_obj, name) or space.w_nil
         frame.push(w_res)
 
     def STORE_INSTANCE_VAR(self, space, bytecode, frame, pc, idx):
@@ -503,6 +503,14 @@ class Interpreter(object):
         w_name = frame.pop()
         w_scope = frame.pop()
         assert isinstance(w_func, W_FunctionObject)
+        # None is special case. It means that we are trying to define
+        # a method on Symbol or Numeric.
+        if w_scope is None:
+            raise space.error(space.w_TypeError,
+                """can't define singleton method "%s" for %s""" % (
+                    space.symbol_w(w_name), space.getclass(frame.w_self).name
+                )
+            )
         w_scope.define_method(space, space.symbol_w(w_name), w_func)
         frame.push(space.w_nil)
 
@@ -510,6 +518,8 @@ class Interpreter(object):
         w_func = frame.pop()
         w_name = frame.pop()
         w_obj = frame.pop()
+        if space.is_kind_of(w_obj, space.w_symbol) or space.is_kind_of(w_obj, space.w_numeric):
+            raise space.error(space.w_TypeError, "no class/module to add method")
         assert isinstance(w_func, W_FunctionObject)
         w_obj.attach_method(space, space.symbol_w(w_name), w_func)
         frame.push(space.w_nil)
@@ -531,6 +541,8 @@ class Interpreter(object):
 
     def LOAD_SINGLETON_CLASS(self, space, bytecode, frame, pc):
         w_obj = frame.pop()
+        if space.is_kind_of(w_obj, space.w_symbol) or space.is_kind_of(w_obj, space.w_fixnum):
+            raise space.error(space.w_TypeError, "can't define singleton")
         frame.push(space.getsingletonclass(w_obj))
 
     def SEND(self, space, bytecode, frame, pc, meth_idx, num_args):
