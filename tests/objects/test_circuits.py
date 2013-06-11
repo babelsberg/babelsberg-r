@@ -41,7 +41,7 @@ class Battery < TwoLeadedObject
   def initialize(supply_voltage)
     super()
     @supply_voltage = supply_voltage
-    always { lead1.voltage - lead2.voltage == @supply_voltage.? }
+    always { lead2.voltage - lead1.voltage == @supply_voltage.? }
   end
 end
 
@@ -100,10 +100,8 @@ class TestCircuits(BaseTopazTest):
     def test_battery_setup(self, space):
         w_res = space.execute(CircuitClasses + """
           b = Battery.new(5.0)
-          return [ b.lead1.voltage, b.lead1.current,
-                   b.lead2.voltage, b.lead2.current ] """)
-        assert (self.unwrap(space, w_res) == [5.0, 0.0, 0.0, 0.0] or
-                self.unwrap(space, w_res) == [0.0, 0.0, -5.0, 0.0])
+          return [ b.lead2.voltage-b.lead1.voltage, b.lead1.current, b.lead2.current ] """)
+        assert self.unwrap(space, w_res) == [5.0, 0.0, 0.0]
 
     def test_battery_simple(self, space):
         w_res = space.execute(CircuitClasses + """
@@ -112,7 +110,7 @@ class TestCircuits(BaseTopazTest):
           always { b.lead1.current == 12.0 }
           return [ b.lead1.voltage, b.lead1.current,
                    b.lead2.voltage, b.lead2.current ] """)
-        assert self.unwrap(space, w_res) == [20.0, 12.0, 15.0, -12.0]
+        assert self.unwrap(space, w_res) == [20.0, 12.0, 25.0, -12.0]
 
     def test_resistor(self, space):
         w_res = space.execute(CircuitClasses + """
@@ -192,4 +190,38 @@ class TestCircuits(BaseTopazTest):
           return [ r.lead1.voltage, r.lead1.current, r.lead2.voltage, r.lead2.current,
                    b.lead1.voltage, b.lead1.current, b.lead2.voltage, b.lead2.current, b.supply_voltage,
                    g.lead.voltage, g.lead.current] """)
-        assert self.unwrap(space, w_res) == [0.0, 0.05, -5.0, -0.05, 0.0, -0.05, -5.0, 0.05, 5.0, 0.0, 0.0]
+        assert self.unwrap(space, w_res) == [0.0, -0.05, 5.0, 0.05, 0.0, 0.05, 5.0, -0.05, 5.0, 0.0, 0.0]
+
+    def test_wheatstone_bridge(self, space):
+        w_res = space.execute(CircuitClasses + """
+          g = Ground.new
+          b = Battery.new(5.0)
+          # CAUTION!  Note that the resistor class temporarily has 100 ohms hardwired
+          # Unfortunately this makes the Wheatstone bridge not very interesting yet
+          r1 = Resistor.new(100.0)
+          r2 = Resistor.new(100.0)
+          r3 = Resistor.new(100.0)
+          r4 = Resistor.new(100.0)
+          w = Wire.new
+          connect [g.lead, b.lead1, r3.lead2, r4.lead2]
+          connect [b.lead2, r1.lead1, r2.lead1]
+          connect [r1.lead2, r3.lead1, w.lead1]
+          connect [r2.lead2, r4.lead1, w.lead2]
+          return [ b.lead1.voltage, b.lead1.current, b.lead2.voltage, b.lead2.current, b.supply_voltage,
+                   g.lead.voltage, g.lead.current,
+                   r1.lead1.voltage, r1.lead1.current, r1.lead2.voltage, r1.lead2.current,
+                   r2.lead1.voltage, r2.lead1.current, r2.lead2.voltage, r2.lead2.current,
+                   r3.lead1.voltage, r3.lead1.current, r3.lead2.voltage, r3.lead2.current,
+                   r4.lead1.voltage, r4.lead1.current, r4.lead2.voltage, r4.lead2.current,
+                   w.lead1.voltage, w.lead1.current, w.lead2.voltage, w.lead2.current      ]  """)
+                   
+        assert self.unwrap(space, w_res) == [0.0, 0.05, 5.0, -0.05, 5.0,
+                                             0.0, 0.0,
+                                             5.0, 0.025, 2.5, -0.025, 
+                                             5.0, 0.025, 2.5, -0.025, 
+                                             2.5, 0.025, 0, -0.025, 
+                                             2.5, 0.025, 0, -0.025, 
+                                             2.5, 0.0, 2.5, 0.0]
+
+
+
