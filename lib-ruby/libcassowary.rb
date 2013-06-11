@@ -47,9 +47,14 @@ class Object
         solver.add_edit_var var, strength
       end
       solver.begin_edit
-      while next_vals = stream.next
+      next_vals = stream.next
+      while next_vals
         solver.resolve [*next_vals]
-        p "Suggested #{next_vals}, got #{vars.collect(&:value)}"
+        begin
+          next_vals = stream.next
+        rescue StopIteration
+          break
+        end
       end
       solver.end_edit
     end
