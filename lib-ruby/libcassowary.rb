@@ -46,6 +46,7 @@ class Object
       vars.each do |var|
         solver.add_edit_var var, strength
       end
+      solver.solve
       solver.begin_edit
       next_vals = stream.next
       while next_vals
