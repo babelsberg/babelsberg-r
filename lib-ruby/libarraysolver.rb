@@ -46,6 +46,7 @@ class ArrayConstraintVariable < ConstraintObject
   def [](*args)
     idx, l = args
     ary = value
+    idx = idx.value if idx.is_a? ConstraintObject
     if idx.is_a? Numeric and (l.nil? or l == 1)
       idx = idx + ary.size if idx < 0
       if idx >= ary.size

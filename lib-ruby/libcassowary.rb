@@ -487,6 +487,12 @@ module Cassowary
       self
     end
 
+    def value
+      terms.keys.inject(constant) do |memo, v|
+        memo + terms[v] * v.value
+      end
+    end
+
     def coefficient_for(variable)
       terms[variable] || 0.0
     end
