@@ -146,3 +146,20 @@ class TestArrayConstraints(BaseTopazTest):
             "libcassowary", "libz3")
         assert self.unwrap(space, w_ca)[0] == self.unwrap(space, w_ca)[1]
         assert self.unwrap(space, w_z3)[0] == self.unwrap(space, w_z3)[1]
+
+    def test_cyclices_among_regions(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            a = [0, 0, 0]
+            always do
+              (a.length == a[0]) &&
+              (a.length <= 3) &&
+              (a.sum == 10) &&
+              (a[1] == 2)
+            end
+            return a
+            """,
+            "libcassowary", "libz3")
+        assert self.unwrap(space, w_ca) == [3, 2, 5]
+        assert self.unwrap(space, w_z3) == [3, 2, 5]

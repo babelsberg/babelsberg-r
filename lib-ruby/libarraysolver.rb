@@ -38,7 +38,7 @@ class ArrayConstraintVariable < ConstraintObject
   end
 
   def length
-    @length = value.size unless @length
+    @length = @constraint_variables.size unless @length
     __constrain__ { @length }
   end
   alias size length
@@ -49,11 +49,15 @@ class ArrayConstraintVariable < ConstraintObject
     idx = idx.value if idx.is_a? ConstraintObject
     if idx.is_a? Numeric and (l.nil? or l == 1)
       idx = idx + ary.size if idx < 0
-      if idx >= ary.size
-        a = 0
+      if idx >= @constraint_variables.size
+        a = 0.0
         @constraint_variables[idx] = __constrain__ { a }
       end
-      @constraint_variables[idx]
+      if l == 1
+        [@constraint_variables[idx]]
+      else
+        @constraint_variables[idx]
+      end
     else
       var = ArrayConstraintVariable.new(ary[*args])
       var.constraint_variables = @constraint_variables[*args]
@@ -80,6 +84,9 @@ class ArrayConstraintVariable < ConstraintObject
     result = @ary.dup
 
     if @length
+      if @constraint_variables.size > @length
+        @length = @constraint_variables.size
+      end
       if result.size < (l = @length)
         while (l -= 1) > 0
           result << 0
@@ -92,11 +99,12 @@ class ArrayConstraintVariable < ConstraintObject
     @constraint_variables.each_with_index do |cv, idx|
       result[idx] = cv.value if cv && cv.value
     end
+
     result
   end
 
   def suggest_value(val)
-    initialize(val)
+    raise "Assignment of constrained Arrays not implemented yet"
   end
 
   def method_missing(method, *args)
