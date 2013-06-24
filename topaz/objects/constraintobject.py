@@ -11,6 +11,10 @@ from topaz.utils.cache import Cache
 class W_ConstraintMarkerObject(W_Object):
     classdef = ClassDef("ConstraintObject", W_Object.classdef)
 
+    @classdef.singleton_method("allocate")
+    def singleton_method_allocate(self, space):
+        return W_ConstraintMarkerObject(space, self)
+
 
 class W_ConstraintObject(W_ConstraintMarkerObject):
     classdef = ClassDef("Constraint", W_ConstraintMarkerObject.classdef)

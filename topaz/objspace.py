@@ -889,7 +889,7 @@ class ObjectSpace(object):
             self.send(
                 self.globals.get(self, "$stderr"),
                 "puts",
-                [self.newstr_fromstr("Warning: Constraint expression returned true, ignoring")]
+                [self.newstr_fromstr("Warning: Constraint expression returned true, re-running it whenever the value changes")]
             )
             return
         elif w_constraint is self.w_false or w_constraint is self.w_nil:

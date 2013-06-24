@@ -781,3 +781,42 @@ class TestConstraintVariableObject(BaseTopazTest):
             10, 5, 25,
             -10, 15, -5
         ]
+
+    def test_class_constraint(self, space):
+        space.execute("""
+        a = 10
+        always { a.kind_of? Fixnum }
+        """)
+
+        with self.raises(space, "ArgumentError"):
+            space.execute("""
+            b = 10
+            always { b.kind_of? Fixnum }
+            b = "hello"
+            """)
+
+        space.execute("""
+        c = []
+        always { c.respond_to? :insert }
+        c = "hello"
+        """)
+
+        with self.raises(space, "ArgumentError"):
+            space.execute("""
+            d = []
+            always { d.respond_to? :insert }
+            d = 10
+            """)
+
+        space.execute("""
+        e = []
+        always { e.is_a? Enumerable }
+        e = {}
+        """)
+
+        with self.raises(space, "ArgumentError"):
+            space.execute("""
+            f = []
+            always { f.is_a? Enumerable }
+            f = "hello"
+            """)
