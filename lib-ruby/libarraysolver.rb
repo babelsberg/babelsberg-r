@@ -79,6 +79,17 @@ class ArrayConstraintVariable < ConstraintObject
     r
   end
 
+  include Enumerable
+  def each_with_index(&block)
+    i = 0
+    ary = value
+    while i < ary.size
+      yield self[i], i
+      i += 1
+    end
+    true
+  end
+
   # VM interface
   def value
     result = @ary.dup

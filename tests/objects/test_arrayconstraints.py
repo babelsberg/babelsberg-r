@@ -1,3 +1,4 @@
+import operator
 import py
 
 from ..base import BaseTopazTest
@@ -91,7 +92,6 @@ class TestArrayConstraints(BaseTopazTest):
             return a
             """)
         result = self.unwrap(space, w_ca)
-        import operator
         assert reduce(operator.add, result) == 50
         for i in xrange(len(result) - 1):
             assert result[i] > result[i + 1]
@@ -163,3 +163,17 @@ class TestArrayConstraints(BaseTopazTest):
             "libcassowary", "libz3")
         assert self.unwrap(space, w_ca) == [3, 2, 5]
         assert self.unwrap(space, w_z3) == [3, 2, 5]
+
+    def test_inject(self, space):
+        w_ca, w_z3 = self.execute(
+            space,
+            """
+            a = [0, 0, 0]
+            always do
+              a.inject(0) { |memo, ea| memo + ea } == 100
+            end
+            return a
+            """,
+            "libcassowary", "libz3")
+        assert reduce(operator.add, self.unwrap(space, w_ca)) == 100
+        assert reduce(operator.add, self.unwrap(space, w_z3)) == 100
