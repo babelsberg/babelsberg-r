@@ -1,5 +1,6 @@
 import copy
 
+from rpython.rlib import jit
 from rpython.rlib.listsort import make_timsort_class
 from rpython.rlib.objectmodel import newlist_hint
 
@@ -68,6 +69,9 @@ class W_ArrayObject(W_Object):
             self.constraint_items_w += [None] * (len(self.items_w) - len(self.constraint_items_w))
         self.constraint_items_w[idx] = c_var
 
+    def length(self):
+        return len(self.items_w)
+
     @classdef.singleton_method("allocate")
     def singleton_method_allocate(self, space):
         return W_ArrayObject(space, [], self)
@@ -83,7 +87,7 @@ class W_ArrayObject(W_Object):
     @classdef.method("[]")
     @classdef.method("slice")
     def method_subscript(self, space, w_idx, w_count=None):
-        start, end, as_range, nil = space.subscript_access(len(self.items_w), w_idx, w_count=w_count)
+        start, end, as_range, nil = space.subscript_access(self.length(), w_idx, w_count=w_count)
         if nil:
             return space.w_nil
         elif as_range:
@@ -110,7 +114,7 @@ class W_ArrayObject(W_Object):
             w_count = w_count_or_obj
         else:
             w_obj = w_count_or_obj
-        start, end, as_range, _ = space.subscript_access(len(self.items_w), w_idx, w_count=w_count)
+        start, end, as_range, _ = space.subscript_access(self.length(), w_idx, w_count=w_count)
 
         if w_count and end < start:
             raise space.error(space.w_IndexError,
@@ -119,15 +123,20 @@ class W_ArrayObject(W_Object):
         elif start < 0:
             raise space.error(space.w_IndexError,
                 "index %d too small for array; minimum: %d" % (
-                    start - len(self.items_w),
-                    -len(self.items_w)
+                    start - self.length(),
+                    -self.length()
                 )
             )
-        elif start >= len(self.items_w):
-            self.items_w += [space.w_nil] * (start - len(self.items_w) + 1)
+        elif start >= self.length():
+            self.items_w += [space.w_nil] * (start - self.length() + 1)
             self.items_w[start] = w_obj
         elif as_range:
-            self._subscript_assign_range(space, start, end, w_obj)
+            w_converted = space.convert_type(w_obj, space.w_array, "to_ary", raise_error=False)
+            if w_converted is space.w_nil:
+                rep_w = [w_obj]
+            else:
+                rep_w = space.listview(w_converted)
+            self._subscript_assign_range(space, start, end, rep_w)
         else:
             # TODO: See comment in "[]"
             c_var = space.newconstraintvariable(w_owner=self, idx=start)
@@ -135,18 +144,13 @@ class W_ArrayObject(W_Object):
                 self.items_w[start] = w_obj
         return w_obj
 
-    def _subscript_assign_range(self, space, start, end, w_obj):
+    def _subscript_assign_range(self, space, start, end, rep_w):
         assert end >= 0
-        w_converted = space.convert_type(w_obj, space.w_array, "to_ary", raise_error=False)
-        if w_converted is space.w_nil:
-            rep_w = [w_obj]
-        else:
-            rep_w = space.listview(w_converted)
         delta = (end - start) - len(rep_w)
         if delta < 0:
             self.items_w += [None] * -delta
             lim = start + len(rep_w)
-            i = len(self.items_w) - 1
+            i = self.length() - 1
             while i >= lim:
                 self.items_w[i] = self.items_w[i + delta]
                 i -= 1
@@ -157,13 +161,13 @@ class W_ArrayObject(W_Object):
     @classdef.method("slice!")
     @check_frozen()
     def method_slice_i(self, space, w_idx, w_count=None):
-        start, end, as_range, nil = space.subscript_access(len(self.items_w), w_idx, w_count=w_count)
+        start, end, as_range, nil = space.subscript_access(self.length(), w_idx, w_count=w_count)
 
         if nil:
             return space.w_nil
         elif as_range:
-            start = min(max(start, 0), len(self.items_w))
-            end = min(max(end, 0), len(self.items_w))
+            start = min(max(start, 0), self.length())
+            end = min(max(end, 0), self.length())
             delta = (end - start)
             assert delta >= 0
             w_items = self.items_w[start:start + delta]
@@ -177,11 +181,11 @@ class W_ArrayObject(W_Object):
     @classdef.method("size")
     @classdef.method("length")
     def method_length(self, space):
-        return space.newint(len(self.items_w))
+        return space.newint(self.length())
 
     @classdef.method("empty?")
     def method_emptyp(self, space):
-        return space.newbool(len(self.items_w) == 0)
+        return space.newbool(self.length() == 0)
 
     @classdef.method("+", other="array")
     def method_add(self, space, other):
@@ -255,12 +259,6 @@ class W_ArrayObject(W_Object):
             for w_o in self.items_w
         ]))
 
-    @classdef.singleton_method("try_convert")
-    def method_try_convert(self, space, w_obj):
-        if not space.is_kind_of(w_obj, space.w_array):
-            w_obj = space.convert_type(w_obj, space.w_array, "to_ary", raise_error=False)
-        return w_obj
-
     @classdef.method("pop")
     @check_frozen()
     def method_pop(self, space, w_num=None):
@@ -276,7 +274,7 @@ class W_ArrayObject(W_Object):
             if num < 0:
                 raise space.error(space.w_ArgumentError, "negative array size")
             else:
-                pop_size = max(0, len(self.items_w) - num)
+                pop_size = max(0, self.length() - num)
                 res_w = self.items_w[pop_size:]
                 del self.items_w[pop_size:]
                 return space.newarray(res_w)
@@ -285,8 +283,8 @@ class W_ArrayObject(W_Object):
     @check_frozen()
     def method_delete_at(self, space, idx):
         if idx < 0:
-            idx += len(self.items_w)
-        if idx < 0 or idx >= len(self.items_w):
+            idx += self.length()
+        if idx < 0 or idx >= self.length():
             return space.w_nil
         else:
             return self.items_w.pop(idx)
@@ -297,23 +295,22 @@ class W_ArrayObject(W_Object):
             count = Coerce.int(space, w_count)
             if count < 0:
                 raise space.error(space.w_ArgumentError, "negative array size")
-            start = len(self.items_w) - count
+            start = self.length() - count
             if start < 0:
                 start = 0
             return space.newarray(self.items_w[start:])
 
-        if len(self.items_w) == 0:
+        if self.length() == 0:
             return space.w_nil
         else:
-            return self.items_w[len(self.items_w) - 1]
+            return self.items_w[self.length() - 1]
 
     @classdef.method("pack")
     def method_pack(self, space, w_template):
         template = Coerce.str(space, w_template)
         result = RPacker(template, space.listview(self)).operate(space)
         w_result = space.newstr_fromchars(result)
-        if space.is_true(space.send(w_template, "tainted?")):
-            space.send(w_result, "taint")
+        space.infect(w_result, w_template)
         return w_result
 
     @classdef.method("to_ary")
@@ -349,7 +346,7 @@ class W_ArrayObject(W_Object):
     @classdef.method("rotate!", n="int")
     @check_frozen()
     def method_rotate_i(self, space, n=1):
-        length = len(self.items_w)
+        length = self.length()
         if length == 0:
             return self
         if abs(n) >= length:
@@ -365,13 +362,13 @@ class W_ArrayObject(W_Object):
 
     @classdef.method("insert", i="int")
     @check_frozen()
+    @jit.look_inside_iff(lambda self, space, i, args_w: jit.isconstant(len(args_w)))
     def method_insert(self, space, i, args_w):
         if not args_w:
             return self
-        length = len(self.items_w)
+        length = self.length()
         if i > length:
-            for _ in xrange(i - length):
-                self.items_w.append(space.w_nil)
+            self._append_nils(space, i - length)
             self.items_w.extend(args_w)
             return self
         if i < 0:
@@ -385,3 +382,7 @@ class W_ArrayObject(W_Object):
             self.items_w.insert(i, w_e)
             i += 1
         return self
+
+    def _append_nils(self, space, num):
+        for _ in xrange(num):
+            self.items_w.append(space.w_nil)

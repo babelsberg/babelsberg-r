@@ -429,10 +429,10 @@ class ObjectSpace(object):
         complete_name = self.buildname(name, w_scope)
         return W_ClassObject(self, complete_name, superclass, is_singleton=is_singleton, attached=attached)
 
-    def newfunction(self, w_name, w_code, lexical_scope):
+    def newfunction(self, w_name, w_code, lexical_scope, visibility):
         name = self.symbol_w(w_name)
         assert isinstance(w_code, W_CodeObject)
-        return W_UserFunction(name, w_code, lexical_scope)
+        return W_UserFunction(name, w_code, lexical_scope, visibility)
 
     def newmethod(self, name, w_cls):
         w_function = w_cls.find_method(self, name)
@@ -701,7 +701,7 @@ class ObjectSpace(object):
                     "undefined method `%s' for %s" % (name, class_name)
                 )
             else:
-                args_w.insert(0, self.newsymbol(name))
+                args_w = [self.newsymbol(name)] + args_w
                 return method_missing.call(self, w_receiver, args_w, block)
         return raw_method.call(self, w_receiver, args_w, block)
 

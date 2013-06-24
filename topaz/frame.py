@@ -2,6 +2,7 @@ from rpython.rlib import jit
 
 from topaz.closure import LocalCell
 from topaz.objects.arrayobject import W_ArrayObject
+from topaz.objects.functionobject import W_FunctionObject
 
 
 class BaseFrame(object):
@@ -33,6 +34,7 @@ class Frame(BaseFrame):
         self.lexical_scope = lexical_scope
         self.block = block
         self.parent_interp = parent_interp
+        self.visibility = W_FunctionObject.PUBLIC
         self.lastblock = None
 
     def _set_arg(self, space, pos, w_value):
@@ -43,8 +45,7 @@ class Frame(BaseFrame):
         if (len(args_w) == 1 and
             isinstance(args_w[0], W_ArrayObject) and len(bytecode.arg_pos) >= 2):
             w_arg = args_w[0]
-            assert isinstance(w_arg, W_ArrayObject)
-            args_w = w_arg.items_w
+            args_w = space.listview(w_arg)
         minargc = len(bytecode.arg_pos) - len(bytecode.defaults)
         if len(args_w) < minargc:
             args_w.extend([space.w_nil] * (minargc - len(args_w)))
@@ -68,8 +69,10 @@ class Frame(BaseFrame):
         defl_start = len(args_w) - (len(bytecode.arg_pos) - len(bytecode.defaults))
         for i in xrange(len(bytecode.arg_pos) - len(args_w)):
             bc = bytecode.defaults[i + defl_start]
+            self.bytecode = bc
             w_value = Interpreter().interpret(space, self, bc)
             self._set_arg(space, bytecode.arg_pos[i + len(args_w)], w_value)
+        self.bytecode = bytecode
 
         if bytecode.splat_arg_pos != -1:
             if len(bytecode.arg_pos) > len(args_w):

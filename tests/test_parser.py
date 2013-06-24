@@ -613,7 +613,7 @@ class TestParser(BaseTopazTest):
         """)
         assert res == ast.Main(ast.Block([
             ast.Statement(ast.Assignment(ast.Variable("i", 2), ast.ConstantInt(0))),
-            ast.Statement(ast.While(ast.Send(ast.Variable("i", 3),  "<", [ast.ConstantInt(10)], None, 3), ast.Block([
+            ast.Statement(ast.While(ast.Send(ast.Variable("i", 3), "<", [ast.ConstantInt(10)], None, 3), ast.Block([
                 ast.Statement(ast.Send(ast.Self(4), "puts", [ast.Variable("i", 4)], None, 4)),
                 ast.Statement(ast.Send(ast.Self(5), "puts", [ast.ConstantInt(1)], None, 5)),
                 ast.Statement(ast.Send(ast.Self(6), "puts", [ast.Variable("i", 6)], None, 6)),
@@ -867,7 +867,7 @@ class TestParser(BaseTopazTest):
 
         assert space.parse("def f(a, b) a + b end") == ast.Main(ast.Block([
             ast.Statement(ast.Function(None, "f", [ast.Argument("a"), ast.Argument("b")], None, None, ast.Block([
-                ast.Statement(ast.Send(ast.Variable("a", 1),  "+", [ast.Variable("b", 1)], None, 1))
+                ast.Statement(ast.Send(ast.Variable("a", 1), "+", [ast.Variable("b", 1)], None, 1))
             ])))
         ]))
 
@@ -2145,6 +2145,7 @@ HERE
         assert space.parse("$-w") == simple_global("$-w")
         assert space.parse("$@") == simple_global("$@")
         assert space.parse("$;") == simple_global("$;")
+        assert space.parse("$<") == simple_global("$<")
 
     def test_comments(self, space):
         r = space.parse("""
@@ -2751,3 +2752,15 @@ foo bar
 
         with self.raises(space, 'SyntaxError'):
             space.parse("=begin\nbar\n=foo")
+
+    def test_multiline_comments_lineno(self, space):
+        r = space.parse("""
+=begin
+some
+lines
+=end
+        1 + 1
+        """)
+        assert r == ast.Main(ast.Block([
+            ast.Statement(ast.Send(ast.ConstantInt(1), "+", [ast.ConstantInt(1)], None, 6))
+        ]))
