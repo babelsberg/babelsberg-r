@@ -782,6 +782,17 @@ class TestConstraintVariableObject(BaseTopazTest):
             -10, 15, -5
         ]
 
+    def test_non_solveable_variable_constraint_blocks(self, space):
+        w_res = space.execute("""
+        $calls = 0
+        a = "hello"
+        always { $calls += 1; a.is_a?(String) }
+        always { $calls += 1; a.is_a?(String) }
+        a = "foo"
+        return $calls
+        """)
+        assert self.unwrap(space, w_res) == 4
+
     def test_class_constraint(self, space):
         space.execute("""
         a = 10

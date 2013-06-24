@@ -473,9 +473,8 @@ class ObjectSpace(object):
 
     def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
         c_var = self._findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar, idx=idx, w_key=w_key)
-        if c_var:
-            return c_var
-        elif self.is_constructing_constraint():
+
+        if not c_var and self.is_constructing_constraint():
             c_var = ConstrainedVariable(
                 self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar, idx=idx, w_key=w_key
             )
@@ -493,16 +492,17 @@ class ObjectSpace(object):
                 else:
                     # TODO: dictionary constraints
                     raise NotImplementedError
-            if not c_var.is_solveable():
-                # No constraint solver variable available for this object
-                # Only keep the block alive if this is a variable that
-                # will not be registered with a solver. This means this
-                # variable is on the path to a constraint, and the block
-                # will have to be re-evaluated when this variable is set
-                c_var.add_constraint_block(self.current_constraint_block(), self.current_constraint_strength())
-                return c_var
-            else:
-                return c_var
+
+        if c_var and not c_var.is_solveable() and self.is_constructing_constraint():
+            # No constraint solver variable available for this object
+            # Only keep the block alive if this is a variable that
+            # will not be registered with a solver. This means this
+            # variable is on the path to a constraint, and the block
+            # will have to be re-evaluated when this variable is set
+            c_var.add_constraint_block(self.current_constraint_block(), self.current_constraint_strength())
+
+        if c_var:
+            return c_var
         else:
             return None
 

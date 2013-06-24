@@ -126,6 +126,9 @@ class ConstrainedVariable(W_Root):
         return self.w_external_variable is not None
 
     def add_constraint_block(self, block, w_strength):
+        for block, _ in self.constraint_blocks:
+            if block is block:
+                return
         self.constraint_blocks.append((block, w_strength))
 
     def load_value(self, space):
@@ -199,7 +202,9 @@ class ConstrainedVariable(W_Root):
 
     def recalculate_path(self, space, w_value):
         self.store_value(space, w_value)
-        for block, w_strength in self.constraint_blocks:
+        constraint_blocks = self.constraint_blocks[:]
+        del self.constraint_blocks[:]
+        for block, w_strength in constraint_blocks:
             for w_constraint in block.get_constraints():
                 space.send(w_constraint, "disable")
             block.remove_constraints()
