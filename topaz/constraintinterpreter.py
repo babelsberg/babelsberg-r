@@ -126,8 +126,8 @@ class ConstrainedVariable(W_Root):
         return self.w_external_variable is not None
 
     def add_constraint_block(self, block, w_strength):
-        for block, _ in self.constraint_blocks:
-            if block is block:
+        for blk, _ in self.constraint_blocks:
+            if block is blk:
                 return
         self.constraint_blocks.append((block, w_strength))
 
