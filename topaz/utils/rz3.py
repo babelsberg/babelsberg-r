@@ -153,6 +153,9 @@ z3_mk_int_sort = rffi.llexternal("Z3_mk_int_sort", [Z3_context], Z3_sort, compil
 z3_mk_real_sort = rffi.llexternal("Z3_mk_real_sort", [Z3_context], Z3_sort, compilation_info=eci)
 z3_mk_bool_sort = rffi.llexternal("Z3_mk_bool_sort", [Z3_context], Z3_sort, compilation_info=eci)
 
+# Bool
+z3_mk_not = rffi.llexternal("Z3_mk_not", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
+
 # Arithmetic
 def binop(name):
     globals()[name.lower()] = rffi.llexternal(name, [Z3_context, Z3_ast, Z3_ast], Z3_ast, compilation_info=eci)
@@ -163,6 +166,10 @@ binop("Z3_mk_ge")
 binop("Z3_mk_power")
 binop("Z3_mk_eq")
 binop("Z3_mk_div")
+
+def z3_mk_ne(context, ast1, ast2):
+    return z3_mk_not(context, z3_mk_eq(context, ast1, ast2))
+
 
 def multiop(name):
     def create_method(func, name):
