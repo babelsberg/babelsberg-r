@@ -125,6 +125,7 @@ class W_ModuleObject(W_RootObject):
         obj.instance_variable_constraints = copy.deepcopy(self.instance_variable_constraints, memo)
         obj.included_modules = copy.deepcopy(self.included_modules, memo)
         obj.descendants = copy.deepcopy(self.descendants, memo)
+        obj.flags = copy.deepcopy(self.flags, memo)
         return obj
 
     def getclass(self, space):
