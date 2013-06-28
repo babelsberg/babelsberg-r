@@ -39,11 +39,6 @@ class MSpecScript
           "^#{Rubyspec}/core/marshal/load_spec.rb",
           "^#{Rubyspec}/core/marshal/restore_spec.rb",
           "^#{Rubyspec}/core/kernel/autoload_spec.rb",
-          "^#{Rubyspec}/core/kernel/define_singleton_method_spec.rb",
-          "^#{Rubyspec}/core/main/public_spec.rb",
-          "^#{Rubyspec}/core/main/private_spec.rb",
-          "^#{Rubyspec}/core/main/include_spec.rb",
-          "^#{Rubyspec}/core/main/def_spec.rb",
           "^#{Rubyspec}/core/filetest",
           "^#{Rubyspec}/core/io/reopen_spec.rb",
           "^#{Rubyspec}/core/io/lineno_spec.rb",
@@ -54,7 +49,6 @@ class MSpecScript
           "^#{Rubyspec}/core/file/socket_spec.rb",
           "^#{Rubyspec}/core/file/ftype_spec.rb",
           "^#{Rubyspec}/core/file/open_spec.rb",
-          "^#{Rubyspec}/core/io/sysopen_spec.rb",
           "^#{Rubyspec}/core/numeric/to_c_spec.rb",
           "^#{Rubyspec}/core/process/status/exited_spec.rb",
           "^#{Rubyspec}/core/process/status/exitstatus_spec.rb",
@@ -62,9 +56,6 @@ class MSpecScript
           "^#{Rubyspec}/core/process/status/signaled_spec.rb",
           "^#{Rubyspec}/core/process/status/success_spec.rb",
           "^#{Rubyspec}/core/process/status/termsig_spec.rb",
-          "^#{Rubyspec}/core/process/wait2_spec.rb",
-          "^#{Rubyspec}/core/process/wait_spec.rb",
-          "^#{Rubyspec}/core/process/waitall_spec.rb",
           "^#{Rubyspec}/core/file/ctime_spec.rb"
   ]
 
@@ -72,8 +63,6 @@ class MSpecScript
               "^#{Rubyspec}/language/block_spec.rb",
               "^#{Rubyspec}/language/regexp/character_classes_spec.rb",
               "^#{Rubyspec}/language/send_spec.rb",
-              "^#{Rubyspec}/language/constants_spec.rb",
-              "^#{Rubyspec}/language/precedence_spec.rb",
               "^#{Rubyspec}/language/predefined_spec.rb",
               "^#{Rubyspec}/language/predefined/data_spec.rb",
               "^#{Rubyspec}/language/regexp/encoding_spec.rb",
@@ -83,12 +72,11 @@ class MSpecScript
               "^#{Rubyspec}/language/BEGIN_spec.rb",
               "^#{Rubyspec}/language/alias_spec.rb",
               "^#{Rubyspec}/language/break_spec.rb",
-              "^#{Rubyspec}/language/def_spec.rb",
               "^#{Rubyspec}/language/defined_spec.rb",
               "^#{Rubyspec}/language/or_spec.rb",
-              "^#{Rubyspec}/language/retry_spec.rb",
               "^#{Rubyspec}/language/return_spec.rb",
-              "^#{Rubyspec}/language/super_spec.rb"]
+              "^#{Rubyspec}/language/super_spec.rb"
+  ]
 
   command_line = ["#{Rubyspec}/command_line"]
 

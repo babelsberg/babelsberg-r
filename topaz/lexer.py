@@ -143,7 +143,9 @@ class Lexer(object):
             elif ch in "\r\n":
                 space_seen = newline_seen = True
                 self.newline(ch)
-                if self.state not in [self.EXPR_BEG, self.EXPR_DOT]:
+                if self.state not in [self.EXPR_BEG, self.EXPR_DOT,
+                                      self.EXPR_VALUE, self.EXPR_FNAME,
+                                      self.EXPR_CLASS]:
                     self.add("\n")
                     self.command_start = True
                     self.state = self.EXPR_BEG
@@ -374,6 +376,7 @@ class Lexer(object):
             if ch == self.EOF:
                 self.error("embedded document meets end of file")
             if ch in "\r\n":
+                self.newline(ch)
                 if (self.read() == "=" and
                     self.read() == "e" and
                     self.read() == "n" and
@@ -533,7 +536,7 @@ class Lexer(object):
         self.add(ch)
         self.state = self.EXPR_END
         ch = self.read()
-        if ch in "$>:?\\!\"~&`'+/,@;":
+        if ch in "$<>:?\\!\"~&`'+/,@;":
             self.add(ch)
             yield self.emit("GVAR")
         elif ch == "-" and self.peek().isalnum():

@@ -235,6 +235,7 @@ class W_Z3Ptr(W_Object):
     method_gt = new_binop(classdef, ">", rz3.z3_mk_gt)
     method_pow = new_binop(classdef, "**", rz3.z3_mk_power)
     method_eq = new_binop(classdef, "==", rz3.z3_mk_eq)
+    method_eq = new_binop(classdef, "!=", rz3.z3_mk_ne)
     method_ge = new_binop(classdef, ">=", rz3.z3_mk_ge)
     method_le = new_binop(classdef, "<=", rz3.z3_mk_le)
     method_add = new_binop(classdef, "+", rz3.z3_mk_add)

@@ -51,7 +51,7 @@ class W_FileObject(W_IOObject):
         space.set_const(w_cls, "Stat", space.getclassfor(W_FileStatObject))
 
     @classdef.singleton_method("allocate")
-    def method_allocate(self, space, args_w):
+    def method_allocate(self, space):
         return W_FileObject(space)
 
     @classdef.singleton_method("size?", name="path")
@@ -249,7 +249,10 @@ class W_FileObject(W_IOObject):
     @classdef.method("truncate", length="int")
     def method_truncate(self, space, length):
         self.ensure_not_closed(space)
-        ftruncate(self.fd, length)
+        try:
+            ftruncate(self.fd, length)
+        except OSError as e:
+            raise error_for_oserror(space, e)
         return space.newint(0)
 
     @classdef.method("chmod", mode="int")
@@ -328,7 +331,7 @@ class W_FileStatObject(W_Object):
         return self._stat
 
     @classdef.singleton_method("allocate")
-    def singleton_method_allocate(self, space, w_args):
+    def singleton_method_allocate(self, space):
         return W_FileStatObject(space)
 
     @classdef.method("initialize", filename="path")

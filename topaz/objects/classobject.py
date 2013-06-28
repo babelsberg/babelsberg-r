@@ -1,5 +1,7 @@
 import copy
 
+from rpython.rlib.objectmodel import specialize
+
 from topaz.module import ClassDef
 from topaz.objects.moduleobject import UndefMethod, W_ModuleObject
 from topaz.objects.objectobject import W_Object
@@ -74,12 +76,13 @@ class W_ClassObject(W_ModuleObject):
             method = self.superclass.find_method(space, name)
         return method
 
-    def methods(self, space, inherit=True):
+    @specialize.argtype(2)
+    def methods(self, space, visibility=None, inherit=True):
         methods = {}
-        for name in W_ModuleObject.methods(self, space, inherit):
+        for name in W_ModuleObject.methods(self, space, inherit=inherit, visibility=visibility):
             methods[name] = None
         if inherit and self.superclass is not None:
-            for name in self.superclass.methods(space, inherit):
+            for name in self.superclass.methods(space, visibility=visibility):
                 method = self._find_method_pure(space, name, self.version)
                 if method is None or not isinstance(method, UndefMethod):
                     methods[name] = None
@@ -118,17 +121,17 @@ class W_ClassObject(W_ModuleObject):
             W_ModuleObject.method_undefined(self, space, w_name)
 
     @classdef.singleton_method("allocate")
-    def singleton_method_allocate(self, space, args_w):
+    def singleton_method_allocate(self, space):
         return space.newclass(None, None)
 
     @classdef.method("new")
     def method_new(self, space, args_w, block):
-        w_obj = space.send(self, "allocate", args_w, block)
+        w_obj = space.send(self, "allocate")
         space.send(w_obj, "initialize", args_w, block)
         return w_obj
 
     @classdef.method("allocate")
-    def method_allocate(self, space, args_w):
+    def method_allocate(self, space):
         return W_Object(space, self)
 
     @classdef.method("initialize")

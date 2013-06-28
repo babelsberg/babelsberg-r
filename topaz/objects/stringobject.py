@@ -423,16 +423,10 @@ class W_StringObject(W_Object):
         return new_string if change_made else None
 
     @classdef.singleton_method("allocate")
-    def singleton_method_allocate(self, space, w_s=None):
+    def singleton_method_allocate(self, space):
         strategy = space.fromcache(ConstantStringStrategy)
         storage = strategy.erase("")
         return W_StringObject(space, storage, strategy, self)
-
-    @classdef.singleton_method("try_convert")
-    def method_try_convert(self, space, w_obj):
-        if not space.is_kind_of(w_obj, space.w_string):
-            w_obj = space.convert_type(w_obj, space.w_string, "to_str", raise_error=False)
-        return w_obj
 
     @classdef.method("initialize")
     def method_initialize(self, space, w_s=None):
@@ -481,7 +475,9 @@ class W_StringObject(W_Object):
     def method_times(self, space, times):
         if times < 0:
             raise space.error(space.w_ArgumentError, "negative argument")
-        return self.strategy.mul(space, self.str_storage, times)
+        res = self.strategy.mul(space, self.str_storage, times)
+        space.infect(res, self)
+        return res
 
     @classdef.method("<<")
     @classdef.method("concat")
@@ -556,6 +552,22 @@ class W_StringObject(W_Object):
             for i in xrange(pad_len / len(padstr)):
                 chars += padstr
             chars += padstr[:pad_len % len(padstr) + 1]
+            return space.newstr_fromchars(chars)
+
+    @classdef.method("rjust", integer="int", padstr="str")
+    def method_rjust(self, space, integer, padstr=" "):
+        if not padstr:
+            raise space.error(space.w_ArgumentError, "zero width padding")
+        elif integer <= self.length():
+            return self.copy(space)
+        else:
+            pad_len = integer - self.length() - 1
+            assert pad_len >= 0
+            chars = []
+            for i in xrange(pad_len / len(padstr)):
+                chars += padstr
+            chars += padstr[:pad_len % len(padstr) + 1]
+            chars += space.str_w(self)
             return space.newstr_fromchars(chars)
 
     def search_context(self, space, ctx):
@@ -1129,6 +1141,13 @@ class W_StringObject(W_Object):
             )
         self.strategy.to_mutable(space, self)
         self.strategy.insert(self.str_storage, index, other)
+        return self
+
+    @classdef.method("prepend", other="str")
+    @check_frozen()
+    def method_prepend(self, space, other):
+        self.strategy.to_mutable(space, self)
+        self.strategy.insert(self.str_storage, 0, other)
         return self
 
     @classdef.method("strip!")

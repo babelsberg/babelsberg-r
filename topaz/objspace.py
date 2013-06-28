@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+import gc
 import os
 import sys
 import weakref
@@ -119,6 +120,8 @@ class ObjectSpace(object):
         self.w_class = self.getclassfor(W_ClassObject)
         # We replace the one reference to our FakeClass with the real class.
         self.w_basicobject.klass.superclass = self.w_class
+
+        gc.collect()
         assert cls_reference() is None
 
         self.w_symbol = self.getclassfor(W_SymbolObject)
@@ -426,10 +429,10 @@ class ObjectSpace(object):
         complete_name = self.buildname(name, w_scope)
         return W_ClassObject(self, complete_name, superclass, is_singleton=is_singleton, attached=attached)
 
-    def newfunction(self, w_name, w_code, lexical_scope):
+    def newfunction(self, w_name, w_code, lexical_scope, visibility):
         name = self.symbol_w(w_name)
         assert isinstance(w_code, W_CodeObject)
-        return W_UserFunction(name, w_code, lexical_scope)
+        return W_UserFunction(name, w_code, lexical_scope, visibility)
 
     def newmethod(self, name, w_cls):
         w_function = w_cls.find_method(self, name)
@@ -470,9 +473,8 @@ class ObjectSpace(object):
 
     def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
         c_var = self._findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar, idx=idx, w_key=w_key)
-        if c_var:
-            return c_var
-        elif self.is_constructing_constraint():
+
+        if not c_var and self.is_constructing_constraint():
             c_var = ConstrainedVariable(
                 self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar, idx=idx, w_key=w_key
             )
@@ -490,16 +492,17 @@ class ObjectSpace(object):
                 else:
                     # TODO: dictionary constraints
                     raise NotImplementedError
-            if not c_var.is_solveable():
-                # No constraint solver variable available for this object
-                # Only keep the block alive if this is a variable that
-                # will not be registered with a solver. This means this
-                # variable is on the path to a constraint, and the block
-                # will have to be re-evaluated when this variable is set
-                c_var.add_constraint_block(self.current_constraint_block(), self.current_constraint_strength())
-                return c_var
-            else:
-                return c_var
+
+        if c_var and not c_var.is_solveable() and self.is_constructing_constraint():
+            # No constraint solver variable available for this object
+            # Only keep the block alive if this is a variable that
+            # will not be registered with a solver. This means this
+            # variable is on the path to a constraint, and the block
+            # will have to be re-evaluated when this variable is set
+            c_var.add_constraint_block(self.current_constraint_block(), self.current_constraint_strength())
+
+        if c_var:
+            return c_var
         else:
             return None
 
@@ -698,7 +701,7 @@ class ObjectSpace(object):
                     "undefined method `%s' for %s" % (name, class_name)
                 )
             else:
-                args_w.insert(0, self.newsymbol(name))
+                args_w = [self.newsymbol(name)] + args_w
                 return method_missing.call(self, w_receiver, args_w, block)
         return raw_method.call(self, w_receiver, args_w, block)
 
@@ -886,7 +889,7 @@ class ObjectSpace(object):
             self.send(
                 self.globals.get(self, "$stderr"),
                 "puts",
-                [self.newstr_fromstr("Warning: Constraint expression returned true, ignoring")]
+                [self.newstr_fromstr("Warning: Constraint expression returned true, re-running it whenever the value changes")]
             )
             return
         elif w_constraint is self.w_false or w_constraint is self.w_nil:

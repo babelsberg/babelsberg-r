@@ -50,3 +50,10 @@ Spend exactly 100 dollars and buy exactly 100 animals. Dogs cost
 have to buy at least one of each. How many of each should you buy?
 Dogs: 3, cats: 41, mice: 56
 """
+
+    def test_eight_queens(self, space, tmpdir, capfd):
+        self.run(space, tmpdir, "nqueens.rb")
+        out, err = capfd.readouterr()
+        assert out == u"""Z3 constraint solver loaded.
+[#<Queen: 0x0>, #<Queen: 1x3>, #<Queen: 2x1>, #<Queen: 3x2>, #<Queen: 4x4>, #<Queen: 5x5>, #<Queen: 6x6>, #<Queen: 7x7>]
+"""
