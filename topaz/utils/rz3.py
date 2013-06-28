@@ -38,8 +38,15 @@ if not os.path.isfile(z3_exe):
         my_python = sys.executable
         if not my_python:
             my_python = "python"
-        os.system("%s scripts/mk_make.py" % my_python)
-        os.chdir("build")
+        os.system("%s %s" % (
+                my_python,
+                os.path.join(
+                    z3_dir,
+                    "scripts",
+                    "mk_make.py"
+                )
+        )
+        os.chdir(os.path.join(z3_dir, "build"))
         if WINNT:
             os.system("nmake")
         elif POSIX:
