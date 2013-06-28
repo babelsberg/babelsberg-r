@@ -45,7 +45,7 @@ if not os.path.isfile(z3_exe):
                     "scripts",
                     "mk_make.py"
                 )
-        )
+        ))
         os.chdir(os.path.join(z3_dir, "build"))
         if WINNT:
             os.system("nmake")
