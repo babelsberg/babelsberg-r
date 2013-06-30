@@ -24,6 +24,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         self.constraints_w = constraints_w
         self.w_strength = w_strength
         self.block = block
+        block.enable_constraint()
         self.enabled = True
 
     @classdef.method("enable")
@@ -31,6 +32,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         if not self.enabled:
             for w_constraint in self.constraints_w:
                 space.send(w_constraint, "enable", [self.w_strength])
+            self.block.enable_constraint()
             self.enabled = True
             return space.w_true
         else:
@@ -41,6 +43,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         if self.enabled:
             for w_constraint in self.constraints_w:
                 space.send(w_constraint, "disable")
+            self.block.disable_constraint()
             self.enabled = False
             return space.w_true
         else:

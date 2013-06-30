@@ -831,3 +831,10 @@ class TestConstraintVariableObject(BaseTopazTest):
             always { f.is_a? Enumerable }
             f = "hello"
             """)
+
+    def test_disable_class_constraint(self, space):
+        space.execute("""
+        f = 1
+        once { f.is_a? Fixnum }
+        f = "hello"
+        """)

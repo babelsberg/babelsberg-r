@@ -205,8 +205,9 @@ class ConstrainedVariable(W_Root):
         constraint_blocks = self.constraint_blocks[:]
         del self.constraint_blocks[:]
         for block, w_strength in constraint_blocks:
-            for w_constraint in block.get_constraints():
-                space.send(w_constraint, "disable")
-            block.remove_constraints()
-            args_w = [] if w_strength is None else [w_strength]
-            space.send(space.w_object, "always", args_w, block=block)
+            if block.is_constraint_enabled():
+                for w_constraint in block.get_constraints():
+                    space.send(w_constraint, "disable")
+                block.remove_constraints()
+                args_w = [] if w_strength is None else [w_strength]
+                space.send(space.w_object, "always", args_w, block=block)
