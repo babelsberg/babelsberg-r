@@ -42,6 +42,7 @@ end
 
 class Array
   def alldifferent?
+    return true if self.empty?
     asts = map do |element|
       case element
       when Fixnum
@@ -56,7 +57,13 @@ class Array
         raise "Cannot solve alldifferent? on this array (no Z3 interpretation for #{element.inspect})"
       end
     end
-    asts.pop.alldifferent(*asts)
+
+    begin
+      return asts.pop.alldifferent(*asts)
+    rescue RuntimeError
+      # we're not constructing constraints
+      return self.uniq.size == self.size
+    end
   end
 end
 

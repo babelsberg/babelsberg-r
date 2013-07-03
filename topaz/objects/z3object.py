@@ -49,7 +49,7 @@ class W_Z3Object(W_RootObject):
         # XXX: This should somehow also set the initial value
         sym = rz3.z3_mk_int_symbol(ctx, self.next_id)
         self.next_id += 1
-        return W_Z3Ptr(space, self, rz3.z3_mk_const(ctx, sym, ty))
+        return W_Z3Ptr(space, self, rz3.z3_mk_const(ctx, sym, ty), w_object)
 
     def assert_ptr(self, space, w_pointer):
         if not isinstance(w_pointer, W_Z3Ptr):
@@ -180,10 +180,11 @@ class W_Z3Ptr(W_Object):
     _immutable_fields_ = ["w_z3", "pointer"]
     classdef = ClassDef("Z3Pointer", W_ConstraintMarkerObject.classdef)
 
-    def __init__(self, space, w_z3, pointer):
+    def __init__(self, space, w_z3, pointer, w_value=None):
         W_Object.__init__(self, space, space.getclassfor(W_Z3Ptr))
         self.w_z3 = w_z3
         self.pointer = pointer
+        self.w_value = w_value
         rz3.z3_ast_inc_ref(self.w_z3.ctx, self.pointer)
 
     def __del__(self):
@@ -249,8 +250,12 @@ class W_Z3Ptr(W_Object):
 
     @classdef.method("alldifferent")
     def method_alldifferent(self, space, args_w):
-        asts_w = [self.coerce_constant_arg(space, w_arg) for w_arg in args_w]
-        return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_distinct(self.w_z3.ctx, asts_w))
+        if space.is_constructing_constraint():
+            asts_w = [self.coerce_constant_arg(space, w_arg) for w_arg in args_w]
+            return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_distinct(self.w_z3.ctx, asts_w))
+        else:
+            # normal case handled in Ruby
+            raise space.error(space.w_RuntimeError)
 
     @classdef.method("-@")
     def method_unary_minus(self, space):
@@ -277,4 +282,9 @@ class W_Z3Ptr(W_Object):
 
     @classdef.method("value")
     def method_value(self, space):
-        return space.send(self.w_z3, "[]", [self])
+        w_value = space.send(self.w_z3, "[]", [self])
+        if w_value is space.w_nil:
+            return self.w_value or space.w_nil
+        elif self.w_value:
+            self.w_value = w_value
+        return w_value

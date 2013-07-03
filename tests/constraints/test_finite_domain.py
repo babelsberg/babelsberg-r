@@ -14,8 +14,9 @@ class TestFinitDomain(BaseTopazTest):
         d = true
         e = true
         always { [a, c, d, e].alldifferent? }
-        return a, c, d, e
+        return a, c, d, e, [a, c, d, e].alldifferent?
         """)
         res = self.unwrap(space, w_res)
         assert res[0] != res[1]
         assert res[2] and not res[3] or not res[2] and res[3]
+        assert res[4]
