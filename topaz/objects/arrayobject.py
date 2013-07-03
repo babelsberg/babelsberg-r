@@ -3,6 +3,7 @@ import copy
 from rpython.rlib import jit
 from rpython.rlib.listsort import make_timsort_class
 from rpython.rlib.objectmodel import newlist_hint
+from rpython.rlib.rbigint import rbigint
 
 from topaz.coerce import Coerce
 from topaz.module import ClassDef, check_frozen
@@ -23,7 +24,10 @@ class RubySorter(BaseRubySorter):
 
     def lt(self, w_a, w_b):
         w_cmp_res = self.space.compare(w_a, w_b, self.sortblock)
-        return self.space.int_w(w_cmp_res) < 0
+        if self.space.is_kind_of(w_cmp_res, self.space.w_bignum):
+            return self.space.bigint_w(w_cmp_res).lt(rbigint.fromint(0))
+        else:
+            return self.space.int_w(w_cmp_res) < 0
 
 
 class RubySortBy(BaseRubySortBy):
