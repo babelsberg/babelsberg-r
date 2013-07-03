@@ -242,6 +242,20 @@ class W_Z3Ptr(W_Object):
     method_sub = new_binop(classdef, "-", rz3.z3_mk_sub)
     method_div = new_binop(classdef, "/", rz3.z3_mk_div)
     method_mul = new_binop(classdef, "*", rz3.z3_mk_mul)
+    method_mod = new_binop(classdef, "%", rz3.z3_mk_mod)
+    method_rem = new_binop(classdef, "remainder", rz3.z3_mk_rem)
+    method_or = new_binop(classdef, "or", rz3.z3_mk_or)
+    method_and = new_binop(classdef, "and", rz3.z3_mk_and)
+
+    @classdef.method("alldifferent")
+    def method_alldifferent(self, space, args_w):
+        asts_w = [self.coerce_constant_arg(space, w_arg) for w_arg in args_w]
+        return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_distinct(self.w_z3.ctx, asts_w))
+
+    @classdef.method("-@")
+    def method_unary_minus(self, space):
+        ast = rz3.z3_mk_unary_minus(self.w_z3.ctx, self.pointer)
+        return W_Z3Ptr(space, self.w_z3, ast)
 
     @classdef.method("enable")
     def method_enable(self, space):

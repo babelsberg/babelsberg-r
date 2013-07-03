@@ -175,6 +175,10 @@ binop("Z3_mk_ge")
 binop("Z3_mk_power")
 binop("Z3_mk_eq")
 binop("Z3_mk_div")
+binop("Z3_mk_rem")
+binop("Z3_mk_mod")
+
+z3_mk_unary_minus = rffi.llexternal("Z3_mk_unary_minus", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
 
 def z3_mk_ne(context, ast1, ast2):
     return z3_mk_not(context, z3_mk_eq(context, ast1, ast2))
@@ -209,6 +213,18 @@ z3_mk_real = rffi.llexternal("Z3_mk_real", [Z3_context, rffi.INT, rffi.INT], Z3_
 z3_mk_int = rffi.llexternal("Z3_mk_int", [Z3_context, rffi.INT, Z3_sort], Z3_ast, compilation_info=eci)
 
 # Propositional Logic
+_z3_mk_distinct = rffi.llexternal("Z3_mk_distinct", [Z3_context, rffi.UINT, Z3_astP], Z3_ast, compilation_info=eci)
+def z3_mk_distinct(ctx, asts):
+    size = len(asts)
+    ptr = lltype.malloc(Z3_astP.TO, size, flavor='raw')
+    for i, ast in enumerate(asts):
+        ptr[i] = ast
+    ast = _z3_mk_distinct(ctx, size, ptr)
+    lltype.free(ptr, flavor='raw')
+    return ast
+
+multiop("Z3_mk_and")
+multiop("Z3_mk_or")
 z3_mk_true = rffi.llexternal("Z3_mk_true", [Z3_context], Z3_ast, compilation_info=eci)
 z3_mk_false = rffi.llexternal("Z3_mk_false", [Z3_context], Z3_ast, compilation_info=eci)
 z3_get_bool_value = rffi.llexternal("Z3_get_bool_value", [Z3_context, Z3_ast], rffi.INT, compilation_info=eci)
