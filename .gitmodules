@@ -4,3 +4,6 @@
 [submodule "lib-ruby/cassowary"]
 	path = lib-ruby/cassowary
 	url = git://github.com/timfel/cassowary-ruby
+[submodule "lib-ruby/deltablue"]
+	path = lib-ruby/deltablue
+	url = git://github.com/timfel/deltared.git
