@@ -115,6 +115,14 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
     def method_solver_constraints(self, space):
         return space.newarray(self.constraint_objects_w[:])
 
+    @classdef.method("constraint_variables")
+    def method_solver_constraints(self, space):
+        vars_w = []
+        for w_var in self.constraint_variables_w:
+            if w_var.is_solveable():
+                vars_w.append(w_var.w_external_variable)
+        return space.newarray(vars_w)
+
     @classdef.method("predicate")
     def method_constraint_block(self, space):
         return self.block
@@ -132,3 +140,20 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         if enabled:
             space.send(self, "enable")
         return self.w_strength
+
+    @classdef.method("initialize")
+    def method_initialize(self, space, block=None):
+        if not block:
+            raise space.error(space.w_ArgumentError, "no block given")
+        if self.block:
+            raise space.error(space.w_ArgumentError, "cannot re-initialize Constraint")
+        self.block = block
+
+        with space.constraint_construction(block, None, self):
+            w_constraint_object = space.send(self, "__constrain__", [], block=block)
+            self.add_constraint_object(w_constraint_object)
+        return self
+
+    @classdef.singleton_method("allocate")
+    def singleton_method_allocate(self, space):
+        return W_ConstraintObject(space, None, None)
