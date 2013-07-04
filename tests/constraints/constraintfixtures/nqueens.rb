@@ -19,7 +19,7 @@ class EightQueens
     end
 
     def diagonal
-      row + column - 1
+      row - column - 1
     end
 
     def inspect
@@ -52,4 +52,12 @@ class EightQueens
   end
 end
 
-p EightQueens.new
+q = EightQueens.new
+q.queens.each do |queen|
+  q.queens.each do |other|
+    unless queen == other
+      raise "Wrong solution" if queen.row == other.row || queen.column == other.column || queen.diagonal == other.diagonal
+    end
+  end
+end
+puts "Right solution"
