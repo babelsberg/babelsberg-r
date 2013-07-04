@@ -176,7 +176,7 @@ class W_Z3Object(W_RootObject):
                 raise NotImplementedError("Ast type %d" % kind)
 
 
-class W_Z3Ptr(W_Object):
+class W_Z3Ptr(W_ConstraintMarkerObject):
     _immutable_fields_ = ["w_z3", "pointer"]
     classdef = ClassDef("Z3Pointer", W_ConstraintMarkerObject.classdef)
 
@@ -246,7 +246,7 @@ class W_Z3Ptr(W_Object):
     method_mod = new_binop(classdef, "%", rz3.z3_mk_mod)
     method_rem = new_binop(classdef, "remainder", rz3.z3_mk_rem)
     method_or = new_binop(classdef, "or", rz3.z3_mk_or)
-    method_and = new_binop(classdef, "and", rz3.z3_mk_and)
+    # method_and = new_binop(classdef, "and", rz3.z3_mk_and)
 
     @classdef.method("alldifferent")
     def method_alldifferent(self, space, args_w):

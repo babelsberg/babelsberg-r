@@ -49,8 +49,7 @@ class ConstraintInterpreter(Interpreter):
     def JUMP_AND(self, space, bytecode, frame, pc, target_pc):
         w_lhs = frame.peek()
         if space.is_kind_of(w_lhs, space.w_constraintobject):
-            space.enable_constraint(w_lhs)
-            frame.pop()
+            space.send(w_lhs, "and", [frame.pop()])
             return pc
         else:
             return Interpreter.JUMP_AND(self, space, bytecode, frame, pc, target_pc)
@@ -80,7 +79,7 @@ class ConstrainedVariable(W_Root):
         self.cvar = cvar
         self.idx = idx
         self.w_key = w_key
-        self.constraint_blocks = []
+        self.constraints_w = []
         self.w_equality_constraint = None
 
         if cell:
@@ -125,11 +124,10 @@ class ConstrainedVariable(W_Root):
     def is_solveable(self):
         return self.w_external_variable is not None
 
-    def add_constraint_block(self, block, w_strength):
-        for blk, _ in self.constraint_blocks:
-            if block is blk:
-                return
-        self.constraint_blocks.append((block, w_strength))
+    def add_to_constraint(self, w_constraint):
+        if w_constraint not in self.constraints_w:
+            self.constraints_w.append(w_constraint)
+            w_constraint.add_constraint_variable(self)
 
     def load_value(self, space):
         if self.cell:
@@ -202,12 +200,5 @@ class ConstrainedVariable(W_Root):
 
     def recalculate_path(self, space, w_value):
         self.store_value(space, w_value)
-        constraint_blocks = self.constraint_blocks[:]
-        del self.constraint_blocks[:]
-        for block, w_strength in constraint_blocks:
-            if block.is_constraint_enabled():
-                for w_constraint in block.get_constraints():
-                    space.send(w_constraint, "disable")
-                block.remove_constraints()
-                args_w = [] if w_strength is None else [w_strength]
-                space.send(space.w_object, "always", args_w, block=block)
+        for w_constraint in self.constraints_w:
+            space.send(w_constraint, "recalculate")

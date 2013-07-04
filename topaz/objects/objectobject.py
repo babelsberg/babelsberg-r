@@ -159,12 +159,13 @@ class W_RootObject(W_BaseObject):
     def method_always(self, space, w_strength=None, block=None):
         if block is None:
             raise space.error(space.w_ArgumentError, "no constraint block given")
-        if block.has_constraint():
-            raise space.error(space.w_ArgumentError, "double-use of same constraint block")
         arg_w = [] if w_strength is None else [w_strength]
-        w_constraint = space.send(self, "__constrain__", arg_w, block=block)
-        space.enable_constraint(w_constraint, w_strength=w_strength, block=block)
-        return space.newconstraintobject(w_strength, block)
+        with space.constraint_construction(block, w_strength):
+            w_constraint_object = space.send(self, "__constrain__", arg_w, block=block)
+            w_constraint = space.current_constraint()
+            w_constraint.add_constraint_object(w_constraint_object)
+        space.send(w_constraint, "enable")
+        return w_constraint
 
 
 class W_Object(W_RootObject):

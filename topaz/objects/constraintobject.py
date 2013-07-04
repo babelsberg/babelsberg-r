@@ -15,45 +15,107 @@ class W_ConstraintMarkerObject(W_Object):
     def singleton_method_allocate(self, space):
         return W_ConstraintMarkerObject(space, self)
 
+    @classdef.method("and")
+    def method_and(self, space, w_rhs):
+        if space.is_constructing_constraint():
+            w_constraint = space.current_constraint()
+            w_constraint.add_constraint_object(self)
+            return w_rhs
+        else:
+            return space.send(
+                self,
+                "method_missing",
+                [space.newstr_fromstr("and"), w_rhs]
+            )
 
 class W_ConstraintObject(W_ConstraintMarkerObject):
     classdef = ClassDef("Constraint", W_ConstraintMarkerObject.classdef)
 
-    def __init__(self, space, constraints_w, w_strength, block):
+    def __init__(self, space, w_strength, block):
         W_Object.__init__(self, space)
-        self.constraints_w = constraints_w
         self.w_strength = w_strength
         self.block = block
-        block.enable_constraint()
-        self.enabled = True
+        self.enabled = False
+        self.constraint_objects_w = []
+        self.constraint_variables_w = []
+
+    def get_constraint_objects(self):
+        return self.constraint_objects_w
+
+    def add_constraint_object(self, w_value):
+        self.constraint_objects_w.append(w_value)
+
+    def remove_constraint_objects(self):
+        del self.constraint_objects_w[:]
+
+    def has_constraint_objects(self):
+        return len(self.constraint_objects_w) > 0
+
+    def add_constraint_variable(self, w_value):
+        if w_value not in self.constraint_variables_w:
+            self.constraint_variables_w.append(w_value)
 
     @classdef.method("enable")
     def method_enable(self, space):
         if not self.enabled:
-            for w_constraint in self.constraints_w:
-                space.send(w_constraint, "enable", [self.w_strength])
-            self.block.enable_constraint()
+            for w_constraint_object in self.constraint_objects_w:
+                self.enable_constraint_object(space, w_constraint_object)
             self.enabled = True
             return space.w_true
         else:
             return space.w_nil
 
+    def enable_constraint_object(self, space, w_constraint_object):
+        if w_constraint_object is space.w_true:
+            space.send(
+                space.globals.get(self, "$stderr"),
+                "puts",
+                [space.newstr_fromstr("Warning: Constraint expression returned true, re-running it whenever the value changes")]
+            )
+        elif w_constraint_object is space.w_false or w_constraint_object is space.w_nil:
+            raise space.error(
+                space.w_ArgumentError,
+                "constraint block returned false-y, cannot assert that (did you `require' your solver?)"
+            )
+        elif not space.respond_to(w_constraint_object, "enable"):
+            raise space.error(
+                space.w_TypeError,
+                ("constraint block did an object (%s:%s) that doesn't respond to #enable " +
+                 "(did you `require' your solver?)") % (
+                     space.any_to_s(w_constraint_object),
+                     space.getclass(w_constraint_object).name
+                 )
+            )
+        else:
+            arg_w = [] if self.w_strength is None else [self.w_strength]
+            space.send(w_constraint_object, "enable", arg_w)
+
     @classdef.method("disable")
     def method_disable(self, space):
         if self.enabled:
-            for w_constraint in self.constraints_w:
-                space.send(w_constraint, "disable")
-            self.block.disable_constraint()
+            for w_constraint_object in self.constraint_objects_w:
+                if space.respond_to(w_constraint_object, "disable"):
+                    space.send(w_constraint_object, "disable")
             self.enabled = False
             return space.w_true
         else:
             return space.w_nil
 
-    @classdef.method("solver_constraints")
-    def method_solver_constraints(self, space):
-        return space.newarray(self.constraints_w[:])
+    @classdef.method("recalculate")
+    def method_recalculate(self, space):
+        if self.enabled:
+            space.send(self, "disable")
+            del self.constraint_objects_w[:]
+            with space.constraint_construction(self.block, self.w_strength, self):
+                w_constraint_object = space.invoke_block(self.block, [])
+                self.add_constraint_object(w_constraint_object)
+            space.send(self, "enable")
 
-    @classdef.method("constraint_block")
+    @classdef.method("primitive_constraints")
+    def method_solver_constraints(self, space):
+        return space.newarray(self.constraint_objects_w[:])
+
+    @classdef.method("predicate")
     def method_constraint_block(self, space):
         return self.block
 

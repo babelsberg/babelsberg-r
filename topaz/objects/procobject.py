@@ -16,30 +16,6 @@ class W_ProcObject(W_Object):
         self.parent_interp = parent_interp
         self.regexp_match_cell = regexp_match_cell
         self.is_lambda = is_lambda
-        self.constraints = []
-        self.constraint_enabled = False
-
-    def get_constraints(self):
-        return self.constraints
-
-    def add_constraint(self, w_value):
-        self.constraints.append(w_value)
-
-    def remove_constraints(self):
-        del self.constraints[:]
-
-    def has_constraint(self):
-        return len(self.constraints) > 0
-
-    def is_constraint_enabled(self):
-        return self.constraint_enabled
-
-    def enable_constraint(self):
-        self.constraint_enabled = True
-
-    def disable_constraint(self):
-        self.constraint_enabled = False
-
     def copy(self, space, w_self=None, lexical_scope=None, is_lambda=False):
         return W_ProcObject(
             space, self.bytecode,

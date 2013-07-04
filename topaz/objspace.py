@@ -105,8 +105,7 @@ class ObjectSpace(object):
         self.exit_handlers_w = []
 
         self.execution_mode_stack = [NORMAL_EXECUTION]
-        self.constraint_block_stack = []
-        self.constraint_strength_stack = []
+        self.constraint_stack = []
 
         self.w_true = W_TrueObject(self)
         self.w_false = W_FalseObject(self)
@@ -497,13 +496,13 @@ class ObjectSpace(object):
                     # TODO: dictionary constraints
                     raise NotImplementedError
 
-        if c_var and not c_var.is_solveable() and self.is_constructing_constraint():
+        if c_var and self.is_constructing_constraint():
             # No constraint solver variable available for this object
             # Only keep the block alive if this is a variable that
             # will not be registered with a solver. This means this
             # variable is on the path to a constraint, and the block
             # will have to be re-evaluated when this variable is set
-            c_var.add_constraint_block(self.current_constraint_block(), self.current_constraint_strength())
+            c_var.add_to_constraint(self.current_constraint())
 
         if c_var:
             return c_var
@@ -902,38 +901,6 @@ class ObjectSpace(object):
         else:
             return c_var.load_value(self)
 
-    def enable_constraint(self, w_constraint, w_strength=None, block=None):
-        if w_strength is None:
-            w_strength = self.current_constraint_strength()
-        if block is None:
-            block = self.current_constraint_block()
-        if w_constraint is self.w_true:
-            self.send(
-                self.globals.get(self, "$stderr"),
-                "puts",
-                [self.newstr_fromstr("Warning: Constraint expression returned true, re-running it whenever the value changes")]
-            )
-            return
-        elif w_constraint is self.w_false or w_constraint is self.w_nil:
-            raise self.error(
-                self.w_ArgumentError,
-                "constraint block returned false-y, cannot assert that (did you `require' your solver?)"
-            )
-        elif not self.respond_to(w_constraint, "enable"):
-            raise self.error(
-                self.w_TypeError,
-                ("constraint block did an object (%s:%s) that doesn't respond to #enable " +
-                 "(did you `require' your solver?)") % (
-                     self.any_to_s(w_constraint),
-                     self.getclass(w_constraint).name
-                 )
-            )
-        if block:
-            block.add_constraint(w_constraint)
-        arg_w = [] if w_strength is None else [w_strength]
-        with self.normal_execution():
-            self.send(w_constraint, "enable", arg_w) # XXX: TODO: propagate strength properly
-
     def suggest_value(self, c_var, w_value):
         if self.is_executing_normally():
             if c_var.is_solveable():
@@ -942,28 +909,20 @@ class ObjectSpace(object):
                 c_var.recalculate_path(self, w_value)
             return True
         elif self.is_constructing_constraint() and c_var.is_solveable():
-            w_constraint = self.send(c_var.w_external_variable, "==", [w_value])
-            self.enable_constraint(
-                w_constraint,
-                w_strength=self.current_constraint_strength(),
-                block=self.current_constraint_block()
-            )
+            w_constraint_object = self.send(c_var.w_external_variable, "==", [w_value])
+            w_constraint = self.current_constraint()
+            w_constraint.add_constraint_object(w_constraint)
             return True
         else:
             return False
 
     def newconstraintobject(self, w_strength, block):
-        return W_ConstraintObject(self, block.get_constraints(), w_strength, block)
+        return W_ConstraintObject(self, w_strength, block)
 
-    def current_constraint_block(self):
-        if not self.constraint_block_stack:
+    def current_constraint(self):
+        if not self.constraint_stack:
             return None
-        return self.constraint_block_stack[-1]
-
-    def current_constraint_strength(self):
-        if not self.constraint_strength_stack:
-            return None
-        return self.constraint_strength_stack[-1]
+        return self.constraint_stack[-1]
 
     def is_executing_normally(self):
         return self.execution_mode_stack[-1] == NORMAL_EXECUTION
@@ -977,27 +936,30 @@ class ObjectSpace(object):
     def constraint_execution(self):
         return _ExecutionModeContextManager(self, EXECUTING_CONSTRAINTS)
 
-    def constraint_construction(self, block, w_strength):
+    def constraint_construction(self, block, w_strength, w_constraint=None):
         return _ExecutionModeContextManager(
-            self, CONSTRUCTING_CONSTRAINT, block=block, w_strength=w_strength
+            self, CONSTRUCTING_CONSTRAINT, block=block, w_strength=w_strength, w_constraint=w_constraint
         )
 
 
 class _ExecutionModeContextManager(object):
-    def __init__(self, space, executiontype, block=None, w_strength=None):
+    def __init__(self, space, executiontype, block=None, w_strength=None, w_constraint=None):
         self.space = space
         self.executiontype = executiontype
         self.block = block
         self.w_strength = w_strength
+        self.w_constraint = w_constraint
 
     def __enter__(self):
-        if self.block:
-            self.space.constraint_block_stack.append(self.block)
-            self.space.constraint_strength_stack.append(self.w_strength)
+        if self.w_constraint:
+            w_c = self.w_constraint
+        elif not self.space.is_constructing_constraint():
+            w_c = self.space.newconstraintobject(self.w_strength, self.block)
+        else:
+            w_c = self.space.current_constraint()
+        self.space.constraint_stack.append(w_c)
         self.space.execution_mode_stack.append(self.executiontype)
 
     def __exit__(self, exc_type, exc_value, tb):
-        if self.block:
-            self.space.constraint_block_stack.pop()
-            self.space.constraint_strength_stack.pop()
+        self.space.constraint_stack.pop()
         self.space.execution_mode_stack.pop()
