@@ -248,6 +248,15 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
     method_or = new_binop(classdef, "or", rz3.z3_mk_or)
     # method_and = new_binop(classdef, "and", rz3.z3_mk_and)
 
+    @classdef.method("abs")
+    def method_abs(self, space):
+        cond = space.send(self, "<", [space.newint(0)])
+        assert isinstance(cond, W_Z3Ptr)
+        then = space.send(self, "-@")
+        assert isinstance(cond, W_Z3Ptr)
+        ast = rz3.z3_mk_ite(self.w_z3.ctx, cond.pointer, then.pointer, self.pointer)
+        return W_Z3Ptr(space, self.w_z3, ast)
+
     @classdef.method("alldifferent")
     def method_alldifferent(self, space, args_w):
         if space.is_constructing_constraint():

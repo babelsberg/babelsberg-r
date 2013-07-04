@@ -228,6 +228,7 @@ multiop("Z3_mk_or")
 z3_mk_true = rffi.llexternal("Z3_mk_true", [Z3_context], Z3_ast, compilation_info=eci)
 z3_mk_false = rffi.llexternal("Z3_mk_false", [Z3_context], Z3_ast, compilation_info=eci)
 z3_get_bool_value = rffi.llexternal("Z3_get_bool_value", [Z3_context, Z3_ast], rffi.INT, compilation_info=eci)
+z3_mk_ite = rffi.llexternal("Z3_mk_ite", [Z3_context, Z3_ast, Z3_ast, Z3_ast], Z3_ast, compilation_info=eci)
 
 # Symbols
 Z3_symbol = rffi.COpaquePtr("Z3_symbol")

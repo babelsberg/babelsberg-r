@@ -833,8 +833,19 @@ class TestConstraintVariableObject(BaseTopazTest):
             """)
 
     def test_disable_class_constraint(self, space):
+        # This raises if it fails
         space.execute("""
         f = 1
         once { f.is_a? Fixnum }
         f = "hello"
         """)
+
+    def test_abs(self, space):
+        w_res = space.execute("""
+        require "libz3"
+        x = 10
+        always { x.abs >= 100 }
+        x = -100
+        return x
+        """)
+        assert self.unwrap(space, w_res) == -100
