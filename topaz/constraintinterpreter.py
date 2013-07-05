@@ -49,7 +49,8 @@ class ConstraintInterpreter(Interpreter):
     def JUMP_AND(self, space, bytecode, frame, pc, target_pc):
         w_lhs = frame.peek()
         if space.is_kind_of(w_lhs, space.w_constraintobject):
-            space.send(w_lhs, "and", [frame.pop()])
+            with space.normal_execution():
+                space.send(w_lhs, "and", [frame.pop()])
             return pc
         else:
             return Interpreter.JUMP_AND(self, space, bytecode, frame, pc, target_pc)
