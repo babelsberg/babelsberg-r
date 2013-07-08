@@ -21,18 +21,30 @@ class TestLocalPropagation(BaseTopazTest):
         """)
         assert self.unwrap(space, w_res) == ["0", 0, "23", 23, "7", 7]
 
-    def test_class_constraint(self, space):
+    def test_interface_constraint(self, space):
         w_res = space.execute("""
         require "libdeltablue"
 
-        enumerable = nil
-        always predicate: -> { enumerable.is_a? Comparable },
-               methods: -> {[ enumerable <-> { "" } ]}
+        to_i_able = nil
+        always predicate: -> { to_i_able.respond_to? :to_i },
+               methods: -> {[ to_i_able <-> { "" } ]}
 
         $res = []
-        $res << enumerable
-        enumerable = 100
-        $res << enumerable
+        $res << to_i_able
+        to_i_able = 100
+        $res << to_i_able
         return $res
         """)
         assert self.unwrap(space, w_res) == ["", 100]
+
+    def test_class_constraint_raises(self, space):
+        with self.raises(space, "RuntimeError", "Failed to enforce a required constraint"):
+            space.execute("""
+            require "libdeltablue"
+            string = nil
+
+            always predicate: -> { string.is_a? String },
+                   methods: -> {[ string <-> { "" } ]}
+
+            string = 10
+            """)
