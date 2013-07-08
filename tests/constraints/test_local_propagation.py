@@ -48,3 +48,16 @@ class TestLocalPropagation(BaseTopazTest):
 
             string = 10
             """)
+
+    def test_non_required_class_constraint_doesnt_raise(self, space):
+        space.execute("""
+        require "libdeltablue"
+        string = nil
+
+        always predicate: -> { string.is_a? String },
+               methods: -> {[ string <-> { "" } ]},
+               priority: :medium
+
+        string = 10
+        # Fails if this raises
+        """)
