@@ -57,9 +57,19 @@ class DeltaRed::Formula < ConstraintObject
 end
 
 class DeltaRed::Solver < ConstraintObject
-  def add_constraint(predicate, strength, weight, error, methods)
+  def add_constraint(predicate, strength, methods)
     formulas = __constrain__(&methods)
-    DeltaRed.constraint! do |c|
+
+    strength ||= :required
+    strength = case strength
+               when :weak then DeltaRed::WEAK
+               when :medium then DeltaRed::MEDIUM
+               when :strong then DeltaRed::STRONG
+               when :required then DeltaRed::REQUIRED
+               else raise ArgumentError, "unsupported strength #{strength}"
+               end
+
+    DeltaRed.constraint!(strength: strength) do |c|
       formulas.each do |formula|
         formula.add_to_constraint(c)
         formula.add_predicate(predicate)
@@ -85,10 +95,8 @@ class Object
     if strength_or_hash.is_a?(Hash)
       block ||= strength_or_hash[:predicate]
       strength = strength_or_hash[:priority] || strength_or_hash[:strength]
-      weight = strength_or_hash[:weight]
-      error = strength_or_hash[:error]
       methods = strength_or_hash[:methods]
-      DeltaRed::Solver::Instance.add_constraint(block, strength, weight, error, methods)
+      DeltaRed::Solver::Instance.add_constraint(block, strength, methods)
     else
       if strength_or_hash.nil?
         prim_always(&block)

@@ -8,7 +8,7 @@ class TestLocalPropagation(BaseTopazTest):
         require "libdeltablue"
 
         string, number = "0", 0
-        always predicate: -> { string == number },
+        always predicate: -> { string == number.to_s },
                methods:  -> {[ string <-> { number.to_s },
                                number <-> { string.to_i } ]}
 
