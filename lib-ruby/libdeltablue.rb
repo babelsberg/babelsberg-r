@@ -8,7 +8,7 @@ class DeltaRed::Variable < ConstraintObject
   end
 
   def add_predicate(pred)
-    predicates << pred
+    predicates << pred if pred
   end
 
   def <(block)
@@ -95,7 +95,12 @@ class Object
     if strength_or_hash.is_a?(Hash)
       predicate = strength_or_hash[:predicate]
       strength = strength_or_hash[:priority] || strength_or_hash[:strength]
-      methods = strength_or_hash[:methods] || block
+      methods = strength_or_hash[:methods]
+      if block and methods.nil? # we can leave the predicate off, if we want
+        methods = block
+      elsif block and predicate.nil?
+        predicate = block
+      end
       DeltaRed::Solver::Instance.add_constraint(predicate, strength, methods)
     else
       if strength_or_hash.nil?
