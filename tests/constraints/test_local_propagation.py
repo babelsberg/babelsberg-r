@@ -20,3 +20,19 @@ class TestLocalPropagation(BaseTopazTest):
         return $res
         """)
         assert self.unwrap(space, w_res) == ["0", 0, "23", 23, "7", 7]
+
+    def test_class_constraint(self, space):
+        w_res = space.execute("""
+        require "libdeltablue"
+
+        enumerable = nil
+        always predicate: -> { enumerable.is_a? Comparable },
+               methods: -> {[ enumerable <-> { "" } ]}
+
+        $res = []
+        $res << enumerable
+        enumerable = 100
+        $res << enumerable
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == ["", 100]
