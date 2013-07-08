@@ -8,9 +8,9 @@ class TestLocalPropagation(BaseTopazTest):
         require "libdeltablue"
 
         string, number = "0", 0
-        always predicate: ->{ string == number },
-               methods: ->{{ string => ->{ number.to_s },
-                             number => ->{ string.to_i }}}
+        always predicate: -> { string == number },
+               methods:  -> {[ string <-> { number.to_s },
+                               number <-> { string.to_i } ]}
 
         $res = [string, number]
         string = "23"

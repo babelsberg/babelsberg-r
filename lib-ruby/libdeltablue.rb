@@ -3,29 +3,47 @@ require "deltared"
 
 # XXX: Ugh, no namespace
 class DeltaRed::Variable
+  def <(block)
+    # TODO: check that we're in `always'
+    # TODO: strength and stuff
+    constraint = ::Constraint.new(&block)
+    k_sources = constraint.constraint_variables
+    mapping = {k_sources => self}
+    DeltaRed::Formula.new(mapping, block)
+  end
+
   def method_missing(name, *args, &block)
-    # XXX: Hack: never send, just check that it could work
+    # XXX: Hack: never send, just check that it could work?
     super unless value.respond_to?(name)
   end
 
   def suggest_value(val)
+    # TODO: check predicate first
     self.value = val
   end
 end
 
-class DeltaRedSolver < ConstraintObject
-  def constraint(block, strength, weight, error, methods)
-    methods_hash = __constrain__(&methods)
+class DeltaRed::Formula
+  def initialize(mapping, block)
+    @mapping, @block = mapping, block
+  end
+
+  def add_to_constraint(c)
+    c.formula(@mapping) {|*a| @block.call }
+  end
+end
+
+class DeltaRed::Solver < ConstraintObject
+  def add_constraint(block, strength, weight, error, methods)
+    formulas = __constrain__(&methods)
     DeltaRed.constraint! do |c|
-      methods_hash.keys.each do |k|
-        block_k = methods_hash[k]
-        constraint = Constraint.new(&block_k)
-        k_sources = constraint.constraint_variables
-        p k_sources
-        c.formula({k_sources => k}) {|*a| block_k.call }
+      formulas.each do |formula|
+        formula.add_to_constraint(c)
       end
     end
   end
+
+  Instance = self.new
 end
 
 # Enable DeltaBlue
@@ -46,8 +64,7 @@ class Object
       weight = strength_or_hash[:weight]
       error = strength_or_hash[:error]
       methods = strength_or_hash[:methods]
-
-      DeltaRedSolver.new.constraint(block, strength, weight, error, methods)
+      DeltaRed::Solver::Instance.add_constraint(block, strength, weight, error, methods)
     else
       if strength_or_hash.nil?
         prim_always(&block)
