@@ -2,7 +2,15 @@ $LOAD_PATH.unshift(File.expand_path("../deltablue/lib/", __FILE__))
 require "deltared"
 
 # XXX: Ugh, no namespace
-class DeltaRed::Variable
+class DeltaRed::Variable < ConstraintObject
+  def predicates
+    @predicates ||= []
+  end
+
+  def add_predicate(pred)
+    predicates << pred
+  end
+
   def <(block)
     # TODO: check that we're in `always'
     # TODO: strength and stuff
@@ -13,17 +21,22 @@ class DeltaRed::Variable
   end
 
   def method_missing(name, *args, &block)
-    # XXX: Hack: never send, just check that it could work?
-    super unless value.respond_to?(name)
+    # XXX: Is this really necessary?
+    super unless value.respond_to? name
   end
 
   def suggest_value(val)
-    # TODO: check predicate first
-    self.value = val
+    prev = @value
+    @value = val
+    unless predicates.all?(&:call)
+      # assign previous value and let deltablue handle the constraints
+      @value = prev
+      self.value = val
+    end
   end
 end
 
-class DeltaRed::Formula
+class DeltaRed::Formula < ConstraintObject
   def initialize(mapping, block)
     @mapping, @block = mapping, block
   end
@@ -31,14 +44,25 @@ class DeltaRed::Formula
   def add_to_constraint(c)
     c.formula(@mapping) {|*a| @block.call }
   end
+
+  def add_predicate(proc)
+    variables.each do |var|
+      var.add_predicate(proc)
+    end
+  end
+
+  def variables
+    (@mapping.keys + @mapping.values).flatten.uniq
+  end
 end
 
 class DeltaRed::Solver < ConstraintObject
-  def add_constraint(block, strength, weight, error, methods)
+  def add_constraint(predicate, strength, weight, error, methods)
     formulas = __constrain__(&methods)
     DeltaRed.constraint! do |c|
       formulas.each do |formula|
         formula.add_to_constraint(c)
+        formula.add_predicate(predicate)
       end
     end
   end
