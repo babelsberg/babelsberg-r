@@ -61,3 +61,47 @@ class TestLocalPropagation(BaseTopazTest):
         string = 10
         # Fails if this raises
         """)
+
+    def test_simple_alt_syntax(self, space):
+        w_res = space.execute("""
+        require "libdeltablue"
+
+        string, number = "0", 0
+        always predicate: -> { string == number.to_s } do
+          [string <-> { number.to_s },
+           number <-> { string.to_i }]
+        end
+
+        $res = [string, number]
+        string = "23"
+        $res << string << number
+        number = 7
+        $res << string << number
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == ["0", 0, "23", 23, "7", 7]
+
+    def test_arithmetic(self, space):
+        w_res = space.execute("""
+        require "libdeltablue"
+        $res = []
+        x, y, z = 0, 0, 0
+
+        always predicate: -> { x + y == z } do
+          [x <-> { z - y },
+           y <-> { z - x },
+           z <-> { x + y }]
+        end
+
+        $res << [x, y, z]
+        x = 20
+        $res << [x, y, z]
+        z = 100
+        $res << [x, y, z]
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [
+            [0, 0, 0],
+            [20, -20, 0],
+            [20, 80, 100]
+        ]

@@ -22,7 +22,7 @@ class DeltaRed::Variable < ConstraintObject
 
   def method_missing(name, *args, &block)
     # XXX: Is this really necessary?
-    super unless value.respond_to? name
+    super unless value.respond_to?(name)
   end
 
   def suggest_value(val)
@@ -93,10 +93,10 @@ class Object
 
   def always(strength_or_hash = nil, &block)
     if strength_or_hash.is_a?(Hash)
-      block ||= strength_or_hash[:predicate]
+      predicate = strength_or_hash[:predicate]
       strength = strength_or_hash[:priority] || strength_or_hash[:strength]
-      methods = strength_or_hash[:methods]
-      DeltaRed::Solver::Instance.add_constraint(block, strength, methods)
+      methods = strength_or_hash[:methods] || block
+      DeltaRed::Solver::Instance.add_constraint(predicate, strength, methods)
     else
       if strength_or_hash.nil?
         prim_always(&block)
