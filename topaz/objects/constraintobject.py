@@ -70,8 +70,10 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
 
     def enable_constraint_object(self, space, w_constraint_object):
         if w_constraint_object is space.w_true:
+            w_stderr = space.find_const(space.w_object, "STDERR")
+            assert isinstance(w_stderr, W_RootObject)
             space.send(
-                space.globals.get(self, "$stderr"),
+                w_stderr,
                 "puts",
                 [space.newstr_fromstr("Warning: Constraint expression returned true, re-running it whenever the value changes")]
             )

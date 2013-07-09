@@ -177,6 +177,7 @@ class W_Z3Object(W_RootObject):
 
 
 class W_Z3Ptr(W_ConstraintMarkerObject):
+    _attrs_ = ["w_z3", "pointer", "w_value"]
     _immutable_fields_ = ["w_z3", "pointer"]
     classdef = ClassDef("Z3Pointer", W_ConstraintMarkerObject.classdef)
 
@@ -253,7 +254,7 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         cond = space.send(self, "<", [space.newint(0)])
         assert isinstance(cond, W_Z3Ptr)
         then = space.send(self, "-@")
-        assert isinstance(cond, W_Z3Ptr)
+        assert isinstance(then, W_Z3Ptr)
         ast = rz3.z3_mk_ite(self.w_z3.ctx, cond.pointer, then.pointer, self.pointer)
         return W_Z3Ptr(space, self.w_z3, ast)
 
