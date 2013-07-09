@@ -916,9 +916,6 @@ class ObjectSpace(object):
         else:
             return False
 
-    def newconstraintobject(self, w_strength, block):
-        return W_ConstraintObject(self, w_strength, block)
-
     def current_constraint(self):
         if not self.constraint_stack:
             return None
@@ -936,28 +933,18 @@ class ObjectSpace(object):
     def constraint_execution(self):
         return _ExecutionModeContextManager(self, EXECUTING_CONSTRAINTS)
 
-    def constraint_construction(self, block, w_strength, w_constraint=None):
-        return _ExecutionModeContextManager(
-            self, CONSTRUCTING_CONSTRAINT, block=block, w_strength=w_strength, w_constraint=w_constraint
-        )
+    def constraint_construction(self, w_constraint):
+        return _ExecutionModeContextManager(self, CONSTRUCTING_CONSTRAINT, w_constraint)
 
 
 class _ExecutionModeContextManager(object):
-    def __init__(self, space, executiontype, block=None, w_strength=None, w_constraint=None):
+    def __init__(self, space, executiontype, w_constraint=None):
         self.space = space
         self.executiontype = executiontype
-        self.block = block
-        self.w_strength = w_strength
         self.w_constraint = w_constraint
 
     def __enter__(self):
-        if self.w_constraint:
-            w_c = self.w_constraint
-        elif not self.space.is_constructing_constraint():
-            w_c = self.space.newconstraintobject(self.w_strength, self.block)
-        else:
-            w_c = self.space.current_constraint()
-        self.space.constraint_stack.append(w_c)
+        self.space.constraint_stack.append(self.w_constraint)
         self.space.execution_mode_stack.append(self.executiontype)
 
     def __exit__(self, exc_type, exc_value, tb):

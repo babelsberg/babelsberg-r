@@ -140,9 +140,10 @@ class W_RootObject(W_BaseObject):
         space.w_top_self = W_Object(space, w_cls)
 
     @classdef.method("__constrain__")
-    def method_constrain(self, space, block, w_strength=None):
-        with space.constraint_construction(block, w_strength):
-            return space.invoke_block(block, [])
+    def method_constrain(self, space, args_w, block):
+        space.send(self, "puts", [space.newstr_fromstr("DEPRECATION WARNING: __constrain__ has been deprecated, use Constraint.new instead")])
+        w_constraint = space.send(space.w_constraint, "new", args_w, block)
+        return space.send(space.send(w_constraint, "primitive_constraints"), "last")
 
     @classdef.method("?")
     def method_readonly(self, space, block, w_strength=None):
@@ -156,14 +157,8 @@ class W_RootObject(W_BaseObject):
         return self
 
     @classdef.method("always")
-    def method_always(self, space, w_strength=None, block=None):
-        if block is None:
-            raise space.error(space.w_ArgumentError, "no constraint block given")
-        arg_w = [] if w_strength is None else [w_strength]
-        with space.constraint_construction(block, w_strength):
-            w_constraint_object = space.send(self, "__constrain__", arg_w, block=block)
-            w_constraint = space.current_constraint()
-            w_constraint.add_constraint_object(w_constraint_object)
+    def method_always(self, space, args_w, block):
+        w_constraint = space.send(space.w_constraint, "new", args_w, block)
         space.send(w_constraint, "enable")
         return w_constraint
 
