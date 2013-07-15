@@ -915,6 +915,9 @@ class ObjectSpace(object):
                 c_var.recalculate_path(self, w_value)
             return True
         elif self.is_constructing_constraint() and c_var.is_solveable():
+            # TODO: Track which c_vars have been assigned in this
+            # construction, and raise an error if one is assigned more
+            # than once
             w_constraint_object = self.send(c_var.w_external_variable, "==", [w_value])
             w_constraint = self.current_constraint()
             w_constraint.add_constraint_object(w_constraint)
