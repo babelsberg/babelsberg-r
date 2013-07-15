@@ -145,7 +145,10 @@ class Frame(BaseFrame):
             instr = self.last_instr
         else:
             instr = prev_frame.back_last_instr - 1
-        return self.bytecode.lineno_table[instr]
+        try:
+            return self.bytecode.lineno_table[instr]
+        except IndexError:
+            return -1
 
     def get_code_name(self):
         return self.bytecode.name
