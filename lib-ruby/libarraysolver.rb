@@ -79,6 +79,12 @@ class ArrayConstraintVariable < ConstraintObject
     r
   end
 
+  def alldifferent?
+    raise "Need Z3 for this" unless defined? Z3
+    return true if @constraint_variables.empty?
+    always { @constraint_variables.alldifferent? }
+  end
+
   include Enumerable
   def each_with_index(&block)
     i = 0
