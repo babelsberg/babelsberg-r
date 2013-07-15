@@ -131,7 +131,7 @@ end
 
 class Array
   def for_constraint(name)
-    if self.all? { |e| e.is_a? Numeric }
+    if self.all? { |e| e.is_a? Numeric } and !self.empty?
       ArrayConstraintVariable.new(self)
     end
   end

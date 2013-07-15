@@ -57,3 +57,8 @@ Dogs: 3, cats: 41, mice: 56
         assert out == u"""Z3 constraint solver loaded.
 Right solution
 """
+
+    def test_send_more_money(self, space, tmpdir, capfd):
+        self.run(space, tmpdir, "send_more_money.rb")
+        out, err = capfd.readouterr()
+        assert out.split('\n')[-2] == u"Working solution"
