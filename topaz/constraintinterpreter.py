@@ -105,6 +105,10 @@ class ConstrainedVariable(W_Root):
         # TODO: remove external variable from solver
         pass
 
+    # XXX: remove once we find another way to store the ConstrainedVariable object
+    def is_kind_of(self, space, w_cls):
+        return False
+
     def make_readonly(self, space):
         if not self.is_readonly():
             self.w_equality_constraint = space.send(self.w_external_variable, "==", [self.get_i(space)])

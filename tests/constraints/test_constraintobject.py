@@ -782,7 +782,7 @@ class TestConstraintVariableObject(BaseTopazTest):
             -10, 15, -5
         ]
 
-    @py.test.mark.xfails
+    @py.test.mark.xfail
     def test_edit_complex_object_stream(self, space):
         w_ca = space.execute("""
         require "libcassowary"
