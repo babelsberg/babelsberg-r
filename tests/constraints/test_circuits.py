@@ -23,14 +23,21 @@ class TwoLeadedObject
 end
 
 class Resistor < TwoLeadedObject
+  # XXX: Check whether we are using cassowary, to avoid nonlinear result error further down
+  $USING_CASSOWARY = (x = 1.0; Constraint.new { x }.value.is_a? Cassowary::Variable)
+
   attr_reader :resistance
   def initialize(resistance)
     super()
     @resistance = resistance
     # Ohm's Law constraint
-    # temporarily use a fixed value for the resistance to avoid getting a nonlinear constraint error
-    # always { lead1.voltage - lead2.voltage == resistance*lead1.current }
-    always { lead1.voltage - lead2.voltage == 100*lead1.current }
+    unless $USING_CASSOWARY
+      always { lead1.voltage - lead2.voltage == resistance.? * lead1.current }
+    else
+      # using Cassowary
+      # temporarily use a fixed value for the resistance to avoid getting a nonlinear constraint error
+      always { lead1.voltage - lead2.voltage == 100*lead1.current }
+    end
   end
 end
 
