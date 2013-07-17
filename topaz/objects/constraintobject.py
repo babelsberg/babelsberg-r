@@ -163,3 +163,8 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
     @classdef.singleton_method("allocate")
     def singleton_method_allocate(self, space):
         return W_ConstraintObject(space)
+
+    @classdef.method("value")
+    def method_return_value(self, space):
+        # last added constraint object is the return value
+        return self.constraint_objects_w[-1]

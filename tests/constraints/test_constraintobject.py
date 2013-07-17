@@ -422,7 +422,7 @@ class TestConstraintVariableObject(BaseTopazTest):
 
               def for_constraint(name)
                 @float ||= self.to_f
-                __constrain__ { @float }
+                Constraint.new { @float }.value
               end
             end
 
@@ -453,7 +453,7 @@ class TestConstraintVariableObject(BaseTopazTest):
                   @float = 0
                   always { @float == self.to_f }
                 end
-                __constrain__ { @float }
+                Constraint.new { @float }.value
               end
             end
 
@@ -481,7 +481,7 @@ class TestConstraintVariableObject(BaseTopazTest):
                   @float = 0
                   @stay = always { @float == self.to_f }
                 end
-                __constrain__ { @float }
+                Constraint.new { @float }.value
               end
 
               def update(float)

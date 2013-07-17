@@ -68,7 +68,7 @@ def connect(leads)
   leads[1..-1].each { |a| always { a.voltage == leads[0].voltage } }
   # sum of currents has to be 0
   sum = leads.inject(0) do |memo, lead|
-    __constrain__ { lead.current } + memo
+    Constraint.new { lead.current }.value + memo
   end
   always { sum == 0 }
 end

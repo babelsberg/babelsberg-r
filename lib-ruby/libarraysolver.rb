@@ -24,7 +24,7 @@ class ArrayConstraintVariable < ConstraintObject
   def initialize(ary)
     @ary = ary
     @constraint_variables = @ary.collect do |var|
-      __constrain__ { var }
+      Constraint.new { var }.value
     end
   end
 
@@ -39,7 +39,7 @@ class ArrayConstraintVariable < ConstraintObject
 
   def length
     @length = @constraint_variables.size unless @length
-    __constrain__ { @length }
+    Constraint.new { @length }.value
   end
   alias size length
 
@@ -51,7 +51,7 @@ class ArrayConstraintVariable < ConstraintObject
       idx = idx + ary.size if idx < 0
       if idx >= @constraint_variables.size
         a = 0.0
-        @constraint_variables[idx] = __constrain__ { a }
+        @constraint_variables[idx] = Constraint.new { a }.value
       end
       if l == 1
         [@constraint_variables[idx]]

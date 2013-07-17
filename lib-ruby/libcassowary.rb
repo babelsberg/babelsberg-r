@@ -38,7 +38,7 @@ class Object
     unless block
       raise(ArgumentError, "No variable binding given")
     end
-    vars = [*__constrain__(&block)]
+    vars = Constraint.new(&block).constraint_variables
     unless vars.all? { |o| o.is_a? Cassowary::Variable }
       raise ArgumentError, "Block did not return a Cassowary::Variable or array of Cassowary::Variables, cannot create edit constraint"
     end

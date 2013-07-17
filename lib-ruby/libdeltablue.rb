@@ -75,7 +75,7 @@ end
 
 class DeltaRed::Solver < ConstraintObject
   def add_constraint(predicate, strength, methods)
-    formulas = __constrain__(&methods)
+    formulas = Constraint.new(&methods).value
 
     strength ||= :required
     strength = case strength
