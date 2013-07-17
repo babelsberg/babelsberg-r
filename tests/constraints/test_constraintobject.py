@@ -782,6 +782,47 @@ class TestConstraintVariableObject(BaseTopazTest):
             -10, 15, -5
         ]
 
+    @py.test.mark.xfails
+    def test_edit_complex_object_stream(self, space):
+        w_ca = space.execute("""
+        require "libcassowary"
+        $res = []
+
+        class Point
+          attr_accessor :x, :y
+          def initialize(x, y); self.x, self.y = x, y; end
+        end
+
+        @top = Point.new 0, 0
+        $top = @top
+
+        class Stream
+          def initialize(ary)
+            @ary = ary
+          end
+
+          def next
+            ($res << $top.x << $top.y) if @ary.size > 0
+            @ary.pop
+          end
+        end
+
+        always { @top.x >= 10 }
+        always { @top.x <= 100 }
+        always { @top.x == @top.y * 2 }
+
+        edit_stream = Stream.new([Point.new(10, 10), Point.new(20, 20)])
+        edit(edit_stream) { @top }
+
+        $res << @top.x << @top.y
+        return $res
+        """)
+        assert self.unwrap(space, w_ca) == [
+            10, 5,
+            10, 5,
+            20, 10
+        ]
+
     def test_non_solveable_variable_constraint_blocks(self, space):
         w_res = space.execute("""
         $calls = 0
