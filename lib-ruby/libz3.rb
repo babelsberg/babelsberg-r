@@ -17,6 +17,27 @@ class Z3::Z3Pointer
 end
 
 class Numeric
+  alias prev_coerce coerce
+  def coerce(other)
+    if other.kind_of?(Z3::Z3Pointer)
+      [other, Z3::Instance.make_real(self)]
+    else
+      prev_coerce(other)
+    end
+  end
+end
+
+class Fixnum
+  def coerce(other)
+    if other.kind_of?(Z3::Z3Pointer)
+      [other, Z3::Instance.make_int(self)]
+    else
+      super(other)
+    end
+  end
+end
+
+class Numeric
   def for_constraint(name)
     Z3::Instance.make_real_variable(self.to_f)
   end

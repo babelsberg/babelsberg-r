@@ -3,8 +3,6 @@ import py
 from ..base import BaseTopazTest
 
 CircuitClasses = """
-require "libcassowary"
-
 class Lead
   attr_reader :voltage, :current
   def initialize
@@ -76,21 +74,26 @@ end
 """
 
 class TestCircuits(BaseTopazTest):
-    def execute(self, space, code, *libs):
-        return [space.execute("""
-                require "%s"
-
-                %s
-                """ % (lib, code)) for lib in libs]
+    def execute(self, space, code):
+        w_cassowary = space.execute("""
+        require "libcassowary"
+        %s
+        """ % code)
+        w_z3 = space.execute("""
+        require "libz3"
+        %s
+        """ % code)
+        assert self.unwrap(space, w_cassowary) == self.unwrap(space, w_z3)
+        return w_z3
 
     def test_ground(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           g = Ground.new
           return [ g.lead.voltage, g.lead.current] """)
         assert self.unwrap(space, w_res) == [0.0, 0.0]
 
     def test_twoleadedobject(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           t = TwoLeadedObject.new
           always { t.lead1.voltage == 20.0 }
           always { t.lead1.current == 12.0 }
@@ -98,13 +101,13 @@ class TestCircuits(BaseTopazTest):
         assert self.unwrap(space, w_res) == [20.0, 12.0, -12.0]
 
     def test_battery_setup(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           b = Battery.new(5.0)
           return [ b.lead2.voltage-b.lead1.voltage, b.lead1.current, b.lead2.current ] """)
         assert self.unwrap(space, w_res) == [5.0, 0.0, 0.0]
 
     def test_battery_simple(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           b = Battery.new(5.0)
           always { b.lead1.voltage == 20.0 }
           always { b.lead1.current == 12.0 }
@@ -113,7 +116,7 @@ class TestCircuits(BaseTopazTest):
         assert self.unwrap(space, w_res) == [20.0, 12.0, 25.0, -12.0]
 
     def test_resistor(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           # CAUTION!  Note that the resistor class temporarily has 100 ohms hardwired
           r = Resistor.new(100.0)
           always { r.lead1.voltage == 10.0 }
@@ -122,7 +125,7 @@ class TestCircuits(BaseTopazTest):
         assert self.unwrap(space, w_res) == [10.0, 0.05, 5.0, -0.05]
 
     def test_wire(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           w = Wire.new
           always { w.lead1.voltage == 10.0 }
           always { w.lead1.current == 2.0 }
@@ -130,13 +133,13 @@ class TestCircuits(BaseTopazTest):
         assert self.unwrap(space, w_res) == [10.0, 2.0, 10.0, -2.0]
 
     def test_connect0(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           connect []
           return 10  """)
         assert self.unwrap(space, w_res) == 10
 
     def test_connect1(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           a = Lead.new
           always { a.voltage == 7.0 }
           connect [a]
@@ -144,7 +147,7 @@ class TestCircuits(BaseTopazTest):
         assert self.unwrap(space, w_res) == [7.0, 0.0]
 
     def test_connect2(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           a = Lead.new
           b = Lead.new
           always { a.voltage == 7.0 }
@@ -152,9 +155,9 @@ class TestCircuits(BaseTopazTest):
           connect [a,b]
           return [a.voltage, a.current, b.voltage, b.current]  """)
         assert self.unwrap(space, w_res) == [7.0, 3.0, 7.0, -3.0]
-   
+
     def test_connect3(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           a = Lead.new
           b = Lead.new
           c = Lead.new
@@ -166,7 +169,7 @@ class TestCircuits(BaseTopazTest):
         assert self.unwrap(space, w_res) == [7.0, 3.0, 7.0, 5.0, 7.0, -8.0]
 
     def test_connect4(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           a = Lead.new
           b = Lead.new
           c = Lead.new
@@ -178,9 +181,9 @@ class TestCircuits(BaseTopazTest):
           connect [a,b,c,d]
           return [a.voltage, a.current, b.voltage, b.current, c.voltage, c.current, d.voltage, d.current]  """)
         assert self.unwrap(space, w_res) == [7.0, 3.0, 7.0, 5.0, 7.0, -9.5, 7.0, 1.5]
-   
+
     def test_battery_resistor(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           g = Ground.new
           # CAUTION!  Note that the resistor class temporarily has 100 ohms hardwired
           r = Resistor.new(100.0)
@@ -193,7 +196,7 @@ class TestCircuits(BaseTopazTest):
         assert self.unwrap(space, w_res) == [0.0, -0.05, 5.0, 0.05, 0.0, 0.05, 5.0, -0.05, 5.0, 0.0, 0.0]
 
     def test_wheatstone_bridge(self, space):
-        w_res = space.execute(CircuitClasses + """
+        w_res = self.execute(space, CircuitClasses + """
           g = Ground.new
           b = Battery.new(5.0)
           # CAUTION!  Note that the resistor class temporarily has 100 ohms hardwired
@@ -214,14 +217,11 @@ class TestCircuits(BaseTopazTest):
                    r3.lead1.voltage, r3.lead1.current, r3.lead2.voltage, r3.lead2.current,
                    r4.lead1.voltage, r4.lead1.current, r4.lead2.voltage, r4.lead2.current,
                    w.lead1.voltage, w.lead1.current, w.lead2.voltage, w.lead2.current      ]  """)
-                   
+
         assert self.unwrap(space, w_res) == [0.0, 0.05, 5.0, -0.05, 5.0,
                                              0.0, 0.0,
-                                             5.0, 0.025, 2.5, -0.025, 
-                                             5.0, 0.025, 2.5, -0.025, 
-                                             2.5, 0.025, 0, -0.025, 
-                                             2.5, 0.025, 0, -0.025, 
+                                             5.0, 0.025, 2.5, -0.025,
+                                             5.0, 0.025, 2.5, -0.025,
+                                             2.5, 0.025, 0, -0.025,
+                                             2.5, 0.025, 0, -0.025,
                                              2.5, 0.0, 2.5, 0.0]
-
-
-
