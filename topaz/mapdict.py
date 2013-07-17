@@ -249,7 +249,7 @@ class ConstraintVarNode(StorageNode):
 
     def copy_constraint_vars(self, space, w_obj, w_target):
         StorageNode.copy_constraint_vars(self, space, w_obj, w_target)
-        w_target.set_constraint_var(space, self.name, w_obj.storage[self.pos])
+        w_target.set_constraint_var(space, self.name, self.read(space, w_obj))
 
     def write(self, space, w_obj, w_value):
         w_obj.object_storage[self.pos] = w_value
