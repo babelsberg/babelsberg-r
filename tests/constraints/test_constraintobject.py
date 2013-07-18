@@ -782,7 +782,6 @@ class TestConstraintVariableObject(BaseTopazTest):
             -10, 15, -5
         ]
 
-    @py.test.mark.xfail
     def test_edit_complex_object_stream(self, space):
         w_ca = space.execute("""
         require "libcassowary"
@@ -812,15 +811,15 @@ class TestConstraintVariableObject(BaseTopazTest):
         always { @top.x == @top.y * 2 }
 
         edit_stream = Stream.new([Point.new(10, 10), Point.new(20, 20)])
-        edit(edit_stream) { @top }
+        edit(stream: edit_stream, accessors: [:x, :y]) { @top }
 
         $res << @top.x << @top.y
         return $res
         """)
         assert self.unwrap(space, w_ca) == [
             10, 5,
-            10, 5,
-            20, 10
+            20, 10,
+            10, 5
         ]
 
     def test_non_solveable_variable_constraint_blocks(self, space):

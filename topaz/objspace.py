@@ -79,11 +79,6 @@ from topaz.parser import Parser
 from topaz.utils.ll_file import isdir
 
 
-NORMAL_EXECUTION = 0
-EXECUTING_CONSTRAINTS = 1
-CONSTRUCTING_CONSTRAINT = 2
-
-
 class SpaceCache(Cache):
     def __init__(self, space):
         Cache.__init__(self)
@@ -104,7 +99,7 @@ class ObjectSpace(object):
         self.bootstrap = True
         self.exit_handlers_w = []
 
-        self.execution_mode_stack = [NORMAL_EXECUTION]
+        self._executionmodes = ExecutionModeHolder(NormalExecution())
         self.constraint_stack = []
 
         self.w_true = W_TrueObject(self)
@@ -931,19 +926,19 @@ class ObjectSpace(object):
         return self.constraint_stack[-1]
 
     def is_executing_normally(self):
-        return self.execution_mode_stack[-1] == NORMAL_EXECUTION
+        return isinstance(self._executionmodes.get(), NormalExecution)
 
     def is_constructing_constraint(self):
-        return self.execution_mode_stack[-1] == CONSTRUCTING_CONSTRAINT
+        return isinstance(self._executionmodes.get(), ConstructingConstraint)
 
     def normal_execution(self):
-        return _ExecutionModeContextManager(self, NORMAL_EXECUTION)
+        return _ExecutionModeContextManager(self, NormalExecution)
 
     def constraint_execution(self):
-        return _ExecutionModeContextManager(self, EXECUTING_CONSTRAINTS)
+        return _ExecutionModeContextManager(self, ExecutingConstraints)
 
     def constraint_construction(self, w_constraint):
-        return _ExecutionModeContextManager(self, CONSTRUCTING_CONSTRAINT, w_constraint)
+        return _ExecutionModeContextManager(self, ConstructingConstraint, w_constraint)
 
 
 class _ExecutionModeContextManager(object):
@@ -954,8 +949,39 @@ class _ExecutionModeContextManager(object):
 
     def __enter__(self):
         self.space.constraint_stack.append(self.w_constraint)
-        self.space.execution_mode_stack.append(self.executiontype)
+        self.space._executionmodes.append(self.executiontype())
 
     def __exit__(self, exc_type, exc_value, tb):
         self.space.constraint_stack.pop()
-        self.space.execution_mode_stack.pop()
+        self.space._executionmodes.pop()
+
+
+class ExecutionModeHolder(object):
+    # TODO: convert to be threadlocal store once we have threads
+    def __init__(self, em):
+        self._executionmode = em
+
+    def get(self):
+        return jit.promote(self._executionmode)
+
+    def append(self, em):
+        em.prepend(self._executionmode)
+        self._executionmode = em
+
+    def pop(self):
+        self._executionmode = self._executionmode.prev
+
+
+class ExecutionMode(object):
+    _attrs_ = ["prev"]
+
+    def prepend(self, prev):
+        self.prev = prev
+
+
+class NormalExecution(ExecutionMode):
+    pass
+class ExecutingConstraints(ExecutionMode):
+    pass
+class ConstructingConstraint(ExecutionMode):
+    pass
