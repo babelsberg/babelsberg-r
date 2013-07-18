@@ -12,12 +12,24 @@ class Numeric
   end
 end
 
-class Fixnum
+class Float
+  alias prev_coerce coerce
   def coerce(other)
     if other.kind_of?(Cassowary::AbstractVariable) || other.kind_of?(Cassowary::Constraint)
       [other, self.as_linear_expression]
     else
-      super(other)
+      prev_coerce(other)
+    end
+  end
+end
+
+class Fixnum
+  alias prev_coerce coerce
+  def coerce(other)
+    if other.kind_of?(Cassowary::AbstractVariable) || other.kind_of?(Cassowary::Constraint)
+      [other, self.as_linear_expression]
+    else
+      prev_coerce(other)
     end
   end
 end
