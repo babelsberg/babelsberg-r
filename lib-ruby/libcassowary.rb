@@ -43,7 +43,7 @@ class Numeric
 end
 
 class Object
-  def __parse_edit_constraint_arguments(stream, opts = nil, block)
+  def __parse_edit_constraint_arguments(stream, opts, block)
     # TODO: make this work if we mix complex objects and float
     # variables in block
     if stream.is_a? Hash
@@ -55,6 +55,7 @@ class Object
       raise ArgumentError, "#{stream} does not respond to `next'"
     end
 
+    opts ||= {}
     strength = opts[:strength] || opts[:priority] || :strong
     strength = Cassowary.symbolic_strength(strength)
 
