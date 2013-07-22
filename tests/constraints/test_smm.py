@@ -18,8 +18,8 @@ class TestMain(object):
         assert res == status
         return f
 
+    # this version of the program outputs the solution rather than just saying that it worked
     def test_smm(self, space, tmpdir, capfd):
         self.run(space, tmpdir, "smm.rb")
         out, err = capfd.readouterr()
-        print "testing - where is this output?"
-        assert out.split('\n')[-2] == u"Working solution"
+        assert out.split('\n')[-2] == u"solution: [s,e,n,d,m,o,r,y] = [9, 5, 6, 7, 1, 0, 8, 2]"
