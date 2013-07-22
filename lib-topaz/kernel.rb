@@ -33,6 +33,11 @@ module Kernel
   end
   private :chop
 
+  def chomp
+    $_.chomp!
+  end
+  private :chomp
+
   def Array(arg)
     if ary = Topaz.try_convert_type(arg, Array, :to_ary)
       ary
