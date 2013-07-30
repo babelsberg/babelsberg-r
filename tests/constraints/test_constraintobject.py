@@ -889,3 +889,34 @@ class TestConstraintVariableObject(BaseTopazTest):
         return x
         """)
         assert self.unwrap(space, w_res) == -100
+
+    def test_identity1(self, space):
+        w_res = space.execute("""
+        a = Object.new
+        b = Object.new
+        always { a.eql? b }
+        return a.object_id == b.object_id
+        """)
+        assert self.unwrap(space, w_res) == True
+
+    def test_identity2(self, space):
+        w_res = space.execute("""
+        a = Object.new
+        b = Object.new
+        c = always { a.eql? b }
+        $res = [a.object_id == b.object_id]
+        a = x = Object.new
+        $res << [a.object_id == b.object_id, a.object_id == x.object_id]
+        b = x = Object.new
+        $res << [a.object_id == b.object_id, b.object_id == x.object_id]
+        c.disable
+        a = x = Object.new
+        $res << [a.object_id != b.object_id, a.object_id == x.object_id]
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [
+            True,
+            [True, True],
+            [True, True],
+            [True, True]
+        ]

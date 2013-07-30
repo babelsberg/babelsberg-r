@@ -168,3 +168,37 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
     def method_return_value(self, space):
         # last added constraint object is the return value
         return self.constraint_objects_w[-1]
+
+
+class W_IdentityConstraintObject(W_ConstraintMarkerObject):
+    _attrs_ = ["enabled", "c_this", "c_that"]
+    classdef = ClassDef("IdentityConstraint", W_ConstraintMarkerObject.classdef)
+
+    @classdef.method("initialize")
+    def method_initialize(self, space, w_this, w_that):
+        from topaz.constraintinterpreter import ConstrainedVariable
+        c_this = space.find_instance_var(w_this, ConstrainedVariable.CONSTRAINT_IVAR)
+        c_that = space.find_instance_var(w_that, ConstrainedVariable.CONSTRAINT_IVAR)
+        assert isinstance(c_this, ConstrainedVariable)
+        assert isinstance(c_that, ConstrainedVariable)
+        self.enabled = False
+        self.c_this = c_this
+        self.c_that = c_that
+
+    @classdef.method("enable")
+    def method_enable(self, space):
+        if not self.enabled:
+            self.c_this.constrain_identity(self.c_that)
+            with space.constraint_execution():
+                self.c_this.set_identical_variables(space)
+            self.enabled = True
+
+    @classdef.method("disable")
+    def method_disable(self, space):
+        if self.enabled:
+            self.c_this.unconstrain_identity(self.c_that)
+            self.enabled = False
+
+    @classdef.singleton_method("allocate")
+    def singleton_method_allocate(self, space):
+        return W_IdentityConstraintObject(space)

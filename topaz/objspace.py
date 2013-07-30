@@ -41,7 +41,7 @@ from topaz.objects.boolobject import W_TrueObject, W_FalseObject
 from topaz.objects.classobject import W_ClassObject
 from topaz.objects.codeobject import W_CodeObject
 
-from topaz.objects.constraintobject import W_ConstraintObject, W_ConstraintMarkerObject
+from topaz.objects.constraintobject import W_ConstraintObject, W_ConstraintMarkerObject, W_IdentityConstraintObject
 from topaz.objects.z3object import W_Z3Object
 
 from topaz.objects.dirobject import W_DirObject
@@ -162,6 +162,7 @@ class ObjectSpace(object):
 
         self.w_constraintobject = self.getclassfor(W_ConstraintMarkerObject)
         self.w_constraint = self.getclassfor(W_ConstraintObject)
+        self.w_identity_constraint = self.getclassfor(W_IdentityConstraintObject)
         self.w_z3 = self.getclassfor(W_Z3Object)
 
         self.w_topaz = self.getmoduleobject(Topaz.moduledef)

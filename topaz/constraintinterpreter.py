@@ -80,7 +80,8 @@ class ConstrainedVariable(W_Root):
         self.idx = idx
         self.w_key = w_key
         self.constraints_w = []
-        self.w_equality_constraint = None
+        self.w_readonly_constraint = None
+        self.identical_variables = []
 
         if cell:
             from topaz.closure import ClosureCell
@@ -111,22 +112,64 @@ class ConstrainedVariable(W_Root):
 
     def make_readonly(self, space):
         if not self.is_readonly():
-            self.w_equality_constraint = space.send(self.w_external_variable, "==", [self.get_i(space)])
-            space.send(self.w_equality_constraint, "enable")
+            self.w_readonly_constraint = space.send(self.w_external_variable, "==", [self.get_i(space)])
+            space.send(self.w_readonly_constraint, "enable")
 
     def make_writable(self, space):
         if not self.is_writable():
-            space.send(self.w_equality_constraint, "disable")
-            self.w_equality_constraint = None
+            space.send(self.w_readonly_constraint, "disable")
+            self.w_readonly_constraint = None
 
     def is_readonly(self):
         return not self.is_writable()
 
     def is_writable(self):
-        return self.is_solveable() and self.w_equality_constraint is None
+        return self.is_solveable() and self.w_readonly_constraint is None
 
     def is_solveable(self):
         return self.w_external_variable is not None
+
+    def constrain_identity(self, other):
+        self.__constrain_identity__(other)
+        other.__constrain_identity__(self)
+
+    def __constrain_identity__(self, other):
+        if other not in self.identical_variables:
+            self.identical_variables.append(other)
+
+    def unconstrain_identity(self, other):
+        self.__unconstrain_identity__(other)
+        other.__unconstrain_identity__(self)
+
+    def __unconstrain_identity__(self, other):
+        try:
+            self.identical_variables.remove(other)
+        except ValueError:
+            pass
+
+    def all_identical_variables(self, array):
+        if self not in array:
+            array.append(self)
+            for other in self.identical_variables:
+                other.all_identical_variables(array=array)
+        return array
+
+    def set_identical_variables(self, space):
+        if self.identical_variables:
+            all_identical = self.all_identical_variables([])
+            w_value = self.get_i(space)
+
+            for other in all_identical:
+                if not space.eq_w(other.get_i(space), w_value):
+                    if other.is_solveable():
+                        other.suggest_value(space, w_value)
+                    else:
+                        other.recalculate_path(space, w_value)
+                    if not space.eq_w(other.get_i(space), w_value):
+                        raise space.error(
+                            space.w_RuntimeError,
+                            "identity constraint no longer satisfied"
+                        )
 
     def add_to_constraint(self, w_constraint):
         if w_constraint not in self.constraints_w:
@@ -176,8 +219,11 @@ class ConstrainedVariable(W_Root):
         readonly = self.is_readonly()
         if readonly:
             self.make_writable(space)
+        normal_execution = space.is_executing_normally()
         with space.constraint_execution():
             space.send(self.w_external_variable, "suggest_value", [w_value])
+            if normal_execution:
+                self.set_identical_variables(space)
         if readonly:
             self.make_readonly(space)
 

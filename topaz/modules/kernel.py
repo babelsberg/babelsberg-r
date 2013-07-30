@@ -287,7 +287,11 @@ class Kernel(object):
 
     @moduledef.function("eql?")
     def method_eqlp(self, space, w_other):
-        return space.newbool(self is w_other)
+        if space.is_constructing_constraint():
+            # identity constraint
+            return space.send(space.w_identity_constraint, "new", [self, w_other])
+        else:
+            return space.newbool(self is w_other)
 
     @moduledef.function("instance_variable_defined?", name="symbol")
     def method_instance_variable_definedp(self, space, name):
