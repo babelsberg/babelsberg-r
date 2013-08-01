@@ -101,6 +101,7 @@ class ObjectSpace(object):
 
         self._executionmodes = ExecutionModeHolder(NormalExecution())
         self.constraint_stack = []
+        self.remembered_assignments = []
 
         self.w_true = W_TrueObject(self)
         self.w_false = W_FalseObject(self)
@@ -904,23 +905,42 @@ class ObjectSpace(object):
 
     def assign_value(self, c_var, w_value):
         if self.is_executing_normally():
-            c_var.assign_value(self, w_value)
+            if self.in_multi_assignment():
+                self.remember_assignment(c_var, w_value)
+            else:
+                c_var.assign_value(self, w_value)
             return True
         elif self.is_constructing_constraint() and c_var.is_solveable():
             # TODO: Track which c_vars have been assigned in this
             # construction, and raise an error if one is assigned more
             # than once
+            # TODO: Fix this so it works for complex objects
+            # TODO: Fix this so it works for DeltaBlue variables
             w_constraint_object = self.send(c_var.w_external_variable, "==", [w_value])
             w_constraint = self.current_constraint()
-            w_constraint.add_constraint_object(w_constraint)
-            return True
-        elif self.in_atomic_assignment():
-            atomicem = self.current_execution_mode()
-            import pdb; pdb.set_trace()
-            atomicem.remember(self, c_var, w_value)
+            w_constraint.add_constraint_object(w_constraint_object)
             return True
         else:
             return False
+
+    def in_multi_assignment(self):
+        return len(self.remembered_assignments) > 0
+
+    def begin_multi_assignment(self):
+        self.remembered_assignments.append(None)
+
+    def remember_assignment(self, c_var, w_value):
+        c_var.begin_assign(self, w_value)
+        self.remembered_assignments.append(c_var)
+
+    def end_multi_assignment(self):
+        assert self.remembered_assignments[0] is None
+        self.remembered_assignments.pop(0)
+        for cvar in self.remembered_assignments:
+            cvar.assign(self)
+        for cvar in self.remembered_assignments:
+            cvar.end_assign(self)
+        del self.remembered_assignments[:]
 
     def current_execution_mode(self):
         return self._executionmodes.get()
@@ -936,18 +956,6 @@ class ObjectSpace(object):
     def is_constructing_constraint(self):
         return isinstance(self._executionmodes.get(), ConstructingConstraint)
 
-    def in_atomic_assignment(self):
-        return isinstance(self._executionmodes.get(), AtomicAssignment)
-
-    def begin_atomic_assignment(self):
-        self.atomic_assignment().__enter__()
-
-    def end_atomic_assignment(self):
-        assert self.in_atomic_assignment()
-        self.constraint_stack.pop()
-        em = self._executionmodes.pop()
-        em.exit(self)
-
     def normal_execution(self):
         return _ExecutionModeContextManager(self, NormalExecution)
 
@@ -956,9 +964,6 @@ class ObjectSpace(object):
 
     def constraint_construction(self, w_constraint):
         return _ExecutionModeContextManager(self, ConstructingConstraint, w_constraint)
-
-    def atomic_assignment(self):
-        return _ExecutionModeContextManager(self, AtomicAssignment)
 
 
 class _ExecutionModeContextManager(object):
@@ -969,14 +974,11 @@ class _ExecutionModeContextManager(object):
 
     def __enter__(self):
         self.space.constraint_stack.append(self.w_constraint)
-        em = self.executiontype()
-        self.space._executionmodes.append(em)
-        em.enter(self.space)
+        self.space._executionmodes.append(self.executiontype())
 
     def __exit__(self, exc_type, exc_value, tb):
         self.space.constraint_stack.pop()
-        em = self.space._executionmodes.pop()
-        em.exit(self.space)
+        self.space._executionmodes.pop()
 
 
 class ExecutionModeHolder(object):
@@ -1003,12 +1005,6 @@ class ExecutionMode(object):
     def prepend(self, prev):
         self.prev = prev
 
-    def enter(self, space):
-        pass
-
-    def exit(self, space):
-        pass
-
 
 class NormalExecution(ExecutionMode):
     pass
@@ -1016,20 +1012,3 @@ class ExecutingConstraints(ExecutionMode):
     pass
 class ConstructingConstraint(ExecutionMode):
     pass
-
-
-class AtomicAssignment(ExecutionMode):
-    _attrs_ = ["cvars"]
-
-    def __init__(self):
-        self.cvars = []
-
-    def remember(self, space, cvar, w_value):
-        cvar.begin_assign(space, w_value)
-        self.cvars.append(cvar)
-
-    def exit(self, space):
-        for cvar in self.cvars:
-            cvar.assign(space)
-        for cvar in self.cvars:
-            cvars.end_assign(space)

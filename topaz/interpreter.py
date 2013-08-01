@@ -768,10 +768,10 @@ class Interpreter(object):
         return block.handle(space, frame, unroller)
 
     def BEGIN_MULTI_ASSIGNMENT(self, space, bytecode, frame, pc):
-        space.begin_atomic_assignment()
+        space.begin_multi_assignment()
 
     def END_MULTI_ASSIGNMENT(self, space, bytecode, frame, pc):
-        space.end_atomic_assignment()
+        space.end_multi_assignment()
 
 
 class Return(Exception):

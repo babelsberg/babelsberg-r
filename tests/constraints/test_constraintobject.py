@@ -897,7 +897,7 @@ class TestConstraintVariableObject(BaseTopazTest):
         y = 100
         z = 100
         always { x + y + z == 300 }
-        once { x = 10 }
+        x, y, z = 10, 90, 200
         return x, y, z
         """,
         "libz3", "libcassowary")

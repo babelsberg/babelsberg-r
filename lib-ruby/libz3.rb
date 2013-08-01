@@ -3,7 +3,7 @@ Z3::Instance = Z3.new
 class Z3::Z3Pointer
   def begin_assign(v)
     @proposed_value_constraint = self == v
-    @proposed_value_constraint.enable
+    Z3::Instance.add_constraint(@proposed_value_constraint)
   end
 
   def assign
@@ -11,7 +11,7 @@ class Z3::Z3Pointer
   end
 
   def end_assign
-    @proposed_value_constraint.disable
+    Z3::Instance.remove_constraint(@proposed_value_constraint)
     @proposed_value_constraint = nil
   end
 
