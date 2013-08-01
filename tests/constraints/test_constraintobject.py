@@ -923,3 +923,28 @@ class TestConstraintVariableObject(BaseTopazTest):
         assert w_z3[0][0] == w_z3[1][2]
         assert w_z3[0][1] == w_z3[1][1]
         assert w_z3[0][2] == w_z3[1][0]
+
+    def test_atomic_assignment3(self, space):
+        w_cassowary = space.execute(
+        """
+        require "libcassowary"
+        class Point
+          attr_accessor :x, :y
+          def initialize(a, b)
+            @x = a
+            @y = b
+          end
+        end
+
+        x = Point.new(10, 10)
+        y = Point.new(90, 90)
+        z = Point.new(200, 200)
+        always { x.x + y.x + z.x == 300 }
+        $res = [[x.x, y.x, z.x]]
+        x, y, z = z, y, x
+        $res << [x.x, y.x, z.x]
+        return $res
+        """)
+        assert w_cassowary[0][0] == w_cassowary[1][2]
+        assert w_cassowary[0][1] == w_cassowary[1][1]
+        assert w_cassowary[0][2] == w_cassowary[1][0]

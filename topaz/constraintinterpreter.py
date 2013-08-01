@@ -180,6 +180,7 @@ class ConstrainedVariable(W_Root):
             with space.constraint_execution():
                 space.send(self.w_external_variable, "begin_assign", [w_value])
         else:
+            self.store_value(space, w_value)
             self.w_remembered_value = w_value
 
     def assign(self, space):
