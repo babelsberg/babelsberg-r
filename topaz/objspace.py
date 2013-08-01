@@ -902,12 +902,9 @@ class ObjectSpace(object):
         else:
             return c_var.load_value(self)
 
-    def suggest_value(self, c_var, w_value):
+    def assign_value(self, c_var, w_value):
         if self.is_executing_normally():
-            if c_var.is_solveable():
-                c_var.suggest_value(self, w_value)
-            else:
-                c_var.recalculate_path(self, w_value)
+            c_var.assign_value(self, w_value)
             return True
         elif self.is_constructing_constraint() and c_var.is_solveable():
             # TODO: Track which c_vars have been assigned in this
@@ -917,8 +914,16 @@ class ObjectSpace(object):
             w_constraint = self.current_constraint()
             w_constraint.add_constraint_object(w_constraint)
             return True
+        elif self.in_atomic_assignment():
+            atomicem = self.current_execution_mode()
+            import pdb; pdb.set_trace()
+            atomicem.remember(self, c_var, w_value)
+            return True
         else:
             return False
+
+    def current_execution_mode(self):
+        return self._executionmodes.get()
 
     def current_constraint(self):
         if not self.constraint_stack:
@@ -931,6 +936,18 @@ class ObjectSpace(object):
     def is_constructing_constraint(self):
         return isinstance(self._executionmodes.get(), ConstructingConstraint)
 
+    def in_atomic_assignment(self):
+        return isinstance(self._executionmodes.get(), AtomicAssignment)
+
+    def begin_atomic_assignment(self):
+        self.atomic_assignment().__enter__()
+
+    def end_atomic_assignment(self):
+        assert self.in_atomic_assignment()
+        self.constraint_stack.pop()
+        em = self._executionmodes.pop()
+        em.exit(self)
+
     def normal_execution(self):
         return _ExecutionModeContextManager(self, NormalExecution)
 
@@ -939,6 +956,9 @@ class ObjectSpace(object):
 
     def constraint_construction(self, w_constraint):
         return _ExecutionModeContextManager(self, ConstructingConstraint, w_constraint)
+
+    def atomic_assignment(self):
+        return _ExecutionModeContextManager(self, AtomicAssignment)
 
 
 class _ExecutionModeContextManager(object):
@@ -949,11 +969,14 @@ class _ExecutionModeContextManager(object):
 
     def __enter__(self):
         self.space.constraint_stack.append(self.w_constraint)
-        self.space._executionmodes.append(self.executiontype())
+        em = self.executiontype()
+        self.space._executionmodes.append(em)
+        em.enter(self.space)
 
     def __exit__(self, exc_type, exc_value, tb):
         self.space.constraint_stack.pop()
-        self.space._executionmodes.pop()
+        em = self.space._executionmodes.pop()
+        em.exit(self.space)
 
 
 class ExecutionModeHolder(object):
@@ -969,7 +992,9 @@ class ExecutionModeHolder(object):
         self._executionmode = em
 
     def pop(self):
+        em = self._executionmode
         self._executionmode = self._executionmode.prev
+        return self._executionmode
 
 
 class ExecutionMode(object):
@@ -978,6 +1003,12 @@ class ExecutionMode(object):
     def prepend(self, prev):
         self.prev = prev
 
+    def enter(self, space):
+        pass
+
+    def exit(self, space):
+        pass
+
 
 class NormalExecution(ExecutionMode):
     pass
@@ -985,3 +1016,20 @@ class ExecutingConstraints(ExecutionMode):
     pass
 class ConstructingConstraint(ExecutionMode):
     pass
+
+
+class AtomicAssignment(ExecutionMode):
+    _attrs_ = ["cvars"]
+
+    def __init__(self):
+        self.cvars = []
+
+    def remember(self, space, cvar, w_value):
+        cvar.begin_assign(space, w_value)
+        self.cvars.append(cvar)
+
+    def exit(self, space):
+        for cvar in self.cvars:
+            cvar.assign(space)
+        for cvar in self.cvars:
+            cvars.end_assign(space)

@@ -889,3 +889,18 @@ class TestConstraintVariableObject(BaseTopazTest):
         return x
         """)
         assert self.unwrap(space, w_res) == -100
+
+    def test_atomic_assignment(self, space):
+        res_w = self.execute(space,
+        """
+        x = 100
+        y = 100
+        z = 100
+        always { x + y + z == 300 }
+        once { x = 10 }
+        return x, y, z
+        """,
+        "libz3", "libcassowary")
+        w_z3, w_cassowary = [self.unwrap(space, w_res) for w_res in res_w]
+        assert w_cassowary == [10, 90, 200]
+        assert w_cassowary == w_z3

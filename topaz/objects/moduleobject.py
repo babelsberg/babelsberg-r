@@ -39,7 +39,7 @@ class AttributeWriter(W_FunctionObject):
     def call(self, space, w_obj, args_w, block):
         [w_value] = args_w
         c_var = space.newconstraintvariable(w_owner=w_obj, ivar=self.varname)
-        if not c_var or not space.suggest_value(c_var, w_value):
+        if not c_var or not space.assign_value(c_var, w_value):
             space.set_instance_var(w_obj, self.varname, w_value)
         return w_value
 

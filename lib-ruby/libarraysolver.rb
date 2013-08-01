@@ -120,8 +120,14 @@ class ArrayConstraintVariable < ConstraintObject
     result
   end
 
-  def suggest_value(val)
+  def begin_assign(v)
+  end
+
+  def assign
     raise "Assignment of constrained Arrays not implemented yet"
+  end
+
+  def end_assign
   end
 
   def method_missing(method, *args)

@@ -1,11 +1,18 @@
 Z3::Instance = Z3.new
 
 class Z3::Z3Pointer
-  def suggest_value(v)
-    c = self == v
-    c.enable
+  def begin_assign(v)
+    @proposed_value_constraint = self == v
+    @proposed_value_constraint.enable
+  end
+
+  def assign
     Z3::Instance.solve
-    c.disable
+  end
+
+  def end_assign
+    @proposed_value_constraint.disable
+    @proposed_value_constraint = nil
   end
 
   alias plain_enable enable

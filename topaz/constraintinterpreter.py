@@ -69,7 +69,8 @@ class ConstraintInterpreter(Interpreter):
 
 class ConstrainedVariable(W_Root):
     CONSTRAINT_IVAR = "__constrained_variable__"
-    _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
+    _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "idx", "w_key",
+                          "w_external_variable"]
 
     def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
         self.w_external_variable = None
@@ -80,7 +81,9 @@ class ConstrainedVariable(W_Root):
         self.idx = idx
         self.w_key = w_key
         self.constraints_w = []
-        self.w_equality_constraint = None
+        self.is_readonly = False
+        self.w_readonly_constraint = None
+        self.w_remembered_value = None
 
         if cell:
             from topaz.closure import ClosureCell
@@ -110,20 +113,19 @@ class ConstrainedVariable(W_Root):
         return False
 
     def make_readonly(self, space):
-        if not self.is_readonly():
-            self.w_equality_constraint = space.send(self.w_external_variable, "==", [self.get_i(space)])
-            space.send(self.w_equality_constraint, "enable")
+        if not self.w_readonly_constraint:
+            self.w_readonly_constraint = space.send(self.w_external_variable, "==", [self.get_i(space)])
+            space.send(self.w_readonly_constraint, "enable")
+        self.is_readonly = True
+
+    def make_assignable(self, space):
+        if self.w_readonly_constraint:
+            space.send(self.w_readonly_constraint, "disable")
+            self.w_readonly_constraint = None
 
     def make_writable(self, space):
-        if not self.is_writable():
-            space.send(self.w_equality_constraint, "disable")
-            self.w_equality_constraint = None
-
-    def is_readonly(self):
-        return not self.is_writable()
-
-    def is_writable(self):
-        return self.is_solveable() and self.w_equality_constraint is None
+        self.make_assignable(space)
+        self.is_readonly = False
 
     def is_solveable(self):
         return self.w_external_variable is not None
@@ -171,15 +173,42 @@ class ConstrainedVariable(W_Root):
             storagestr = "unknown"
         return space.newstr_fromstr("%s-%s" % (storagestr, inspectstr))
 
-    def suggest_value(self, space, w_value):
-        assert self.w_external_variable
-        readonly = self.is_readonly()
-        if readonly:
-            self.make_writable(space)
-        with space.constraint_execution():
-            space.send(self.w_external_variable, "suggest_value", [w_value])
-        if readonly:
-            self.make_readonly(space)
+    def propose_value(self, space, w_value):
+        if self.is_solveable():
+            with space.constraint_execution():
+                space.send(self.w_external_variable, "propose_value", [w_value])
+        else:
+            self.w_remembered_value = w_value
+
+    def begin_assign(self, space, w_value):
+        if self.is_solveable():
+            if self.is_readonly:
+                self.make_writable(space)
+            with space.constraint_execution():
+                space.send(self.w_external_variable, "begin_assign", [w_value])
+        else:
+            self.w_remembered_value = w_value
+
+    def assign(self, space):
+        if self.is_solveable():
+            with space.constraint_execution():
+                space.send(self.w_external_variable, "assign")
+        else:
+            self.recalculate_path(space, self.w_remembered_value)
+
+    def end_assign(self, space):
+        if self.is_solveable():
+            with space.constraint_execution():
+                space.send(self.w_external_variable, "end_assign")
+            if self.is_readonly:
+                self.make_readonly(space)
+        else:
+            self.w_remembered_value = None
+
+    def assign_value(self, space, w_value):
+        self.begin_assign(space, w_value)
+        self.assign(space)
+        self.end_assign(space)
 
     def set_i(self, space):
         if self.w_external_variable is not None:

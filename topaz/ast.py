@@ -621,7 +621,9 @@ class MultiAssignment(Node):
 
     def compile(self, ctx):
         self.value.compile(ctx)
+        ctx.emit(consts.BEGIN_MULTI_ASSIGNMENT)
         self.assignable.compile_store(ctx)
+        ctx.emit(consts.END_MULTI_ASSIGNMENT)
 
     def compile_defined(self, ctx):
         ConstantString("assignment").compile(ctx)
