@@ -101,7 +101,7 @@ class ObjectSpace(object):
 
         self._executionmodes = ExecutionModeHolder(NormalExecution())
         self.constraint_stack = []
-        self.remembered_assignments = []
+        self.remembered_assignments = RememberedAssignmentsHolder()
 
         self.w_true = W_TrueObject(self)
         self.w_false = W_FalseObject(self)
@@ -924,20 +924,28 @@ class ObjectSpace(object):
             return False
 
     def in_multi_assignment(self):
-        return len(self.remembered_assignments) > 0
+        return self.remembered_assignments.get() is not None
 
     def begin_multi_assignment(self):
-        self.remembered_assignments.append([])
+        self.remembered_assignments.begin()
 
     def remember_assignment(self, c_var, w_value):
-        self.remembered_assignments[-1].append(c_var)
+        try:
+            self.remembered_assignments.append(c_var)
+        except RuntimeError:
+            self.end_multi_assignment()
+            raise self.error(
+                self.w_RuntimeError,
+                "invalid use of nested multi-(atomic-)assignments. " +
+                "Multi-assignments to constrained variables cannot be nested"
+            )
         c_var.begin_assign(self, w_value)
 
     def end_multi_assignment(self):
-        asgnmts = self.remembered_assignments.pop()
-        for cvar in asgnmts:
+        asgnmts = self.remembered_assignments.end()
+        for cvar in asgnmts.items():
             cvar.assign(self)
-        for cvar in asgnmts:
+        for cvar in asgnmts.items():
             cvar.end_assign(self)
 
     def current_execution_mode(self):
@@ -994,7 +1002,7 @@ class ExecutionModeHolder(object):
     def pop(self):
         em = self._executionmode
         self._executionmode = self._executionmode.prev
-        return self._executionmode
+        return em
 
 
 class ExecutionMode(object):
@@ -1010,3 +1018,42 @@ class ExecutingConstraints(ExecutionMode):
     pass
 class ConstructingConstraint(ExecutionMode):
     pass
+
+
+class RememberedAssignmentsHolder(object):
+    def __init__(self):
+        self._multi_assignments = None
+
+    def get(self):
+        return jit.promote(self._multi_assignments)
+
+    def begin(self):
+        self._multi_assignments = RememberedAssignments(self._multi_assignments)
+
+    def end(self):
+        ma = self._multi_assignments
+        self._multi_assignments = self._multi_assignments.prev
+        return ma
+
+    def append(self, c_var):
+        self._multi_assignments.append(c_var)
+
+
+class RememberedAssignments(object):
+    _immutable_fields_ = ["prev"]
+
+    def __init__(self, prev):
+        self.prev = prev
+        self._assignments = []
+
+    def append(self, c_var):
+        if self.prev and not self.prev.is_empty():
+            # we have a remembered assignment and are adding a new one
+            raise RuntimeError()
+        self._assignments.append(c_var)
+
+    def is_empty(self):
+        return len(self._assignments) == 0
+
+    def items(self):
+        return self._assignments
