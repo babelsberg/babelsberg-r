@@ -259,11 +259,11 @@ class TestCompiler(object):
         """)
         self.assert_compiled(bc.consts_w[0], """
         LOAD_DEREF 0
-        BEGIN_MULTI_ASSIGNMENT
         DUP_TOP
         COERCE_ARRAY 0
         UNPACK_SEQUENCE_SPLAT 3 1
 
+        BEGIN_MULTI_ASSIGNMENT
         STORE_DEREF 1
         DISCARD_TOP
 
@@ -1687,11 +1687,11 @@ class TestCompiler(object):
         DISCARD_TOP
 
         LOAD_CONST 1
-        BEGIN_MULTI_ASSIGNMENT
         DUP_TOP
         COERCE_ARRAY 0
         UNPACK_SEQUENCE 4
 
+        BEGIN_MULTI_ASSIGNMENT
         LOAD_DEREF 3
         ROT_TWO
         SEND 2 1
@@ -1726,11 +1726,11 @@ class TestCompiler(object):
         LOAD_CONST 1
         LOAD_CONST 2
         BUILD_ARRAY 3
-        BEGIN_MULTI_ASSIGNMENT
         DUP_TOP
         COERCE_ARRAY 0
         UNPACK_SEQUENCE_SPLAT 3 1
 
+        BEGIN_MULTI_ASSIGNMENT
         STORE_DEREF 0
         DISCARD_TOP
         STORE_DEREF 1
@@ -1749,10 +1749,10 @@ class TestCompiler(object):
         LOAD_CONST 0
         LOAD_CONST 1
         BUILD_ARRAY 2
-        BEGIN_MULTI_ASSIGNMENT
         DUP_TOP
         COERCE_ARRAY 0
         UNPACK_SEQUENCE_SPLAT 1 0
+        BEGIN_MULTI_ASSIGNMENT
         DISCARD_TOP
         END_MULTI_ASSIGNMENT
 

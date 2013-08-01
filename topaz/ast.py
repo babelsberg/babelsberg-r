@@ -603,6 +603,7 @@ class MultiAssignable(Node):
             ctx.emit(consts.UNPACK_SEQUENCE, len(self.targets))
         else:
             ctx.emit(consts.UNPACK_SEQUENCE_SPLAT, len(self.targets), splat_index)
+        ctx.emit(consts.BEGIN_MULTI_ASSIGNMENT)
         for target in self.targets:
             elems = target.compile_receiver(ctx)
             if elems == 1:
@@ -612,6 +613,7 @@ class MultiAssignable(Node):
                 ctx.emit(consts.ROT_THREE)
             target.compile_store(ctx)
             ctx.emit(consts.DISCARD_TOP)
+        ctx.emit(consts.END_MULTI_ASSIGNMENT)
 
 
 class MultiAssignment(Node):
@@ -621,9 +623,7 @@ class MultiAssignment(Node):
 
     def compile(self, ctx):
         self.value.compile(ctx)
-        ctx.emit(consts.BEGIN_MULTI_ASSIGNMENT)
         self.assignable.compile_store(ctx)
-        ctx.emit(consts.END_MULTI_ASSIGNMENT)
 
     def compile_defined(self, ctx):
         ConstantString("assignment").compile(ctx)
