@@ -904,3 +904,22 @@ class TestConstraintVariableObject(BaseTopazTest):
         w_z3, w_cassowary = [self.unwrap(space, w_res) for w_res in res_w]
         assert w_cassowary == [10, 90, 200]
         assert w_cassowary == w_z3
+
+    def test_atomic_assignment2(self, space):
+        res_w = self.execute(space,
+        """
+        x, y, z = 10, 90, 200
+        always { x + y + z == 300 }
+        $res = [[x, y, z]]
+        x, y, z = z, y, x
+        $res << [x, y, z]
+        return $res
+        """,
+        "libcassowary", "libz3")
+        w_cassowary, w_z3 = [self.unwrap(space, w_res) for w_res in res_w]
+        assert w_cassowary[0][0] == w_cassowary[1][2]
+        assert w_cassowary[0][1] == w_cassowary[1][1]
+        assert w_cassowary[0][2] == w_cassowary[1][0]
+        assert w_z3[0][0] == w_z3[1][2]
+        assert w_z3[0][1] == w_z3[1][1]
+        assert w_z3[0][2] == w_z3[1][0]

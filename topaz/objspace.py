@@ -927,20 +927,18 @@ class ObjectSpace(object):
         return len(self.remembered_assignments) > 0
 
     def begin_multi_assignment(self):
-        self.remembered_assignments.append(None)
+        self.remembered_assignments.append([])
 
     def remember_assignment(self, c_var, w_value):
+        self.remembered_assignments[-1].append(c_var)
         c_var.begin_assign(self, w_value)
-        self.remembered_assignments.append(c_var)
 
     def end_multi_assignment(self):
-        assert self.remembered_assignments[0] is None
-        self.remembered_assignments.pop(0)
-        for cvar in self.remembered_assignments:
+        asgnmts = self.remembered_assignments.pop()
+        for cvar in asgnmts:
             cvar.assign(self)
-        for cvar in self.remembered_assignments:
+        for cvar in asgnmts:
             cvar.end_assign(self)
-        del self.remembered_assignments[:]
 
     def current_execution_mode(self):
         return self._executionmodes.get()

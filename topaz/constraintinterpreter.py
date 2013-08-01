@@ -173,13 +173,6 @@ class ConstrainedVariable(W_Root):
             storagestr = "unknown"
         return space.newstr_fromstr("%s-%s" % (storagestr, inspectstr))
 
-    def propose_value(self, space, w_value):
-        if self.is_solveable():
-            with space.constraint_execution():
-                space.send(self.w_external_variable, "propose_value", [w_value])
-        else:
-            self.w_remembered_value = w_value
-
     def begin_assign(self, space, w_value):
         if self.is_solveable():
             if self.is_readonly:
