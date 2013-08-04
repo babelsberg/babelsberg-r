@@ -33,10 +33,9 @@ class Resistor < TwoLeadedObject
     # to be that value (read-only).  Otherwise the resistance can solved for 
     # in terms of other values.
     super()
-    if resistance.nil?
-      @resistance = 0.0
-    else
-      always { @resistance = resistance.? }
+    @resistance = 0.0
+    if resistance
+      always { @resistance == resistance.? }
     end
     # Ohm's Law constraint
     unless $USING_CASSOWARY
