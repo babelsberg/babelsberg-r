@@ -849,3 +849,32 @@ class TestConstraintVariableObject(BaseTopazTest):
         return x
         """)
         assert self.unwrap(space, w_res) == -100
+
+    def test_lazy_solver_selection(self, space):
+        w_z3, w_cassowary = self.execute(
+            space,
+            """
+            def foo(a = nil)
+              always { a == 100 }
+              return a
+            end
+            return foo
+            """,
+            "libz3", "libcassowary"
+        )
+        assert self.unwrap(space, w_z3) == 100
+        assert self.unwrap(space, w_cassowary) == 100
+
+    def test_late_type_assignment(self, space):
+        w_z3, w_cassowary = self.execute(
+            space,
+            """
+            x = nil
+            always { x.respond_to? :nil? }
+            x = 10
+            always { x + 10 == 100 }
+            return x
+            """,
+            "libz3", "libcassowary")
+        assert self.unwrap(space, w_z3) == 90
+        assert self.unwrap(space, w_cassowary) == 90
