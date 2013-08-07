@@ -497,11 +497,6 @@ class ObjectSpace(object):
                     raise NotImplementedError
 
         if c_var and self.is_constructing_constraint():
-            # No constraint solver variable available for this object
-            # Only keep the block alive if this is a variable that
-            # will not be registered with a solver. This means this
-            # variable is on the path to a constraint, and the block
-            # will have to be re-evaluated when this variable is set
             c_var.add_to_constraint(self.current_constraint())
 
         if c_var:
@@ -908,10 +903,14 @@ class ObjectSpace(object):
             else:
                 c_var.recalculate_path(self, w_value)
             return True
-        elif self.is_constructing_constraint() and c_var.is_solveable():
-            w_constraint_object = self.send(c_var.w_external_variable, "==", [w_value])
-            w_constraint = self.current_constraint()
-            w_constraint.add_constraint_object(w_constraint)
+        elif self.is_constructing_constraint():
+            if c_var.is_solveable():
+                w_constraint_object = self.send(c_var.w_external_variable, "==", [w_value])
+                w_constraint = self.current_constraint()
+                w_constraint.add_constraint_object(w_constraint)
+                w_constraint.add_assignment(c_var, w_constraint)
+            else:
+                c_var.store_value(self, w_value)
             return True
         else:
             return False

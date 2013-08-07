@@ -850,6 +850,18 @@ class TestConstraintVariableObject(BaseTopazTest):
         """)
         assert self.unwrap(space, w_res) == -100
 
+    def test_invalid_multiple_assignment(self, space):
+        with self.raises(space, "RuntimeError", "multiply assigned variable in constraint execution"):
+            space.execute("""
+            require "libcassowary"
+            @sum = -1
+            def foo
+              @sum = 0
+              @sum = 1
+            end
+            always { foo == 1 }
+            """)
+
     def test_lazy_solver_selection(self, space):
         w_z3, w_cassowary = self.execute(
             space,

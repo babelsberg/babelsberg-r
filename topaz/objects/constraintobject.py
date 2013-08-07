@@ -1,5 +1,6 @@
 from rpython.rlib import jit
 
+from topaz.celldict import CellDict, VersionTag
 from topaz.module import ClassDef, ModuleDef
 from topaz.objects.hashobject import W_HashObject
 from topaz.objects.objectobject import W_Object, W_RootObject
@@ -38,6 +39,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         self.enabled = False
         self.constraint_objects_w = []
         self.constraint_variables_w = []
+        self.assignments_w = CellDict()
 
     def get_constraint_objects(self):
         return self.constraint_objects_w
@@ -54,6 +56,14 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
     def add_constraint_variable(self, w_value):
         if w_value not in self.constraint_variables_w:
             self.constraint_variables_w.append(w_value)
+
+    def add_assignment(self, space, c_var, w_constraint):
+        if self.assignments_w.get(c_var):
+            raise space.error(
+                space.w_RuntimeError,
+                "multiply assigned variable in constraint execution"
+            )
+        self.assignments_w.set(c_var, w_constraint)
 
     @classdef.method("enable")
     def method_enable(self, space):
