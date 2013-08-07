@@ -79,11 +79,6 @@ from topaz.parser import Parser
 from topaz.utils.ll_file import isdir
 
 
-NORMAL_EXECUTION = 0
-EXECUTING_CONSTRAINTS = 1
-CONSTRUCTING_CONSTRAINT = 2
-
-
 class SpaceCache(Cache):
     def __init__(self, space):
         Cache.__init__(self)
@@ -104,8 +99,9 @@ class ObjectSpace(object):
         self.bootstrap = True
         self.exit_handlers_w = []
 
-        self.execution_mode_stack = [NORMAL_EXECUTION]
+        self._executionmodes = ExecutionModeHolder(NormalExecution())
         self.constraint_stack = []
+        self.remembered_assignments = RememberedAssignmentsHolder()
 
         self.w_true = W_TrueObject(self)
         self.w_false = W_FalseObject(self)
@@ -346,13 +342,17 @@ class ObjectSpace(object):
         return ec
 
     def create_frame(self, bc, w_self=None, lexical_scope=None, block=None,
-                     parent_interp=None, regexp_match_cell=None):
+                     parent_interp=None, top_parent_interp=None,
+                     regexp_match_cell=None):
 
         if w_self is None:
             w_self = self.w_top_self
         if regexp_match_cell is None:
             regexp_match_cell = ClosureCell(None)
-        return Frame(jit.promote(bc), w_self, lexical_scope, block, parent_interp, regexp_match_cell)
+        return Frame(
+            jit.promote(bc), w_self, lexical_scope, block, parent_interp,
+            top_parent_interp, regexp_match_cell
+        )
 
     def execute_frame(self, frame, bc):
         if self.is_constructing_constraint():
@@ -449,10 +449,11 @@ class ObjectSpace(object):
             return W_UnboundMethodObject(self, w_cls, w_function)
 
     def newproc(self, bytecode, w_self, lexical_scope, cells, block,
-                parent_interp, regexp_match_cell, is_lambda=False):
+                parent_interp, top_parent_interp, regexp_match_cell,
+                is_lambda=False):
         return W_ProcObject(
             self, bytecode, w_self, lexical_scope, cells, block, parent_interp,
-            regexp_match_cell, is_lambda=False
+            top_parent_interp, regexp_match_cell, is_lambda=False
         )
 
     def _findconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
@@ -717,6 +718,7 @@ class ObjectSpace(object):
         frame = self.create_frame(
             bc, w_self=block.w_self, lexical_scope=block.lexical_scope,
             block=block.block, parent_interp=block.parent_interp,
+            top_parent_interp=block.top_parent_interp,
             regexp_match_cell=block.regexp_match_cell,
         )
         if block.is_lambda:
@@ -896,12 +898,12 @@ class ObjectSpace(object):
         else:
             return c_var.load_value(self)
 
-    def suggest_value(self, c_var, w_value):
+    def assign_value(self, c_var, w_value):
         if self.is_executing_normally():
-            if c_var.is_solveable():
-                c_var.suggest_value(self, w_value)
+            if self.in_multi_assignment():
+                self.remember_assignment(c_var, w_value)
             else:
-                c_var.recalculate_path(self, w_value)
+                c_var.assign_value(self, w_value)
             return True
         elif self.is_constructing_constraint():
             if c_var.is_solveable():
@@ -915,8 +917,33 @@ class ObjectSpace(object):
         else:
             return False
 
-    def newconstraintobject(self, w_strength, block):
-        return W_ConstraintObject(self, w_strength, block)
+    def in_multi_assignment(self):
+        return self.remembered_assignments.get() is not None
+
+    def begin_multi_assignment(self):
+        self.remembered_assignments.begin()
+
+    def remember_assignment(self, c_var, w_value):
+        try:
+            self.remembered_assignments.append(c_var)
+        except RuntimeError:
+            self.end_multi_assignment()
+            raise self.error(
+                self.w_RuntimeError,
+                "invalid use of nested multi-(atomic-)assignments. " +
+                "Multi-assignments to constrained variables cannot be nested"
+            )
+        c_var.begin_assign(self, w_value)
+
+    def end_multi_assignment(self):
+        asgnmts = self.remembered_assignments.end()
+        for cvar in asgnmts.items():
+            cvar.assign(self)
+        for cvar in asgnmts.items():
+            cvar.end_assign(self)
+
+    def current_execution_mode(self):
+        return self._executionmodes.get()
 
     def current_constraint(self):
         if not self.constraint_stack:
@@ -924,41 +951,103 @@ class ObjectSpace(object):
         return self.constraint_stack[-1]
 
     def is_executing_normally(self):
-        return self.execution_mode_stack[-1] == NORMAL_EXECUTION
+        return isinstance(self._executionmodes.get(), NormalExecution)
 
     def is_constructing_constraint(self):
-        return self.execution_mode_stack[-1] == CONSTRUCTING_CONSTRAINT
+        return isinstance(self._executionmodes.get(), ConstructingConstraint)
 
     def normal_execution(self):
-        return _ExecutionModeContextManager(self, NORMAL_EXECUTION)
+        return _ExecutionModeContextManager(self, NormalExecution)
 
     def constraint_execution(self):
-        return _ExecutionModeContextManager(self, EXECUTING_CONSTRAINTS)
+        return _ExecutionModeContextManager(self, ExecutingConstraints)
 
-    def constraint_construction(self, block, w_strength, w_constraint=None):
-        return _ExecutionModeContextManager(
-            self, CONSTRUCTING_CONSTRAINT, block=block, w_strength=w_strength, w_constraint=w_constraint
-        )
+    def constraint_construction(self, w_constraint):
+        return _ExecutionModeContextManager(self, ConstructingConstraint, w_constraint)
 
 
 class _ExecutionModeContextManager(object):
-    def __init__(self, space, executiontype, block=None, w_strength=None, w_constraint=None):
+    def __init__(self, space, executiontype, w_constraint=None):
         self.space = space
         self.executiontype = executiontype
-        self.block = block
-        self.w_strength = w_strength
         self.w_constraint = w_constraint
 
     def __enter__(self):
-        if self.w_constraint:
-            w_c = self.w_constraint
-        elif not self.space.is_constructing_constraint():
-            w_c = self.space.newconstraintobject(self.w_strength, self.block)
-        else:
-            w_c = self.space.current_constraint()
-        self.space.constraint_stack.append(w_c)
-        self.space.execution_mode_stack.append(self.executiontype)
+        self.space.constraint_stack.append(self.w_constraint)
+        self.space._executionmodes.append(self.executiontype())
 
     def __exit__(self, exc_type, exc_value, tb):
         self.space.constraint_stack.pop()
-        self.space.execution_mode_stack.pop()
+        self.space._executionmodes.pop()
+
+
+class ExecutionModeHolder(object):
+    # TODO: convert to be threadlocal store once we have threads
+    def __init__(self, em):
+        self._executionmode = em
+
+    def get(self):
+        return jit.promote(self._executionmode)
+
+    def append(self, em):
+        em.prepend(self._executionmode)
+        self._executionmode = em
+
+    def pop(self):
+        em = self._executionmode
+        self._executionmode = self._executionmode.prev
+        return em
+
+
+class ExecutionMode(object):
+    _attrs_ = ["prev"]
+
+    def prepend(self, prev):
+        self.prev = prev
+
+
+class NormalExecution(ExecutionMode):
+    pass
+class ExecutingConstraints(ExecutionMode):
+    pass
+class ConstructingConstraint(ExecutionMode):
+    pass
+
+
+class RememberedAssignmentsHolder(object):
+    def __init__(self):
+        self._multi_assignments = None
+
+    def get(self):
+        return jit.promote(self._multi_assignments)
+
+    def begin(self):
+        self._multi_assignments = RememberedAssignments(self._multi_assignments)
+
+    def end(self):
+        ma = self._multi_assignments
+        self._multi_assignments = self._multi_assignments.prev
+        return ma
+
+    def append(self, c_var):
+        self._multi_assignments.append(c_var)
+
+
+class RememberedAssignments(object):
+    _immutable_fields_ = ["prev"]
+
+    def __init__(self, prev):
+        self.prev = prev
+        self._assignments = []
+
+    def append(self, c_var):
+        if self.prev and not self.prev.is_empty():
+            # we have a remembered assignment and are adding a new one
+            raise RuntimeError()
+        self._assignments.append(c_var)
+
+    def is_empty(self):
+        return len(self._assignments) == 0
+
+    def items(self):
+        return self._assignments

@@ -3,7 +3,7 @@ import copy
 from rpython.rlib import jit
 from rpython.rlib.objectmodel import compute_unique_id
 
-from topaz.mapdict import MapTransitionCache
+from topaz import mapdict
 from topaz.module import ClassDef
 from topaz.scope import StaticScope
 
@@ -140,9 +140,10 @@ class W_RootObject(W_BaseObject):
         space.w_top_self = W_Object(space, w_cls)
 
     @classdef.method("__constrain__")
-    def method_constrain(self, space, block, w_strength=None):
-        with space.constraint_construction(block, w_strength):
-            return space.invoke_block(block, [])
+    def method_constrain(self, space, args_w, block):
+        space.send(self, "puts", [space.newstr_fromstr("DEPRECATION WARNING: __constrain__ has been deprecated, use Constraint.new instead")])
+        w_constraint = space.send(space.w_constraint, "new", args_w, block)
+        return space.send(space.send(w_constraint, "primitive_constraints"), "last")
 
     @classdef.method("?")
     def method_readonly(self, space, block, w_strength=None):
@@ -156,38 +157,34 @@ class W_RootObject(W_BaseObject):
         return self
 
     @classdef.method("always")
-    def method_always(self, space, w_strength=None, block=None):
-        if block is None:
-            raise space.error(space.w_ArgumentError, "no constraint block given")
-        arg_w = [] if w_strength is None else [w_strength]
-        with space.constraint_construction(block, w_strength):
-            w_constraint_object = space.send(self, "__constrain__", arg_w, block=block)
-            w_constraint = space.current_constraint()
-            w_constraint.add_constraint_object(w_constraint_object)
+    def method_always(self, space, args_w, block):
+        w_constraint = space.send(space.w_constraint, "new", args_w, block)
         space.send(w_constraint, "enable")
         return w_constraint
 
 
 class W_Object(W_RootObject):
-    _attrs_ = ["map", "storage"]
+    _attrs_ = ["map", "object_storage", "unboxed_storage"]
 
     def __init__(self, space, klass=None):
         if klass is None:
             klass = space.getclassfor(self.__class__)
-        self.map = space.fromcache(MapTransitionCache).get_class_node(klass)
-        self.storage = None
+        self.map = space.fromcache(mapdict.MapTransitionCache).get_class_node(klass)
+        self.object_storage = None
+        self.unboxed_storage = None
 
     def __deepcopy__(self, memo):
         obj = super(W_Object, self).__deepcopy__(memo)
         obj.map = copy.deepcopy(self.map, memo)
-        obj.storage = copy.deepcopy(self.storage, memo)
+        obj.object_storage = copy.deepcopy(self.object_storage, memo)
+        obj.unboxed_storage = copy.deepcopy(self.unboxed_storage, memo)
         return obj
 
     def getclass(self, space):
-        return jit.promote(self.map).get_class()
+        return jit.promote(self.map).find(mapdict.ClassNode).getclass()
 
     def getsingletonclass(self, space):
-        w_cls = jit.promote(self.map).get_class()
+        w_cls = jit.promote(self.map).find(mapdict.ClassNode).getclass()
         if w_cls.is_singleton:
             return w_cls
         w_cls = space.newclass(w_cls.name, w_cls, is_singleton=True, attached=self)
@@ -195,7 +192,7 @@ class W_Object(W_RootObject):
         return w_cls
 
     def copy_singletonclass(self, space, w_other):
-        w_cls = jit.promote(self.map).get_class()
+        w_cls = jit.promote(self.map).find(mapdict.ClassNode).getclass()
         assert not w_cls.is_singleton
         w_copy = space.newclass(w_cls.name, w_cls, is_singleton=True, attached=self)
         w_copy.methods_w.update(w_other.methods_w)
@@ -207,51 +204,48 @@ class W_Object(W_RootObject):
         return w_cls
 
     def find_instance_var(self, space, name):
-        idx = jit.promote(self.map).find_attr(space, name)
-        if idx == -1:
+        node = jit.promote(self.map).find(mapdict.AttributeNode, name)
+        if node is None:
             return None
-        return self.storage[idx]
+        return node.read(space, self)
 
     def set_instance_var(self, space, name, w_value):
-        idx = jit.promote(self.map).find_set_attr(space, name)
-        if idx == -1:
-            idx = self.map.add_attr(space, self, name)
-        self.storage[idx] = w_value
+        node = jit.promote(self.map).find(mapdict.AttributeNode, name)
+        if node is None:
+            self.map = node = self.map.add(space, mapdict.AttributeNode.select_type(space, w_value), name, self)
+        node.write(space, self, w_value)
 
     def copy_instance_vars(self, space, w_other):
         assert isinstance(w_other, W_Object)
         w_other.map.copy_attrs(space, w_other, self)
 
     def get_flag(self, space, name):
-        idx = jit.promote(self.map).find_flag(space, name)
-        if idx == -1:
-            return space.w_false
-        return self.storage[idx]
+        node = jit.promote(self.map).find(mapdict.FlagNode, name)
+        return space.w_false if node is None else node.read(space, self)
 
     def set_flag(self, space, name):
-        idx = jit.promote(self.map).find_flag(space, name)
-        if idx == -1:
-            self.map.add_flag(space, self, name)
-        else:
-            self.storage[idx] = space.w_true
+        node = jit.promote(self.map).find(mapdict.FlagNode, name)
+        if node is None:
+            self.map = node = self.map.add(space, mapdict.FlagNode, name, self)
+        node.write(space, self, space.w_true)
 
     def unset_flag(self, space, name):
-        idx = jit.promote(self.map).find_flag(space, name)
-        if idx != -1:
-            # Flags are by default unset, no need to add if unsetting
-            self.storage[idx] = space.w_false
+        node = jit.promote(self.map).find(mapdict.FlagNode, name)
+        # Flags are by default unset, no need to add if unsetting
+        if node is not None:
+            node.write(space, self, space.w_false)
 
     def find_constraint_var(self, space, name):
-        idx = jit.promote(self.map).find_constraint_var(space, name)
-        if idx == -1:
+        node = jit.promote(self.map).find(mapdict.ConstraintVarNode, name)
+        if node is None:
             return None
-        return self.storage[idx]
+        return node.read(space, self)
 
     def set_constraint_var(self, space, name, w_value):
-        idx = jit.promote(self.map).find_constraint_var(space, name)
-        if idx == -1:
-            idx = self.map.add_constraint_var(space, self, name)
-        self.storage[idx] = w_value
+        node = jit.promote(self.map).find(mapdict.ConstraintVarNode, name)
+        if node is None:
+            self.map = node = self.map.add(space, mapdict.ConstraintVarNode, name, self)
+        node.write(space, self, w_value)
 
     def copy_constraint_vars(self, space, w_other):
         assert isinstance(w_other, W_Object)

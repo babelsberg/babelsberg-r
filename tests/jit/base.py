@@ -1,4 +1,5 @@
 import subprocess
+import os
 
 # TODO:
 from pypy.tool.jitlogparser.parser import SimpleParser, Op
@@ -9,13 +10,21 @@ from rpython.jit.tool import oparser
 from rpython.tool import logparser
 
 
+BasePath = os.path.abspath(
+    os.path.join(
+        os.path.join(os.path.dirname(__file__), os.path.pardir),
+        os.path.pardir
+    )
+)
+
 class BaseJITTest(object):
     def run(self, topaz, tmpdir, code):
         tmpdir.join("t.rb").write(code)
         proc = subprocess.Popen(
             [str(topaz), str(tmpdir.join("t.rb"))],
             cwd=str(tmpdir),
-            env={"PYPYLOG": "jit-log-opt:%s" % tmpdir.join("x.pypylog")}
+            env={"PYPYLOG": "jit-log-opt:%s" % tmpdir.join("x.pypylog"),
+                 "LD_LIBRARY_PATH": os.path.join(BasePath, "dependencies", "z3", "build")}
         )
         proc.wait()
         data = logparser.parse_log_file(str(tmpdir.join("x.pypylog")), verbose=False)

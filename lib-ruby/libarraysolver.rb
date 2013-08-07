@@ -24,7 +24,7 @@ class ArrayConstraintVariable < ConstraintObject
   def initialize(ary)
     @ary = ary
     @constraint_variables = @ary.collect do |var|
-      __constrain__ { var }
+      Constraint.new { var }.value
     end
   end
 
@@ -39,7 +39,7 @@ class ArrayConstraintVariable < ConstraintObject
 
   def length
     @length = @constraint_variables.size unless @length
-    __constrain__ { @length }
+    Constraint.new { @length }.value
   end
   alias size length
 
@@ -51,7 +51,7 @@ class ArrayConstraintVariable < ConstraintObject
       idx = idx + ary.size if idx < 0
       if idx >= @constraint_variables.size
         a = 0.0
-        @constraint_variables[idx] = __constrain__ { a }
+        @constraint_variables[idx] = Constraint.new { a }.value
       end
       if l == 1
         [@constraint_variables[idx]]
@@ -77,6 +77,12 @@ class ArrayConstraintVariable < ConstraintObject
     r = RangeConstraint.new(equality_constraints)
     r.enable
     r
+  end
+
+  def alldifferent?
+    raise "Need Z3 for this" unless defined? Z3
+    return true if @constraint_variables.empty?
+    always { @constraint_variables.alldifferent? }
   end
 
   include Enumerable
@@ -114,8 +120,14 @@ class ArrayConstraintVariable < ConstraintObject
     result
   end
 
-  def suggest_value(val)
+  def begin_assign(v)
+  end
+
+  def assign
     raise "Assignment of constrained Arrays not implemented yet"
+  end
+
+  def end_assign
   end
 
   def method_missing(method, *args)
@@ -125,7 +137,7 @@ end
 
 class Array
   def for_constraint(name)
-    if self.all? { |e| e.is_a? Numeric }
+    if self.all? { |e| e.is_a? Numeric } and !self.empty?
       ArrayConstraintVariable.new(self)
     end
   end

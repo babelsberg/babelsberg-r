@@ -422,7 +422,7 @@ class TestConstraintVariableObject(BaseTopazTest):
 
               def for_constraint(name)
                 @float ||= self.to_f
-                __constrain__ { @float }
+                Constraint.new { @float }.value
               end
             end
 
@@ -453,7 +453,7 @@ class TestConstraintVariableObject(BaseTopazTest):
                   @float = 0
                   always { @float == self.to_f }
                 end
-                __constrain__ { @float }
+                Constraint.new { @float }.value
               end
             end
 
@@ -481,7 +481,7 @@ class TestConstraintVariableObject(BaseTopazTest):
                   @float = 0
                   @stay = always { @float == self.to_f }
                 end
-                __constrain__ { @float }
+                Constraint.new { @float }.value
               end
 
               def update(float)
@@ -782,6 +782,46 @@ class TestConstraintVariableObject(BaseTopazTest):
             -10, 15, -5
         ]
 
+    def test_edit_complex_object_stream(self, space):
+        w_ca = space.execute("""
+        require "libcassowary"
+        $res = []
+
+        class Point
+          attr_accessor :x, :y
+          def initialize(x, y); self.x, self.y = x, y; end
+        end
+
+        @top = Point.new 0, 0
+        $top = @top
+
+        class Stream
+          def initialize(ary)
+            @ary = ary
+          end
+
+          def next
+            ($res << $top.x << $top.y) if @ary.size > 0
+            @ary.pop
+          end
+        end
+
+        always { @top.x >= 10 }
+        always { @top.x <= 100 }
+        always { @top.x == @top.y * 2 }
+
+        edit_stream = Stream.new([Point.new(10, 10), Point.new(20, 20)])
+        edit(stream: edit_stream, accessors: [:x, :y]) { @top }
+
+        $res << @top.x << @top.y
+        return $res
+        """)
+        assert self.unwrap(space, w_ca) == [
+            10, 5,
+            20, 10,
+            10, 5
+        ]
+
     def test_non_solveable_variable_constraint_blocks(self, space):
         w_res = space.execute("""
         $calls = 0
@@ -890,3 +930,62 @@ class TestConstraintVariableObject(BaseTopazTest):
             "libz3", "libcassowary")
         assert self.unwrap(space, w_z3) == 90
         assert self.unwrap(space, w_cassowary) == 90
+
+    def test_atomic_assignment(self, space):
+        res_w = self.execute(space,
+        """
+        x = 100
+        y = 100
+        z = 100
+        always { x + y + z == 300 }
+        x, y, z = 10, 90, 200
+        return x, y, z
+        """,
+        "libz3", "libcassowary")
+        w_z3, w_cassowary = [self.unwrap(space, w_res) for w_res in res_w]
+        assert w_cassowary == [10, 90, 200]
+        assert w_cassowary == w_z3
+
+    def test_atomic_assignment2(self, space):
+        res_w = self.execute(space,
+        """
+        x, y, z = 10, 90, 200
+        always { x + y + z == 300 }
+        $res = [[x, y, z]]
+        x, y, z = z, y, x
+        $res << [x, y, z]
+        return $res
+        """,
+        "libcassowary", "libz3")
+        w_cassowary, w_z3 = [self.unwrap(space, w_res) for w_res in res_w]
+        assert w_cassowary[0][0] == w_cassowary[1][2]
+        assert w_cassowary[0][1] == w_cassowary[1][1]
+        assert w_cassowary[0][2] == w_cassowary[1][0]
+        assert w_z3[0][0] == w_z3[1][2]
+        assert w_z3[0][1] == w_z3[1][1]
+        assert w_z3[0][2] == w_z3[1][0]
+
+    def test_atomic_assignment3(self, space):
+        cassowary = self.unwrap(space, space.execute(
+        """
+        require "libcassowary"
+        class Point
+          attr_accessor :x, :y
+          def initialize(a, b)
+            @x = a
+            @y = b
+          end
+        end
+
+        x = Point.new(10, 10)
+        y = Point.new(90, 90)
+        z = Point.new(200, 200)
+        always { x.x + y.x + z.x == 300 }
+        $res = [[x.x, y.x, z.x]]
+        x, y, z = z, y, x
+        $res << [x.x, y.x, z.x]
+        return $res
+        """))
+        assert cassowary[0][0] == cassowary[1][2]
+        assert cassowary[0][1] == cassowary[1][1]
+        assert cassowary[0][2] == cassowary[1][0]

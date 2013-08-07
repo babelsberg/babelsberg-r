@@ -10,6 +10,7 @@ from topaz.utils.cache import Cache
 
 # Marker class for constraint solver objects
 class W_ConstraintMarkerObject(W_Object):
+    _attrs_ = []
     classdef = ClassDef("ConstraintObject", W_Object.classdef)
 
     @classdef.singleton_method("allocate")
@@ -30,12 +31,14 @@ class W_ConstraintMarkerObject(W_Object):
             )
 
 class W_ConstraintObject(W_ConstraintMarkerObject):
+    _attrs_ = ["w_strength", "block", "enabled",
+               "constraint_objects_w", "constraint_variables_w"]
     classdef = ClassDef("Constraint", W_ConstraintMarkerObject.classdef)
 
-    def __init__(self, space, w_strength, block):
+    def __init__(self, space):
         W_Object.__init__(self, space)
-        self.w_strength = w_strength
-        self.block = block
+        self.w_strength = None
+        self.block = None
         self.enabled = False
         self.constraint_objects_w = []
         self.constraint_variables_w = []
@@ -77,8 +80,10 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
 
     def enable_constraint_object(self, space, w_constraint_object):
         if w_constraint_object is space.w_true:
+            w_stderr = space.find_const(space.w_object, "STDERR")
+            assert isinstance(w_stderr, W_RootObject)
             space.send(
-                space.globals.get(self, "$stderr"),
+                w_stderr,
                 "puts",
                 [space.newstr_fromstr("Warning: Constraint expression returned true, re-running it whenever the value changes")]
             )
@@ -116,10 +121,13 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         if self.enabled:
             space.send(self, "disable")
             del self.constraint_objects_w[:]
-            with space.constraint_construction(self.block, self.w_strength, self):
-                w_constraint_object = space.invoke_block(self.block, [])
-                self.add_constraint_object(w_constraint_object)
+            self.run_predicate(space)
             space.send(self, "enable")
+
+    def run_predicate(self, space):
+        with space.constraint_construction(self):
+            w_constraint_object = space.invoke_block(self.block, [])
+            self.add_constraint_object(w_constraint_object)
 
     @classdef.method("primitive_constraints")
     def method_solver_constraints(self, space):
@@ -152,18 +160,21 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         return self.w_strength
 
     @classdef.method("initialize")
-    def method_initialize(self, space, block=None):
+    def method_initialize(self, space, w_strength=None, block=None):
         if not block:
-            raise space.error(space.w_ArgumentError, "no block given")
+            raise space.error(space.w_ArgumentError, "no constraint predicate given")
         if self.block:
             raise space.error(space.w_ArgumentError, "cannot re-initialize Constraint")
+        self.w_strength = w_strength
         self.block = block
-
-        with space.constraint_construction(block, None, self):
-            w_constraint_object = space.send(self, "__constrain__", [], block=block)
-            self.add_constraint_object(w_constraint_object)
+        self.run_predicate(space)
         return self
 
     @classdef.singleton_method("allocate")
     def singleton_method_allocate(self, space):
-        return W_ConstraintObject(space, None, None)
+        return W_ConstraintObject(space)
+
+    @classdef.method("value")
+    def method_return_value(self, space):
+        # last added constraint object is the return value
+        return self.constraint_objects_w[-1]

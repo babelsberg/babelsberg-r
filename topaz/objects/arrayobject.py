@@ -144,7 +144,7 @@ class W_ArrayObject(W_Object):
         else:
             # TODO: See comment in "[]"
             c_var = space.newconstraintvariable(w_owner=self, idx=start)
-            if not c_var or not space.suggest_value(c_var, w_obj):
+            if not c_var or not space.assign_value(c_var, w_obj):
                 self.items_w[start] = w_obj
         return w_obj
 

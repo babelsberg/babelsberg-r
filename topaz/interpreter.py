@@ -46,8 +46,6 @@ class Interpreter(object):
                 pc = self._interpret(space, pc, frame, bytecode)
         except RaiseReturn as e:
             if e.parent_interp is self:
-                if frame.parent_interp:
-                    raise RaiseReturn(frame.parent_interp, e.w_value)
                 return e.w_value
             raise
         except Return as e:
@@ -191,7 +189,7 @@ class Interpreter(object):
             frame.cells[idx].upgrade_to_closure(space, frame, idx)
         c_var = space.newconstraintvariable(cell=frame.cells[idx])
         if c_var:
-            space.suggest_value(c_var, frame.peek())
+            space.assign_value(c_var, frame.peek())
         frame.cells[idx].set(space, frame, idx, frame.peek())
 
     def LOAD_CLOSURE(self, space, bytecode, frame, pc, idx):
@@ -257,7 +255,7 @@ class Interpreter(object):
         w_value = frame.pop()
         w_obj = frame.pop()
         c_var = space.newconstraintvariable(w_owner=w_obj, ivar=name)
-        if not c_var or not space.suggest_value(c_var, w_value):
+        if not c_var or not space.assign_value(c_var, w_value):
             space.set_instance_var(w_obj, name, w_value)
         frame.push(w_value)
 
@@ -287,7 +285,7 @@ class Interpreter(object):
         w_module = frame.pop()
         assert isinstance(w_module, W_ModuleObject)
         c_var = space.newconstraintvariable(w_owner=w_module, cvar=name)
-        if not c_var or not space.suggest_value(c_var, w_value):
+        if not c_var or not space.assign_value(c_var, w_value):
             space.set_class_var(w_module, name, w_value)
         frame.push(w_value)
 
@@ -363,7 +361,7 @@ class Interpreter(object):
         assert isinstance(w_code, W_CodeObject)
         frame.push(space.newproc(
             w_code, frame.w_self, frame.lexical_scope, cells, frame.block,
-            self, frame.regexp_match_cell
+            self, frame.top_parent_interp or self, frame.regexp_match_cell
         ))
 
     def BUILD_LAMBDA(self, space, bytecode, frame, pc):
@@ -721,8 +719,8 @@ class Interpreter(object):
         w_returnvalue = frame.pop()
         block = frame.unrollstack(RaiseReturnValue.kind)
         if block is None:
-            raise RaiseReturn(frame.parent_interp, w_returnvalue)
-        unroller = RaiseReturnValue(frame.parent_interp, w_returnvalue)
+            raise RaiseReturn(frame.top_parent_interp, w_returnvalue)
+        unroller = RaiseReturnValue(frame.top_parent_interp, w_returnvalue)
         return block.handle(space, frame, unroller)
 
     def YIELD(self, space, bytecode, frame, pc, n_args):
@@ -768,6 +766,12 @@ class Interpreter(object):
             raise RaiseBreak(frame.parent_interp, w_value)
         unroller = RaiseBreakValue(frame.parent_interp, w_value)
         return block.handle(space, frame, unroller)
+
+    def BEGIN_MULTI_ASSIGNMENT(self, space, bytecode, frame, pc):
+        space.begin_multi_assignment()
+
+    def END_MULTI_ASSIGNMENT(self, space, bytecode, frame, pc):
+        space.end_multi_assignment()
 
 
 class Return(Exception):
