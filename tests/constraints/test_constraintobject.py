@@ -371,6 +371,8 @@ class TestConstraintVariableObject(BaseTopazTest):
 
         x = true
         y = 10
+        always { b > 10 }
+        always { y > 10 }
         always { a == b > 10 }
         always { x == y > 10 }
         return a, b, x, y
