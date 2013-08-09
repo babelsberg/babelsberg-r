@@ -902,20 +902,26 @@ class TestConstraintVariableObject(BaseTopazTest):
             always { foo == 1 }
             """)
 
+    @py.test.mark.xfail
     def test_lazy_solver_selection(self, space):
         w_z3, w_cassowary = self.execute(
             space,
             """
             def foo(a = nil)
-              always { a == 100 }
-              return a
+              x = nil
+              if a
+                always { x == a.? }
+              else
+                x = 100
+              end
+              return x
             end
-            return foo
+            return foo, foo(10)
             """,
             "libz3", "libcassowary"
         )
-        assert self.unwrap(space, w_z3) == 100
-        assert self.unwrap(space, w_cassowary) == 100
+        assert self.unwrap(space, w_z3) == [100, 10]
+        assert self.unwrap(space, w_cassowary) == [100, 10]
 
     def test_late_type_assignment(self, space):
         w_z3, w_cassowary = self.execute(
