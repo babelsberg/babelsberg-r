@@ -910,7 +910,7 @@ class ObjectSpace(object):
                 w_constraint_object = self.send(c_var.w_external_variable, "==", [w_value])
                 w_constraint = self.current_constraint()
                 w_constraint.add_constraint_object(w_constraint)
-                w_constraint.add_assignment(c_var, w_constraint)
+                w_constraint.add_assignment(self, c_var, w_constraint)
             else:
                 c_var.store_value(self, w_value)
             return True

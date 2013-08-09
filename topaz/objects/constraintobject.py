@@ -42,7 +42,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         self.enabled = False
         self.constraint_objects_w = []
         self.constraint_variables_w = []
-        self.assignments_w = CellDict()
+        self.assignments_w = []
 
     def get_constraint_objects(self):
         return self.constraint_objects_w
@@ -61,12 +61,12 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
             self.constraint_variables_w.append(w_value)
 
     def add_assignment(self, space, c_var, w_constraint):
-        if self.assignments_w.get(c_var):
+        if c_var in self.assignments_w:
             raise space.error(
                 space.w_RuntimeError,
                 "multiply assigned variable in constraint execution"
             )
-        self.assignments_w.set(c_var, w_constraint)
+        self.assignments_w.append(c_var)
 
     @classdef.method("enable")
     def method_enable(self, space):
