@@ -925,6 +925,7 @@ class TestConstraintVariableObject(BaseTopazTest):
         assert self.unwrap(space, w_z3) == [100, 10]
         assert self.unwrap(space, w_cassowary) == [100, 10]
 
+    @py.test.mark.xfail
     def test_late_type_assignment(self, space):
         w_z3, w_cassowary = self.execute(
             space,
