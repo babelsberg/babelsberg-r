@@ -978,11 +978,13 @@ class _ExecutionModeContextManager(object):
         self.w_constraint = w_constraint
 
     def __enter__(self):
-        self.space.constraint_stack.append(self.w_constraint)
+        if self.w_constraint:
+            self.space.constraint_stack.append(self.w_constraint)
         self.space._executionmodes.append(self.executiontype())
 
     def __exit__(self, exc_type, exc_value, tb):
-        self.space.constraint_stack.pop()
+        if self.w_constraint:
+            self.space.constraint_stack.pop()
         self.space._executionmodes.pop()
 
 
