@@ -685,7 +685,9 @@ class ObjectSpace(object):
 
         w_cls = self.getclass(w_receiver)
         raw_method = w_cls.find_method(self, name)
-        if self.is_constructing_constraint() and self.is_kind_of(w_receiver, self.w_constraintobject):
+        if (self.is_constructing_constraint() and
+            isinstance(raw_method, W_UserFunction) and
+            self.is_kind_of(w_receiver, self.w_constraintobject)):
             with self.normal_execution():
                 return self._send_raw(name, raw_method, w_receiver, w_cls, args_w, block)
         else:

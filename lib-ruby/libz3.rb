@@ -85,25 +85,18 @@ class Array
     return true if self.empty?
     asts = map do |element|
       case element
-      when Fixnum
-        Z3::Instance.make_int_variable(element)
-      when Float
-        Z3::Instance.make_real_variable(element)
-      when true, false
-        Z3::Instance.make_bool_variable(element)
       when Z3::Z3Pointer
         element
+      when Fixnum, Float, true, false
+        # not constructing constraint or Z3 does not support element
+        # (otherwise element would have been wrapped)
+        return self.uniq.size == self.size
       else
         raise "Cannot solve alldifferent? on this array (no Z3 interpretation for #{element.inspect})"
       end
     end
 
-    begin
-      return asts.pop.alldifferent(*asts)
-    rescue RuntimeError
-      # we're not constructing constraints
-      return self.uniq.size == self.size
-    end
+    return asts.pop.alldifferent(*asts)
   end
 end
 
