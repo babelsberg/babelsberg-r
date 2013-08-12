@@ -19,8 +19,8 @@ class W_ConstraintMarkerObject(W_Object):
 
     @classdef.method("and")
     def method_and(self, space, w_rhs):
-        if space.is_constructing_constraint():
-            w_constraint = space.current_constraint()
+        w_constraint = space.current_constraint()
+        if w_constraint:
             w_constraint.add_constraint_object(self)
             return w_rhs
         else:
