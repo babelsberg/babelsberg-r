@@ -1,6 +1,4 @@
 class ArrayConstraintVariable < ConstraintObject
-  attr_writer :constraint_variables
-
   # A metaobject to hold multiple constraints over ranges of the
   # array.
   class RangeConstraint < ConstraintObject
@@ -20,10 +18,14 @@ class ArrayConstraintVariable < ConstraintObject
       end
     end
   end
+end
 
-  def initialize(ary)
+class NumericArrayConstraintVariable < ArrayConstraintVariable
+  attr_writer :constraint_variables
+
+  def initialize(ary, cvars=nil)
     @ary = ary
-    @constraint_variables = @ary.collect do |var|
+    @constraint_variables = cvars || @ary.collect do |var|
       Constraint.new { var }.value
     end
   end
@@ -59,7 +61,7 @@ class ArrayConstraintVariable < ConstraintObject
         @constraint_variables[idx]
       end
     else
-      var = ArrayConstraintVariable.new(ary[*args])
+      var = NumericArrayConstraintVariable.new(ary[*args])
       var.constraint_variables = @constraint_variables[*args]
       var
     end
@@ -138,8 +140,15 @@ end
 class Array
   def for_constraint(name)
     if self.all? { |e| e.is_a? Numeric } and !self.empty?
-      ArrayConstraintVariable.new(self)
+      NumericArrayConstraintVariable.new(self)
+    elsif self.all? { |e| e.is_a?(ConstraintObject) && e.value.is_a?(Numeric) } and !self.empty?
+      NumericArrayConstraintVariable.new(self.map(&:value), self)
     end
+  end
+
+  def sum
+    return 0 if empty?
+    self[0] + self[1..-1].sum
   end
 
   def assign_constraint_value(val)
