@@ -955,6 +955,20 @@ class ObjectSpace(object):
             return None
         return self.constraint_stack[-1]
 
+    def current_solver(self):
+        w_constraint = self.current_constraint()
+        if w_constraint:
+            return w_constraint.get_solver()
+        else:
+            return None
+
+    def set_current_solver(self, w_solver):
+        w_constraint = self.current_constraint()
+        if w_constraint:
+            return w_constraint.set_solver(w_solver)
+        else:
+            raise RuntimeError("shouldn't get here")
+
     def is_executing_normally(self):
         return isinstance(self._executionmodes.get(), NormalExecution)
 

@@ -13,6 +13,24 @@ class W_ConstraintMarkerObject(W_Object):
     _attrs_ = []
     classdef = ClassDef("ConstraintObject", W_Object.classdef)
 
+    def api(classdef, name):
+        @classdef.method(name)
+        def method(self, space, args_w):
+            raise space.error(
+                space.w_NotImplementedError,
+                "%s should have implemented %s" % (
+                    space.getclass(self).name,
+                    name
+                )
+            )
+    api(classdef, "begin_assign") # assert equality constraint
+    api(classdef, "assign")       # run solver
+    api(classdef, "end_assign")   # remove equality constraint
+    api(classdef, "value")        # current value
+    api(classdef, "readonly!")    # make read-only
+    api(classdef, "writable!")    # make writable
+    api(classdef, "finalize")     # remove from solver internal structure
+
     @classdef.singleton_method("allocate")
     def singleton_method_allocate(self, space):
         return W_ConstraintMarkerObject(space, self)
@@ -32,7 +50,8 @@ class W_ConstraintMarkerObject(W_Object):
 
 class W_ConstraintObject(W_ConstraintMarkerObject):
     _attrs_ = ["w_strength", "block", "enabled",
-               "constraint_objects_w", "constraint_variables_w", "assignments_w"]
+               "constraint_objects_w", "constraint_variables_w",
+               "assignments_w", "w_solver"]
     classdef = ClassDef("Constraint", W_ConstraintMarkerObject.classdef)
 
     def __init__(self, space):
@@ -160,15 +179,30 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         return self.w_strength
 
     @classdef.method("initialize")
-    def method_initialize(self, space, w_strength=None, block=None):
+    def method_initialize(self, space, w_strength=None, w_options=None, block=None):
         if not block:
             raise space.error(space.w_ArgumentError, "no constraint predicate given")
         if self.block:
             raise space.error(space.w_ArgumentError, "cannot re-initialize Constraint")
-        self.w_strength = w_strength
+        if space.is_kind_of(w_strength, space.w_hash):
+            w_options = w_strength
+            w_strength = space.send(w_strength, "[]", [space.newsymbol("priority")])
+            if w_strength is space.w_nil:
+                w_strength = None
+        if w_options:
+            self.set_solver(space.send(w_options, "[]", [space.newsymbol("solver")]))
         self.block = block
         self.run_predicate(space)
         return self
+
+    def set_solver(self, w_solver):
+        if w_solver is space.w_nil:
+            self.w_solver = None
+        else:
+            self.w_solver = w_solver
+
+    def get_solver(self):
+        return w_solver
 
     @classdef.singleton_method("allocate")
     def singleton_method_allocate(self, space):

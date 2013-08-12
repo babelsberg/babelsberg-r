@@ -16,7 +16,7 @@ class ConstraintInterpreter(Interpreter):
             frame.cells[idx].upgrade_to_closure(space, frame, idx)
             c_var = space.newconstraintvariable(cell=frame.cells[idx])
             if c_var and c_var.is_solveable():
-                w_res = c_var.w_external_variable
+                w_res = c_var.active_external_variable(space)
         if not w_res:
             w_res = frame.cells[idx].get(space, frame, idx) or space.w_nil
         frame.push(w_res)
@@ -26,7 +26,7 @@ class ConstraintInterpreter(Interpreter):
         w_obj = frame.pop()
         c_var = space.newconstraintvariable(w_owner=w_obj, ivar=name)
         if c_var and c_var.is_solveable():
-            w_res = c_var.w_external_variable
+            w_res = c_var.active_external_variable(space)
         else:
             w_res = space.find_instance_var(w_obj, name)
         frame.push(w_res)
@@ -37,7 +37,7 @@ class ConstraintInterpreter(Interpreter):
         assert isinstance(w_module, W_ModuleObject)
         c_var = space.newconstraintvariable(w_owner=w_module, cvar=name)
         if c_var and c_var.is_solveable():
-            w_res = c_var.w_external_variable
+            w_res = c_var.active_external_variable(space)
         else:
             w_res = space.find_class_var(w_module, name)
             if w_res is None:
@@ -58,10 +58,10 @@ class ConstraintInterpreter(Interpreter):
 class ConstrainedVariable(W_Root):
     CONSTRAINT_IVAR = "__constrained_variable__"
     _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "idx", "w_key",
-                          "w_external_variable"]
+                          "external_variables_w"]
 
     def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
-        self.w_external_variable = None
+        self.external_variables_w = CellDict()
         self.cell = cell
         self.w_owner = w_owner
         self.ivar = ivar
@@ -81,16 +81,27 @@ class ConstrainedVariable(W_Root):
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
 
         w_value = self.load_value(space)
-        if space.respond_to(w_value, "for_constraint"):
+        w_solver = space.current_solver()
+        if not w_solver:
+            if space.respond_to(w_value, "constraint_solver"):
+                with space.normal_execution():
+                    w_solver = space.send(w_value, "constraint_solver")
+                    space.set_current_solver(w_solver)
+
+        if w_solver:
+            if space.is_kind_of(w_solver, space.w_module):
+                solver_name = w_solver.name
+            else:
+                solver_name = space.getclass(w_solver).name
             with space.normal_execution():
                 w_external_variable = space.send(
-                    w_value,
-                    "for_constraint",
-                    [self.get_name(space)]
+                    w_solver,
+                    "constraint_variable_for",
+                    [w_value]
                 )
-                if w_external_variable is not space.w_nil:
-                    self.w_external_variable = w_external_variable
-                    space.set_instance_var(self.w_external_variable, self.CONSTRAINT_IVAR, self)
+            if w_external_variable is not space.w_nil:
+                self.external_variables_w.set(solver_name, w_external_variable)
+                space.set_instance_var(w_external_variable, self.CONSTRAINT_IVAR, self)
 
     def __del__(self):
         # TODO: remove external variable from solver
@@ -101,22 +112,18 @@ class ConstrainedVariable(W_Root):
         return False
 
     def make_readonly(self, space):
-        if not self.w_readonly_constraint:
-            self.w_readonly_constraint = space.send(self.w_external_variable, "==", [self.get_i(space)])
-            space.send(self.w_readonly_constraint, "enable")
-        self.is_readonly = True
+        if not self.is_readonly:
+            for w_external_variable in self.external_variables_w:
+                space.send(w_external_variable, "readonly!")
+            self.is_readonly = True
 
     def make_assignable(self, space):
-        if self.w_readonly_constraint:
-            space.send(self.w_readonly_constraint, "disable")
-            self.w_readonly_constraint = None
+        if self.is_readonly:
+            for w_external_variable in self.external_variables_w:
+                space.send(w_external_variable, "writable!")
 
-    def make_writable(self, space):
-        self.make_assignable(space)
-        self.is_readonly = False
-
-    def is_solveable(self):
-        return self.w_external_variable is not None
+    def is_solveable(self, space):
+        return len(self.external_variables_w.values) > 0
 
     def add_to_constraint(self, w_constraint):
         if w_constraint not in self.constraints_w:
@@ -163,10 +170,10 @@ class ConstrainedVariable(W_Root):
 
     def begin_assign(self, space, w_value):
         if self.is_solveable():
-            if self.is_readonly:
-                self.make_writable(space)
+            self.make_assignable(space)
             with space.constraint_execution():
-                space.send(self.w_external_variable, "begin_assign", [w_value])
+                for w_external_variable in self.external_variables_w:
+                    space.send(w_external_variable, "begin_assign", [w_value])
         else:
             self.store_value(space, w_value)
             self.w_remembered_value = w_value
@@ -174,14 +181,16 @@ class ConstrainedVariable(W_Root):
     def assign(self, space):
         if self.is_solveable():
             with space.constraint_execution():
-                space.send(self.w_external_variable, "assign")
+                for w_external_variable in self.external_variables_w:
+                    space.send(w_external_variable, "assign")
         else:
             self.recalculate_path(space, self.w_remembered_value)
 
     def end_assign(self, space):
         if self.is_solveable():
             with space.constraint_execution():
-                space.send(self.w_external_variable, "end_assign")
+                for w_external_variable in self.external_variables_w:
+                    space.send(self.w_external_variable, "end_assign")
             if self.is_readonly:
                 self.make_readonly(space)
         else:
