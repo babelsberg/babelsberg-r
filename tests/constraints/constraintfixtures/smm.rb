@@ -24,7 +24,7 @@ end
 s,e,n,d,m,o,r,y = [0]*8
 
 # each digit is between 0 and 9
-always { [s,e,n,d,m,o,r,y].ins(0..9) }
+always { [s,e,n,d,m,o,r,y].ins(0..9) } 
 
 always { [s,e,n,d,m,o,r,y].alldifferent? }
 

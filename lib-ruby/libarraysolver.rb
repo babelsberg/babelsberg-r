@@ -84,7 +84,7 @@ class NumericArrayConstraintVariable < ArrayConstraintVariable
   def alldifferent?
     raise "Need Z3 for this" unless defined? Z3
     return true if @constraint_variables.empty?
-    @constraint_variables.alldifferent?
+    @constraint_variables[0].alldifferent(*@constraint_variables[1..-1])
   end
 
   include Enumerable
