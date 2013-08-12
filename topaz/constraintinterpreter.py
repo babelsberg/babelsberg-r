@@ -54,18 +54,6 @@ class ConstraintInterpreter(Interpreter):
         else:
             return Interpreter.JUMP_AND(self, space, bytecode, frame, pc, target_pc)
 
-    def SEND(self, space, bytecode, frame, pc, meth_idx, num_args):
-        args_w = frame.popitemsreverse(num_args)
-        w_receiver = frame.pop()
-        w_res = None
-        method = space.symbol_w(bytecode.consts_w[meth_idx])
-        if space.is_kind_of(w_receiver, space.w_constraintobject):
-            with space.normal_execution():
-                w_res = space.send(w_receiver, method, args_w)
-        else:
-            w_res = space.send(w_receiver, method, args_w)
-        frame.push(w_res)
-
 
 class ConstrainedVariable(W_Root):
     CONSTRAINT_IVAR = "__constrained_variable__"
