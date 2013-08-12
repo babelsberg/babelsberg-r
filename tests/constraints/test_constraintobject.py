@@ -408,6 +408,8 @@ class TestConstraintVariableObject(BaseTopazTest):
 
         x = true
         y = 10
+        always { b > 10 }
+        always { y > 10 }
         always { a == b > 10 }
         always { x == y > 10 }
         return a, b, x, y
@@ -926,6 +928,54 @@ class TestConstraintVariableObject(BaseTopazTest):
         return x
         """)
         assert self.unwrap(space, w_res) == -100
+
+    def test_invalid_multiple_assignment(self, space):
+        with self.raises(space, "RuntimeError", "multiply assigned variable in constraint execution"):
+            space.execute("""
+            require "libcassowary"
+            @sum = -1
+            def foo
+              @sum = 0
+              @sum = 1
+            end
+            always { foo == 1 }
+            """)
+
+    @py.test.mark.xfail
+    def test_lazy_solver_selection(self, space):
+        w_z3, w_cassowary = self.execute(
+            space,
+            """
+            def foo(a = nil)
+              x = nil
+              if a
+                always { x == a.? }
+              else
+                x = 100
+              end
+              return x
+            end
+            return foo, foo(10)
+            """,
+            "libz3", "libcassowary"
+        )
+        assert self.unwrap(space, w_z3) == [100, 10]
+        assert self.unwrap(space, w_cassowary) == [100, 10]
+
+    @py.test.mark.xfail
+    def test_late_type_assignment(self, space):
+        w_z3, w_cassowary = self.execute(
+            space,
+            """
+            x = nil
+            always { x.respond_to? :nil? }
+            x = 10
+            always { x + 10 == 100 }
+            return x
+            """,
+            "libz3", "libcassowary")
+        assert self.unwrap(space, w_z3) == 90
+        assert self.unwrap(space, w_cassowary) == 90
 
     def test_atomic_assignment(self, space):
         res_w = self.execute(space,
