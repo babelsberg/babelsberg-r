@@ -1,6 +1,21 @@
 $LOAD_PATH.unshift(File.expand_path("../cassowary/lib/", __FILE__))
 require "cassowary"
 
+class Cassowary::SimplexSolver
+  def weight
+    200
+  end
+
+  def constraint_variable_for(value)
+    case value
+    when Numeric, nil
+      v = Cassowary::Variable.new(value: value || 0)
+      Cassowary::SimplexSolver.instance.add_stay(v)
+      v
+    end
+  end
+end
+
 class Numeric
   alias prev_coerce coerce
   def coerce(other)
@@ -35,10 +50,8 @@ class Fixnum
 end
 
 class Numeric
-  def for_constraint(name)
-    v = Cassowary::Variable.new(name: name, value: self)
-    Cassowary::SimplexSolver.instance.add_stay(v)
-    v
+  def constraint_solver
+    Cassowary::SimplexSolver.instance
   end
 end
 

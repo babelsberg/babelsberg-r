@@ -21,6 +21,18 @@ class Z3::Z3Pointer
     plain_enable
     Z3::Instance.solve
   end
+
+  def readonly!
+    unless @ro_constraint
+      @ro_constraint = self == value
+      Z3::Instance.add_constraint(@ro_constraint)
+    end
+  end
+
+  def writable!
+    Z3::Instance.remove_constraint(@ro_constraint)
+    @ro_constraint = nil
+  end
 end
 
 class Numeric
@@ -56,27 +68,38 @@ class Fixnum
   end
 end
 
-class Numeric
-  def for_constraint(name)
-    Z3::Instance.make_real_variable(self.to_f)
+class Z3
+  def weight
+    100
+  end
+
+  def constraint_variable_for(value)
+    case value
+    when Fixnum
+      return Z3::Instance.make_int_variable(value)
+    when TrueClass, FalseClass
+      Z3::Instance.make_bool_variable(value)
+    when Numeric
+      return Z3::Instance.make_real_variable(value.to_f)
+    end
   end
 end
 
-class Fixnum
-  def for_constraint(name)
-    Z3::Instance.make_int_variable(self)
+class Numeric
+  def constraint_solver
+    Z3::Instance
   end
 end
 
 class TrueClass
-  def for_constraint(name)
-    Z3::Instance.make_bool_variable(self)
+  def constraint_solver
+    Z3::Instance
   end
 end
 
 class FalseClass
-  def for_constraint(name)
-    Z3::Instance.make_bool_variable(self)
+  def constraint_solver
+    Z3::Instance
   end
 end
 

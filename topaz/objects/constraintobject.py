@@ -156,8 +156,8 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
     def method_solver_constraints(self, space):
         vars_w = []
         for w_var in self.constraint_variables_w:
-            if w_var.is_solveable():
-                vars_w.append(w_var.w_external_variable)
+            if w_var.is_solveable(space):
+                vars_w.append(w_var.get_external_variable(self.get_solver()))
         return space.newarray(vars_w)
 
     @classdef.method("predicate")
@@ -184,25 +184,29 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
             raise space.error(space.w_ArgumentError, "no constraint predicate given")
         if self.block:
             raise space.error(space.w_ArgumentError, "cannot re-initialize Constraint")
-        if space.is_kind_of(w_strength, space.w_hash):
+        if w_strength and space.is_kind_of(w_strength, space.w_hash):
             w_options = w_strength
             w_strength = space.send(w_strength, "[]", [space.newsymbol("priority")])
             if w_strength is space.w_nil:
                 w_strength = None
+
+        self.block = block
+        self.w_strength = w_strength
+        self.w_solver = None
         if w_options:
             self.set_solver(space.send(w_options, "[]", [space.newsymbol("solver")]))
-        self.block = block
+
         self.run_predicate(space)
         return self
 
-    def set_solver(self, w_solver):
+    def set_solver(self, space, w_solver):
         if w_solver is space.w_nil:
             self.w_solver = None
         else:
             self.w_solver = w_solver
 
     def get_solver(self):
-        return w_solver
+        return self.w_solver
 
     @classdef.singleton_method("allocate")
     def singleton_method_allocate(self, space):

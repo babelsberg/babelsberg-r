@@ -179,7 +179,7 @@ class Interpreter(object):
         c_var = space.newconstraintvariable(cell=frame.cells[idx])
         # TODO: think of something to mark these dirty so we don't do
         # this lookup all the time
-        if c_var and c_var.is_solveable():
+        if c_var and c_var.is_solveable(space):
             frame.push(space.get_value(c_var))
         else:
             frame.push(frame.cells[idx].get(space, frame, idx) or space.w_nil)
@@ -244,7 +244,7 @@ class Interpreter(object):
         name = space.symbol_w(bytecode.consts_w[idx])
         w_obj = frame.pop()
         c_var = space.newconstraintvariable(w_owner=w_obj, ivar=name)
-        if c_var and c_var.is_solveable():
+        if c_var and c_var.is_solveable(space):
             w_res = space.get_value(c_var)
         else:
             w_res = space.find_instance_var(w_obj, name) or space.w_nil
@@ -273,7 +273,7 @@ class Interpreter(object):
         w_module = frame.pop()
         assert isinstance(w_module, W_ModuleObject)
         c_var = space.newconstraintvariable(w_owner=w_module, cvar=name)
-        if c_var and c_var.is_solveable():
+        if c_var and c_var.is_solveable(space):
             w_value = space.get_value(c_var)
         else:
             w_value = space.find_class_var(w_module, name)

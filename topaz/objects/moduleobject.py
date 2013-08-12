@@ -21,9 +21,9 @@ class AttributeReader(W_FunctionObject):
 
     def call(self, space, w_obj, args_w, block):
         c_var = space.newconstraintvariable(w_owner=w_obj, ivar=self.varname)
-        if c_var and c_var.is_solveable():
+        if c_var and c_var.is_solveable(space):
             if space.is_constructing_constraint():
-                return c_var.w_external_variable
+                return c_var.get_external_variable(space)
             else:
                 return space.get_value(c_var)
         return space.find_instance_var(w_obj, self.varname)

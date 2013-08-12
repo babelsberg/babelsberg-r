@@ -102,8 +102,8 @@ class W_ArrayObject(W_Object):
             # TODO: Make this work for the whole thing
             if space.is_constructing_constraint():
                 c_var = space.newconstraintvariable(w_owner=self, idx=start)
-                if c_var and c_var.is_solveable():
-                    return c_var.w_external_variable
+                if c_var and c_var.is_solveable(space):
+                    return c_var.get_external_variable(space)
             elif space.is_executing_normally():
                 c_var = space.newconstraintvariable(w_owner=self, idx=start)
                 if c_var:

@@ -498,7 +498,7 @@ class ObjectSpace(object):
                     raise NotImplementedError
 
         if c_var and self.is_constructing_constraint():
-            c_var.add_to_constraint(self.current_constraint())
+            c_var.add_to_constraint(self, self.current_constraint())
 
         if c_var:
             return c_var
@@ -898,7 +898,7 @@ class ObjectSpace(object):
             return w_cmp_res
 
     def get_value(self, c_var):
-        if c_var.is_solveable():
+        if c_var.is_solveable(self):
             return c_var.get_i(self)
         else:
             return c_var.load_value(self)
@@ -911,7 +911,7 @@ class ObjectSpace(object):
                 c_var.assign_value(self, w_value)
             return True
         elif self.is_constructing_constraint():
-            if c_var.is_solveable():
+            if c_var.is_solveable(space):
                 w_constraint_object = self.send(c_var.w_external_variable, "==", [w_value])
                 w_constraint = self.current_constraint()
                 w_constraint.add_constraint_object(w_constraint)
@@ -965,7 +965,7 @@ class ObjectSpace(object):
     def set_current_solver(self, w_solver):
         w_constraint = self.current_constraint()
         if w_constraint:
-            return w_constraint.set_solver(w_solver)
+            return w_constraint.set_solver(self, w_solver)
         else:
             raise RuntimeError("shouldn't get here")
 
