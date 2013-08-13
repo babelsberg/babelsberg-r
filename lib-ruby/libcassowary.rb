@@ -17,34 +17,34 @@ class Cassowary::SimplexSolver
 end
 
 class Numeric
-  alias prev_coerce coerce
+  alias coerce_wo_cassowary coerce
   def coerce(other)
     if other.kind_of?(Cassowary::AbstractVariable) || other.kind_of?(Cassowary::Constraint)
       [other, self.as_linear_expression]
     else
-      prev_coerce(other)
+      coerce_wo_cassowary(other)
     end
   end
 end
 
 class Float
-  alias prev_coerce coerce
+  alias coerce_wo_cassowary coerce
   def coerce(other)
     if other.kind_of?(Cassowary::AbstractVariable) || other.kind_of?(Cassowary::Constraint)
       [other, self.as_linear_expression]
     else
-      prev_coerce(other)
+      coerce_wo_cassowary(other)
     end
   end
 end
 
 class Fixnum
-  alias prev_coerce coerce
+  alias coerce_wo_cassowary coerce
   def coerce(other)
     if other.kind_of?(Cassowary::AbstractVariable) || other.kind_of?(Cassowary::Constraint)
       [other, self.as_linear_expression]
     else
-      prev_coerce(other)
+      coerce_wo_cassowary(other)
     end
   end
 end

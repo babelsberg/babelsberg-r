@@ -36,34 +36,34 @@ class Z3::Z3Pointer
 end
 
 class Numeric
-  alias prev_coerce coerce
+  alias coerce_wo_z3 coerce
   def coerce(other)
     if other.kind_of?(Z3::Z3Pointer)
       [other, Z3::Instance.make_real(self)]
     else
-      prev_coerce(other)
+      coerce_wo_z3(other)
     end
   end
 end
 
 class Float
-  alias prev_coerce coerce
+  alias coerce_wo_z3 coerce
   def coerce(other)
     if other.kind_of?(Z3::Z3Pointer)
       [other, Z3::Instance.make_real(self)]
     else
-      prev_coerce(other)
+      coerce_wo_z3(other)
     end
   end
 end
 
 class Fixnum
-  alias prev_coerce coerce
+  alias coerce_wo_z3 coerce
   def coerce(other)
     if other.kind_of?(Z3::Z3Pointer)
       [other, Z3::Instance.make_int(self)]
     else
-      super(other)
+      coerce_wo_z3(other)
     end
   end
 end
