@@ -1,6 +1,5 @@
 * change ||, &&, if-then etc interpretation so we can add them to a solver (Z3)
 * allow variables to be shared between solvers
 * allow constraintvariables specialization (e.g. when they're used in a constructor and are still nil, but should be a Fixnum)
-* allow complex objects in edit constraints
 * extend libarraysolver to work for non-numeric arrays
-* provide finite domain methods from Z3 - for the Sudoku solver
+* make solvers assign new values eagerly, to trigger downstream solvers correctly
