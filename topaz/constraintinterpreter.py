@@ -106,7 +106,7 @@ class ConstrainedVariable(W_Root):
                     w_solver = space.send(w_value, "constraint_solver")
                     space.set_current_solver(w_solver)
         self.add_solver(w_solver)
-        if w_solver:
+        if w_solver and not self._is_solveable(w_solver):
             with space.normal_execution():
                 w_external_variable = space.send(
                     w_solver,
