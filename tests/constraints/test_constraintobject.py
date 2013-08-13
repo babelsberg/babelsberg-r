@@ -575,6 +575,28 @@ class TestConstraintVariableObject(BaseTopazTest):
             True, 20, # after cassowary assigned 20, Z3 is triggered and picks up 20
         ]
 
+    def test_solver_interaction_assignment2(self, space):
+        w_res = space.execute("""
+        require "libcassowary"
+        require "libz3"
+
+        a = true
+        b = 10
+        c = 20
+        always(solver: Cassowary::SimplexSolver.instance) { b + c >= 20 }
+        $res = [a, b, c]
+        always(solver: Z3::Instance) { a == (b > 15) }
+        $res << a << b << c
+        c = 1
+        $res << a << b << c
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [
+            True, 10, 20, # everything's fine
+            False, 10, 20, # Z3 cannot change b, so a is changed to false
+            True, 19, 1, # after cassowary assigned 19 to b, Z3 is triggered and picks it up
+        ]
+
     def test_solver_variable_delegation(self, space):
         w_cassowary, w_z3 = self.execute(
             space,
