@@ -286,6 +286,7 @@ class ConstrainedVariable(W_Root):
             if w_solver:
                 new_weight = Coerce.int(space, space.send(w_solver, "weight"))
                 if new_weight > strongest_weight:
+                    strongest_weight = new_weight
                     w_strongest_solver = w_solver
         return w_strongest_solver
 

@@ -431,39 +431,128 @@ class TestConstraintVariableObject(BaseTopazTest):
         """)
         assert self.unwrap(space, w_res) == [True, 11, True, 11]
 
-    @py.test.mark.xfail
     def test_constraint_solver_interaction_different_domains(self, space):
         w_res = space.execute("""
         require "libz3"
         require "libcassowary"
 
-        raise "Test problem" unless 1.for_constraint("name").is_a?(Cassowary::Variable)
+        a = true
+        b = 15
+        always { b < 11 }
+        $res = [[a, b]]
+        always { a == b > 10 }
+        $res << [a, b]
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [[True, 10], [False, 10.0]]
+
+        w_res = space.execute("""
+        require "libz3"
+        require "libcassowary"
 
         a = true
-        b = 10
-        always { b < 11 }
-        always { a == b > 10 }
-        return a, b
+        b = 15
+        always(solver: Cassowary::SimplexSolver.instance) { b < 11 }
+        $res = [[a, b]]
+        always(solver: Z3::Instance) { a == b > 10 }
+        $res << [a, b]
+        return $res
         """)
-        assert self.unwrap(space, w_res) == [False, 10.0]
+        assert self.unwrap(space, w_res) == [[True, 10], [False, 10.0]]
 
-    @py.test.mark.xfail
+        w_res = space.execute("""
+        require "libz3"
+        require "libcassowary"
+
+        a = true
+        b = 15
+        always(solver: Cassowary::SimplexSolver.instance) { b < 11 }
+        $res = [[a, b]]
+        always(solver: Z3::Instance) { a == b > 10 }
+        $res << [a, b]
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [[True, 10], [False, 10.0]]
+
+    def test_constraint_solver_interaction_z3_on_top(self, space):
+        w_res = space.execute("""
+        require "libz3"
+        require "libcassowary"
+
+        class Cassowary::SimplexSolver
+          def weight
+            -1
+          end
+        end
+
+        class Z3
+          def weight
+            1000 # ensure that Z3 is upstream from Cassowary
+          end
+        end
+
+        a = true
+        b = 15
+        always(solver: Cassowary::SimplexSolver.instance) { b <= 10 }
+        $res = [[a, b]]
+        always(solver: Z3::Instance) { a == b >= 10 && a }
+        $res << [a, b]
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [[True, 10], [True, 10.0]]
+
+    def test_inconsistent_constraints_solver_interaction(self, space):
+        with self.raises(space, "RuntimeError", "unsatisfiable constraint system"):
+            space.execute("""
+            require "libz3"
+            require "libcassowary"
+
+            b = 15
+            always(solver: Cassowary::SimplexSolver.instance) { b <= 10 }
+            $res = [b]
+            always(solver: Z3::Instance) { b > 100 }
+            $res << b
+            return $res
+            """)
+
+    def test_constraint_solver_interaction_different_domains_failure(self, space):
+        with self.raises(space, "RuntimeError", "unsatisfiable constraint system"):
+            space.execute("""
+            require "libz3"
+            require "libcassowary"
+
+            class Cassowary::SimplexSolver
+              def weight
+                1000
+              end
+            end
+
+            class Z3
+              def weight
+                -1000 # ensure that Z3 is donwstream from Cassowary
+              end
+            end
+
+            a = true
+            b = 15
+            always(solver: Cassowary::SimplexSolver.instance) { b < 11 }
+            always(solver: Z3::Instance) { a == b > 100 }
+            always(solver: Z3::Instance) { a } # cannot be satisfied, as `b' is readonly from Z3
+            """)
+
     def test_constraint_solver_interaction_same_domain(self, space):
         w_res = space.execute("""
         require "libz3"
-
-        a = 20
-        b = 10
-        always { b > 10 }
-
         require "libcassowary"
-        raise "Test problem" unless 1.for_constraint("name").is_a?(Cassowary::Variable)
 
-        always { a < b }
-
-        return a, b
+        a = 15
+        b = 10
+        always(solver: Z3::Instance) { b > 10 }
+        $res = [a,b]
+        always(solver: Cassowary::SimplexSolver.instance) { a < b }
+        return $res << a << b
         """)
-        assert self.unwrap(space, w_res) == [10.0, 11]
+        assert self.unwrap(space, w_res) == [15, 11, 10, 11]
 
     def test_solver_variable_delegation(self, space):
         w_cassowary, w_z3 = self.execute(

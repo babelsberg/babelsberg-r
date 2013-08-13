@@ -30,8 +30,10 @@ class Z3::Z3Pointer
   end
 
   def writable!
-    Z3::Instance.remove_constraint(@ro_constraint)
-    @ro_constraint = nil
+    if @ro_constraint
+      Z3::Instance.remove_constraint(@ro_constraint)
+      @ro_constraint = nil
+    end
   end
 end
 

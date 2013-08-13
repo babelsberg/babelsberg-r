@@ -194,7 +194,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         self.w_strength = w_strength
         self.w_solver = None
         if w_options:
-            self.set_solver(space.send(w_options, "[]", [space.newsymbol("solver")]))
+            self.set_solver(space, space.send(w_options, "[]", [space.newsymbol("solver")]))
 
         self.run_predicate(space)
         return self

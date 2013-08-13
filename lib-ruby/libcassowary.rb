@@ -16,6 +16,22 @@ class Cassowary::SimplexSolver
   end
 end
 
+class Cassowary::Variable
+  def readonly!
+    unless @ro_constraint
+      @ro_constraint = self == value
+      Cassowary::SimplexSolver.instance.add_constraint(@ro_constraint)
+    end
+  end
+
+  def writable!
+    if @ro_constraint
+      Cassowary::SimplexSolver.instance.remove_constraint(@ro_constraint)
+      @ro_constraint = nil
+    end
+  end
+end
+
 class Numeric
   alias coerce_wo_cassowary coerce
   def coerce(other)
