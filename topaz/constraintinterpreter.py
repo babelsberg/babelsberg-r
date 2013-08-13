@@ -248,31 +248,34 @@ class ConstrainedVariable(W_Root):
         return space.newstr_fromstr("%s-%s" % (storagestr, inspectstr))
 
     def begin_assign(self, space, w_value):
-        if self.is_solveable():
-            self.make_assignable(space)
+        self.make_assignable(space)
+        self.store_value(space, w_value)
+        defining_variable = self.defining_variable(space)
+        if defining_variable:
             with space.constraint_execution():
-                for w_external_variable in self.external_variables_w:
-                    space.send(w_external_variable, "begin_assign", [w_value])
-        else:
-            self.store_value(space, w_value)
+                space.send(defining_variable, "begin_assign", [w_value])
 
     def assign(self, space):
-        if self.is_solveable():
+        defining_variable = self.defining_variable(space)
+        if defining_variable:
             with space.constraint_execution():
-                for w_external_variable in self.external_variables_w:
-                    space.send(w_external_variable, "assign")
-        else:
-            self.recalculate_path(space)
+                space.send(defining_variable, "assign")
+            # now update the other external variables
+            new_value = self.get_i(space)
+            for w_external_variable in self.external_variables_w:
+                if w_external_variable and w_external_variable is not defining_variable:
+                    space.send(w_external_variable, "begin_assign", [new_value])
+                    space.send(w_external_variable, "assign", [new_value])
 
     def end_assign(self, space):
-        if self.is_solveable():
-            with space.constraint_execution():
-                for w_external_variable in self.external_variables_w:
-                    space.send(w_external_variable, "end_assign")
-            if self.has_readonly:
-                self.make_not_assignable(space)
-        else:
-            pass
+        for w_external_variable in self.external_variables_w:
+            if w_external_variable:
+                space.send(w_external_variable, "end_assign")
+        self.make_not_assignable(space)
+        for i, cs_w in enumerate(self.constraints_w):
+            if (len(self.external_variables_w) < i + 1 or
+                self.external_variables_w[i] is None):
+                self.recalculate_path(space, cs_w)
 
     def assign_value(self, space, w_value):
         self.begin_assign(space, w_value)
@@ -283,7 +286,7 @@ class ConstrainedVariable(W_Root):
         w_strongest_solver = None
         strongest_weight = -1000 # XXX: Magic number
         for i, w_solver in enumerate(self.solvers_w):
-            if w_solver:
+            if w_solver and self._is_solveable(w_solver):
                 new_weight = Coerce.int(space, space.send(w_solver, "weight"))
                 if new_weight > strongest_weight:
                     strongest_weight = new_weight
@@ -321,6 +324,6 @@ class ConstrainedVariable(W_Root):
         self.set_i(space)
         return self.load_value(space)
 
-    def recalculate_path(self, space):
-        for w_constraint in self.constraints_w:
+    def recalculate_path(self, space, constraints_w):
+        for w_constraint in constraints_w:
             space.send(w_constraint, "recalculate")
