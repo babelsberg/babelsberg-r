@@ -1,3 +1,4 @@
+import copy
 import py
 
 from ..base import BaseTopazTest
@@ -6,11 +7,14 @@ E = 0.00000000000001
 
 class TestConstraintVariableObject(BaseTopazTest):
     def execute(self, space, code, *libs):
-        return [space.execute("""
-                require "%s"
+        results = []
+        for lib in libs:
+            results.append(copy.deepcopy(space).execute("""
+            require "%s"
 
-                %s
-                """ % (lib, code)) for lib in libs]
+            %s
+            """ % (lib, code)))
+        return results
 
     def test_names(self, space):
         space.execute("ConstraintVariable")
