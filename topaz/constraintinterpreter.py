@@ -265,7 +265,7 @@ class ConstrainedVariable(W_Root):
             for w_external_variable in self.external_variables_w:
                 if w_external_variable and w_external_variable is not defining_variable:
                     space.send(w_external_variable, "begin_assign", [new_value])
-                    space.send(w_external_variable, "assign", [new_value])
+                    space.send(w_external_variable, "assign")
 
     def end_assign(self, space):
         for w_external_variable in self.external_variables_w:
