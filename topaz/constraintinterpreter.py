@@ -73,8 +73,6 @@ class ConstrainedVariable(W_Root):
         self.idx = idx
         self.w_key = w_key
         self.has_readonly = False
-        self.w_readonly_constraint = None
-        self.w_remembered_value = None
 
         if cell:
             from topaz.closure import ClosureCell
@@ -83,25 +81,7 @@ class ConstrainedVariable(W_Root):
         if not cell and not (w_owner and (ivar or cvar or idx >= 0 or w_key)):
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
 
-        w_value = self.load_value(space)
-        w_solver = space.current_solver()
-        if not w_solver:
-            if space.respond_to(w_value, "constraint_solver"):
-                with space.normal_execution():
-                    w_solver = space.send(w_value, "constraint_solver")
-                    space.set_current_solver(w_solver)
-
-        if w_solver:
-            self.add_solver(w_solver)
-            with space.normal_execution():
-                w_external_variable = space.send(
-                    w_solver,
-                    "constraint_variable_for",
-                    [w_value]
-                )
-            if w_external_variable is not space.w_nil:
-                self.set_external_variable(space, w_solver, w_external_variable)
-                space.set_instance_var(w_external_variable, self.CONSTRAINT_IVAR, self)
+        self.ensure_external_variable(space, space.current_solver())
 
     def __del__(self):
         # TODO: remove external variable from solver
@@ -117,6 +97,25 @@ class ConstrainedVariable(W_Root):
         except ValueError:
             self.solvers_w.append(w_solver)
             return len(self.solvers_w) - 1
+
+    def ensure_external_variable(self, space, w_solver):
+        w_value = self.load_value(space)
+        if not w_solver:
+            if space.respond_to(w_value, "constraint_solver"):
+                with space.normal_execution():
+                    w_solver = space.send(w_value, "constraint_solver")
+                    space.set_current_solver(w_solver)
+        self.add_solver(w_solver)
+        if w_solver:
+            with space.normal_execution():
+                w_external_variable = space.send(
+                    w_solver,
+                    "constraint_variable_for",
+                    [w_value]
+                )
+            if w_external_variable is not space.w_nil:
+                self.set_external_variable(space, w_solver, w_external_variable)
+                space.set_instance_var(w_external_variable, self.CONSTRAINT_IVAR, self)
 
     def set_external_variable(self, space, w_solver, w_external_variable):
         idx = self.solver_idx(w_solver)
@@ -191,16 +190,18 @@ class ConstrainedVariable(W_Root):
                 if v:
                     space.send(self.external_variables_w[i], "readonly!")
 
-    def is_solveable(self, space):
-        return self._is_solveable(space.current_solver())
-
-    @jit.elidable
-    def _is_solveable(self, w_solver=True):
-        if w_solver is not True: # cannot use None, None is a valid solver "marker"
-            return self._get_external_variable(w_solver) is not None
+    def is_solveable(self, space=None):
+        if space:
+            return self._is_solveable(space.current_solver())
         else:
             for w_var in self.external_variables_w:
-                return w_var is not None
+                if w_var is not None:
+                    return True
+            return False
+
+    @jit.elidable
+    def _is_solveable(self, w_solver=None):
+        return self._get_external_variable(w_solver) is not None
 
     def add_to_constraint(self, space, w_constraint):
         solver_constraints_w = self.get_solver_constraints_w(space.current_solver())
@@ -247,32 +248,31 @@ class ConstrainedVariable(W_Root):
         return space.newstr_fromstr("%s-%s" % (storagestr, inspectstr))
 
     def begin_assign(self, space, w_value):
-        if self.is_solveable(space):
+        if self.is_solveable():
             self.make_assignable(space)
             with space.constraint_execution():
                 for w_external_variable in self.external_variables_w:
                     space.send(w_external_variable, "begin_assign", [w_value])
         else:
             self.store_value(space, w_value)
-            self.w_remembered_value = w_value
 
     def assign(self, space):
-        if self.is_solveable(space):
+        if self.is_solveable():
             with space.constraint_execution():
                 for w_external_variable in self.external_variables_w:
                     space.send(w_external_variable, "assign")
         else:
-            self.recalculate_path(space, self.w_remembered_value)
+            self.recalculate_path(space)
 
     def end_assign(self, space):
-        if self.is_solveable(space):
+        if self.is_solveable():
             with space.constraint_execution():
                 for w_external_variable in self.external_variables_w:
-                    space.send(self.w_external_variable, "end_assign")
+                    space.send(w_external_variable, "end_assign")
             if self.has_readonly:
                 self.make_not_assignable(space)
         else:
-            self.w_remembered_value = None
+            pass
 
     def assign_value(self, space, w_value):
         self.begin_assign(space, w_value)
@@ -280,7 +280,6 @@ class ConstrainedVariable(W_Root):
         self.end_assign(space)
 
     def defining_solver(self, space):
-        import pdb; pdb.set_trace()
         w_strongest_solver = None
         strongest_weight = -1000 # XXX: Magic number
         for i, w_solver in enumerate(self.solvers_w):
@@ -304,7 +303,7 @@ class ConstrainedVariable(W_Root):
             # This variable is part of the solver. Get the solvers
             # interpretation and store it
             w_external_variable = self.defining_variable(space)
-            w_value = space.send(self.w_external_variable, "value")
+            w_value = space.send(w_external_variable, "value")
             if w_value != space.w_nil:
                 # w_variable_value may not be the same as w_value,
                 # because client code may choose to return a different
@@ -321,7 +320,6 @@ class ConstrainedVariable(W_Root):
         self.set_i(space)
         return self.load_value(space)
 
-    def recalculate_path(self, space, w_value):
-        self.store_value(space, w_value)
+    def recalculate_path(self, space):
         for w_constraint in self.constraints_w:
             space.send(w_constraint, "recalculate")

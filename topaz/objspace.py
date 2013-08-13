@@ -498,6 +498,7 @@ class ObjectSpace(object):
                     raise NotImplementedError
 
         if c_var and self.is_constructing_constraint():
+            c_var.ensure_external_variable(self, self.current_solver())
             c_var.add_to_constraint(self, self.current_constraint())
 
         if c_var:
@@ -898,7 +899,7 @@ class ObjectSpace(object):
             return w_cmp_res
 
     def get_value(self, c_var):
-        if c_var.is_solveable(self):
+        if c_var.is_solveable():
             return c_var.get_i(self)
         else:
             return c_var.load_value(self)
