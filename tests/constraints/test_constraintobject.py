@@ -116,6 +116,17 @@ class TestConstraintVariableObject(BaseTopazTest):
         """)
         assert self.unwrap(space, w_res) == 11
 
+    def test_double_constraint(self, space):
+        w_res = space.execute("""
+        require "libcassowary"
+        a = 0
+        always { a >= 10 }
+        a = 15
+        always { a <= 11 }
+        return a
+        """)
+        assert self.unwrap(space, w_res) == 11
+
     def test_simple_path(self, space):
         w_res = space.execute("""
         require "libcassowary"
