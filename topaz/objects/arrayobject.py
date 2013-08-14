@@ -1,4 +1,5 @@
 import copy
+import functools
 
 from rpython.rlib import jit
 from rpython.rlib.listsort import make_timsort_class
@@ -6,7 +7,8 @@ from rpython.rlib.objectmodel import newlist_hint
 from rpython.rlib.rbigint import rbigint
 
 from topaz.coerce import Coerce
-from topaz.module import ClassDef, check_frozen
+from topaz.module import ClassDef
+from topaz.module import check_frozen as check_frozen_purely
 from topaz.modules.enumerable import Enumerable
 from topaz.objects.objectobject import W_Object
 from topaz.utils.packing.pack import RPacker
@@ -14,6 +16,39 @@ from topaz.utils.packing.pack import RPacker
 
 BaseRubySorter = make_timsort_class()
 BaseRubySortBy = make_timsort_class()
+
+
+def check_frozen(param="self"):
+    if param != "self":
+        return check_frozen_purely(param)
+
+    def inner(func):
+        code = func.__code__
+        space_idx = code.co_varnames.index("space")
+        obj_idx = code.co_varnames.index("self")
+
+        @functools.wraps(func)
+        def wrapper(*args):
+            space = args[space_idx]
+            w_obj = args[obj_idx]
+
+            # XXX: Copied from module.py
+            if space.is_true(w_obj.get_flag(space, "frozen?")):
+                klass = space.getclass(w_obj)
+                raise space.error(space.w_RuntimeError, "can't modify frozen %s" % klass.name)
+
+            result = func(*args)
+            assert isinstance(w_obj, W_ArrayObject)
+            space.begin_multi_assignment()
+            for idx, cvar in enumerate(w_obj.constraint_items_w):
+                if cvar:
+                    space.assign_value(cvar, w_obj.items_w[idx])
+            space.end_multi_assignment()
+
+            return result
+        wrapper.__wraps__ = func
+        return wrapper
+    return inner
 
 
 class RubySorter(BaseRubySorter):

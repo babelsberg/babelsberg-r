@@ -40,20 +40,24 @@ class Array
   alias push_wo_ensure push
   def push(*args)
     r = push_wo_ensure(*args)
-    ensure_blocks.each do |blk|
-      run_ensure(blk)
-    end
+    self.sort_by!(&:ddate)
     r
+  end
+
+  def map_sum(symbol)
+    return 0 if empty?
+    self[0].send(symbol).? + self[1..-1].map_sum(symbol)
   end
 end
 
 def try_add(series, row)
   series.push(row)
   true
-rescue => e
+rescue Exception => e
+  p e
   false
 ensure
-  series.pop if series.last.equal? row
+  series.pop if series.last.equal?(row)
 end
 
 class ScheduledItem
@@ -78,13 +82,13 @@ series = [ScheduledItem.new(0, 10000),
           ScheduledItem.new(10, -2000),
           ScheduledItem.new(15, -2000),
           ScheduledItem.new(25, -6000)]
-series.rows.ensure do |row|
-  series.sort_by(&:ddate).upto(row).map(&:qty).sum >= 0
-end
+
+always { series.map_sum(:qty) >= 0 }
 
 p series
 p int = candidates(series, [ScheduledItem.new(5, 1000)])
+p series
 p out = candidates(series, [ScheduledItem.new(5, -1000)])
-p series.push(*int)
+p series
 p out = candidates(series, [ScheduledItem.new(5, -1000)])
-p series.push(*out)
+p series
