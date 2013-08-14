@@ -37,9 +37,9 @@ class Array
     end
   end
 
-  alias push_wo_ensure push
+  alias push_wo_sort push
   def push(*args)
-    r = push_wo_ensure(*args)
+    r = push_wo_sort(*args)
     self.sort_by!(&:ddate)
     r
   end
@@ -82,7 +82,6 @@ series = [ScheduledItem.new(0, 10000),
           ScheduledItem.new(10, -2000),
           ScheduledItem.new(15, -2000),
           ScheduledItem.new(25, -6000)]
-
 always { series.map_sum(:qty) >= 0 }
 
 p series
