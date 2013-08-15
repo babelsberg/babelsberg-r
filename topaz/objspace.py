@@ -685,7 +685,12 @@ class ObjectSpace(object):
 
         w_cls = self.getclass(w_receiver)
         raw_method = w_cls.find_method(self, name)
-        return self._send_raw(name, raw_method, w_receiver, w_cls, args_w, block)
+        if (self.is_constructing_constraint() and
+            self.is_kind_of(w_receiver, self.w_constraintobject)):
+            with self.normal_execution():
+                return self._send_raw(name, raw_method, w_receiver, w_cls, args_w, block)
+        else:
+            return self._send_raw(name, raw_method, w_receiver, w_cls, args_w, block)
 
     def send_super(self, w_cls, w_receiver, name, args_w, block=None):
         raw_method = w_cls.find_method_super(self, name)
@@ -973,11 +978,13 @@ class _ExecutionModeContextManager(object):
         self.w_constraint = w_constraint
 
     def __enter__(self):
-        self.space.constraint_stack.append(self.w_constraint)
+        if self.w_constraint:
+            self.space.constraint_stack.append(self.w_constraint)
         self.space._executionmodes.append(self.executiontype())
 
     def __exit__(self, exc_type, exc_value, tb):
-        self.space.constraint_stack.pop()
+        if self.w_constraint:
+            self.space.constraint_stack.pop()
         self.space._executionmodes.pop()
 
 

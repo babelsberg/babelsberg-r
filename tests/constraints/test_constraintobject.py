@@ -20,6 +20,43 @@ class TestConstraintVariableObject(BaseTopazTest):
         out, err = capfd.readouterr()
         assert err.startswith("Warning")
 
+    def test_execution_mode_switching(self, space):
+        w_res = space.execute("""
+        require "libcassowary"
+        class A < ConstraintObject
+          def initialize
+            @a = 1
+          end
+
+          def normal
+            @a
+          end
+
+          def block(&block)
+            @a
+          end
+
+          def splat(*args)
+            @a
+          end
+        end
+
+        class B
+          attr_reader :a
+          def initialize
+            @a = 1
+          end
+        end
+
+        a = A.new
+        b = B.new
+        return [Constraint.new { a.normal }.value,
+                Constraint.new { a.block(&:to_s) }.value,
+                Constraint.new { a.splat 2, 3, 4 }.value,
+                Constraint.new { b.a }.value.is_a?(ConstraintObject) ]
+        """)
+        assert self.unwrap(space, w_res) == [1, 1, 1, True]
+
     def test_local(self, space):
         w_cassowary, w_z3 = self.execute(
             space,

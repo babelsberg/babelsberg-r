@@ -83,8 +83,9 @@ end
 class Array
   def alldifferent?
     return true if self.empty?
-    asts = map do |element|
-      case element
+    asts = []
+    each do |element|
+      asts << case element
       when Fixnum
         Z3::Instance.make_int_variable(element)
       when Float

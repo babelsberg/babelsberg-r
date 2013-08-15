@@ -19,8 +19,8 @@ class W_ConstraintMarkerObject(W_Object):
 
     @classdef.method("and")
     def method_and(self, space, w_rhs):
-        if space.is_constructing_constraint():
-            w_constraint = space.current_constraint()
+        w_constraint = space.current_constraint()
+        if w_constraint:
             w_constraint.add_constraint_object(self)
             return w_rhs
         else:
@@ -32,7 +32,7 @@ class W_ConstraintMarkerObject(W_Object):
 
 class W_ConstraintObject(W_ConstraintMarkerObject):
     _attrs_ = ["w_strength", "block", "enabled",
-               "constraint_objects_w", "constraint_variables_w"]
+               "constraint_objects_w", "constraint_variables_w", "assignments_w"]
     classdef = ClassDef("Constraint", W_ConstraintMarkerObject.classdef)
 
     def __init__(self, space):
