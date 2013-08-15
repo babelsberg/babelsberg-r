@@ -26,6 +26,16 @@ class TestArrayConstraints(BaseTopazTest):
         assert self.unwrap(space, w_ca) == 10
         assert self.unwrap(space, w_z3) == 10
 
+    def test_simple_array2(self, space):
+        with self.raises(space, "Cassowary::RequiredFailure"):
+            space.execute(
+            """
+            require "libcassowary"
+            ary = [1, 2, 3]
+            always { ary[1] == 10 }
+            ary[1] = 20
+            """)
+
     def test_sum(self, space):
         w_ca, w_z3 = self.execute(
             space,
@@ -38,6 +48,30 @@ class TestArrayConstraints(BaseTopazTest):
             "libcassowary", "libz3")
         assert self.unwrap(space, w_ca) == [10, 20, 30]
         assert self.unwrap(space, w_z3) == [10, 20, 30]
+
+    def test_sum2(self, space):
+        w_ca = space.execute(
+            """
+            $sum_execs = 0
+
+            class Array
+              def sum
+                if empty?
+                  $sum_execs += 1
+                  return 0
+                end
+                self[0] + self[1..-1].sum
+              end
+            end
+
+            require "libcassowary"
+            a = [1, 2, 3]
+            always { a.sum == 60 }
+            $res = [$sum_execs, a.sum]
+            a << 20
+            return $res << $sum_execs << a.sum
+            """)
+        assert self.unwrap(space, w_ca) == [1, 60, 3, 60]
 
     def test_length(self, space):
         w_ca, w_z3 = self.execute(

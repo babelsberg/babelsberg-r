@@ -31,19 +31,41 @@ def check_frozen(param="self"):
         def wrapper(*args):
             space = args[space_idx]
             w_obj = args[obj_idx]
+            assert isinstance(w_obj, W_ArrayObject)
 
             # XXX: Copied from module.py
             if space.is_true(w_obj.get_flag(space, "frozen?")):
                 klass = space.getclass(w_obj)
                 raise space.error(space.w_RuntimeError, "can't modify frozen %s" % klass.name)
 
+            old_len = w_obj.length()
+
             result = func(*args)
-            assert isinstance(w_obj, W_ArrayObject)
-            space.begin_multi_assignment()
-            for idx, cvar in enumerate(w_obj.constraint_items_w):
-                if cvar:
-                    space.assign_value(cvar, w_obj.items_w[idx])
-            space.end_multi_assignment()
+
+            if w_obj.constraint_items_w:
+                if old_len == w_obj.length():
+                    space.begin_multi_assignment()
+                    for idx, cvar in enumerate(w_obj.constraint_items_w):
+                        if cvar:
+                            space.assign_value(cvar, w_obj.items_w[idx])
+                    space.end_multi_assignment()
+                else:
+                    # if the length changed, any constraint block may
+                    # have been on a selection of elements or
+                    # something silly like that, so we recalculate
+                    # everything
+                    constraints_w = []
+                    for cvar in w_obj.constraint_items_w:
+                        if cvar:
+                            for w_constraint in cvar.constraints_w:
+                                if w_constraint not in constraints_w:
+                                    constraints_w.append(w_constraint)
+                    for w_constraint in constraints_w:
+                        space.send(w_constraint, "recalculate")
+
+                for idx, cvar in enumerate(w_obj.constraint_items_w):
+                    if cvar:
+                        cvar.set_i(space)
 
             return result
         wrapper.__wraps__ = func
@@ -83,10 +105,14 @@ class W_ArrayObject(W_Object):
     classdef = ClassDef("Array", W_Object.classdef)
     classdef.include_module(Enumerable)
 
-    def __init__(self, space, items_w, klass=None):
+    def __init__(self, space, items_w, klass=None, constraint_items_w=None):
         W_Object.__init__(self, space, klass)
         self.items_w = items_w
-        self.constraint_items_w = newlist_hint(len(items_w))
+        if constraint_items_w:
+            assert len(constraint_items_w) == len(items_w)
+            self.constraint_items_w = constraint_items_w
+        else:
+            self.constraint_items_w = newlist_hint(len(items_w))
 
     def __deepcopy__(self, memo):
         obj = super(W_ArrayObject, self).__deepcopy__(memo)
@@ -132,7 +158,20 @@ class W_ArrayObject(W_Object):
         elif as_range:
             assert start >= 0
             assert end >= 0
-            return W_ArrayObject(space, self.items_w[start:end], space.getnonsingletonclass(self))
+            if space.is_constructing_constraint():
+                for idx in xrange(start, end):
+                    space.newconstraintvariable(w_owner=self, idx=idx)
+                return W_ArrayObject(
+                    space,
+                    self.items_w[start:end],
+                    space.getnonsingletonclass(self),
+                    constraint_items_w=self.constraint_items_w[start:end]
+                )
+            else:
+                # TODO: is this correct, that we consider subscripting
+                # in normal code a copy that does not keep the
+                # constraint items around?
+                return W_ArrayObject(space, self.items_w[start:end], space.getnonsingletonclass(self))
         else:
             # TODO: Make this work for the whole thing
             if space.is_constructing_constraint():
@@ -140,9 +179,9 @@ class W_ArrayObject(W_Object):
                 if c_var and c_var.is_solveable():
                     return c_var.w_external_variable
             elif space.is_executing_normally():
-                c_var = space.newconstraintvariable(w_owner=self, idx=start)
+                c_var = self.find_constraint_on_idx(space, start)
                 if c_var:
-                    return space.get_value(c_var)
+                    c_var.set_i(space)
             return self.items_w[start]
 
     @classdef.method("[]=")
@@ -177,10 +216,7 @@ class W_ArrayObject(W_Object):
                 rep_w = space.listview(w_converted)
             self._subscript_assign_range(space, start, end, rep_w)
         else:
-            # TODO: See comment in "[]"
-            c_var = space.newconstraintvariable(w_owner=self, idx=start)
-            if not c_var or not space.assign_value(c_var, w_obj):
-                self.items_w[start] = w_obj
+            self.items_w[start] = w_obj
         return w_obj
 
     def _subscript_assign_range(self, space, start, end, rep_w):
