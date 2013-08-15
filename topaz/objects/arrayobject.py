@@ -63,9 +63,7 @@ def check_frozen(param="self"):
                     for w_constraint in constraints_w:
                         space.send(w_constraint, "recalculate")
 
-                for idx, cvar in enumerate(w_obj.constraint_items_w):
-                    if cvar:
-                        cvar.set_i(space)
+            w_obj.assign_constraint_values(space)
 
             return result
         wrapper.__wraps__ = func
@@ -123,6 +121,18 @@ class W_ArrayObject(W_Object):
     def listview(self, space):
         return self.items_w
 
+    def assign_constraint_values(self, space):
+        for idx, cvar in enumerate(self.constraint_items_w):
+            if cvar:
+                cvar.set_i(space)
+
+    def newconstraintvariable(self, space, idx):
+        c_var = self.find_constraint_on_idx(space, idx)
+        if not c_var:
+            return space.newconstraintvariable(w_owner=self, idx=idx)
+        else:
+            return c_var
+
     def find_constraint_on_idx(self, space, idx):
         if idx >= len(self.constraint_items_w):
             return None
@@ -153,6 +163,8 @@ class W_ArrayObject(W_Object):
     @classdef.method("slice")
     def method_subscript(self, space, w_idx, w_count=None):
         start, end, as_range, nil = space.subscript_access(self.length(), w_idx, w_count=w_count)
+        if space.is_executing_normally():
+            self.assign_constraint_values(space)
         if nil:
             return space.w_nil
         elif as_range:
@@ -160,7 +172,7 @@ class W_ArrayObject(W_Object):
             assert end >= 0
             if space.is_constructing_constraint():
                 for idx in xrange(start, end):
-                    space.newconstraintvariable(w_owner=self, idx=idx)
+                    self.newconstraintvariable(space, idx)
                 return W_ArrayObject(
                     space,
                     self.items_w[start:end],
@@ -175,13 +187,9 @@ class W_ArrayObject(W_Object):
         else:
             # TODO: Make this work for the whole thing
             if space.is_constructing_constraint():
-                c_var = space.newconstraintvariable(w_owner=self, idx=start)
+                c_var = self.newconstraintvariable(space, start)
                 if c_var and c_var.is_solveable():
                     return c_var.w_external_variable
-            elif space.is_executing_normally():
-                c_var = self.find_constraint_on_idx(space, start)
-                if c_var:
-                    c_var.set_i(space)
             return self.items_w[start]
 
     @classdef.method("[]=")

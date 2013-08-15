@@ -9,7 +9,17 @@ class TestArrayConstraints(BaseTopazTest):
     def execute(self, space, code, *libs):
         return [space.execute("""
                 require "%s"
-                require "libarraysolver"
+                $sum_execs = 0
+
+                class Array
+                  def sum
+                    if empty?
+                      $sum_execs += 1
+                      return 0
+                    end
+                    self[0] + self[1..-1].sum
+                  end
+                end
 
                 %s
                 """ % (lib, code)) for lib in libs]
@@ -43,35 +53,25 @@ class TestArrayConstraints(BaseTopazTest):
             a = [1, 2, 3]
             always { a[0] == 10 && a[1] == 20 }
             always { a.sum == 60 }
-            return a
+            return a.sum, a
             """,
             "libcassowary", "libz3")
-        assert self.unwrap(space, w_ca) == [10, 20, 30]
-        assert self.unwrap(space, w_z3) == [10, 20, 30]
+        assert self.unwrap(space, w_ca) == [60, [10, 20, 30]]
+        assert self.unwrap(space, w_z3) == [60, [10, 20, 30]]
 
     def test_sum2(self, space):
-        w_ca = space.execute(
+        w_ca, w_z3 = self.execute(
+            space,
             """
-            $sum_execs = 0
-
-            class Array
-              def sum
-                if empty?
-                  $sum_execs += 1
-                  return 0
-                end
-                self[0] + self[1..-1].sum
-              end
-            end
-
-            require "libcassowary"
             a = [1, 2, 3]
             always { a.sum == 60 }
             $res = [$sum_execs, a.sum]
             a << 20
             return $res << $sum_execs << a.sum
-            """)
+            """,
+            "libcassowary", "libz3")
         assert self.unwrap(space, w_ca) == [1, 60, 3, 60]
+        assert self.unwrap(space, w_z3) == [1, 60, 3, 60]
 
     def test_length(self, space):
         w_ca, w_z3 = self.execute(
@@ -93,7 +93,7 @@ class TestArrayConstraints(BaseTopazTest):
             always { a[0] * 2 + a[1] == 20.0 }
             always { a[0] + a[1] + a[2] * 2 == 38.0 }
             always { a.sum == 18 }
-            return a
+            return a[0], a[1], a[2]
             """,
             "libcassowary", "libz3")
         assert self.unwrap(space, w_ca) == [22, -24, 20]
@@ -106,11 +106,11 @@ class TestArrayConstraints(BaseTopazTest):
             a = [0, 10]
             always { a.sum == 18 }
             always { a[0] == a.sum }
-            return a
+            return a.sum, a
             """,
             "libcassowary", "libz3")
-        assert self.unwrap(space, w_ca) == [18, 0]
-        assert self.unwrap(space, w_z3) == [18, 0]
+        assert self.unwrap(space, w_ca) == [18, [18, 0]]
+        assert self.unwrap(space, w_z3) == [18, [18, 0]]
 
     def test_progression(self, space):
         w_ca = space.execute(
@@ -206,6 +206,7 @@ class TestArrayConstraints(BaseTopazTest):
             always do
               a.inject(0) { |memo, ea| memo + ea } == 100
             end
+            p a
             return a
             """,
             "libcassowary", "libz3")
