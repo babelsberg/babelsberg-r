@@ -18,15 +18,12 @@ class TwoLeadedObject
 end
 
 class Resistor < TwoLeadedObject
-  # XXX: Check whether we are using cassowary, to avoid nonlinear result error further down
-  $USING_CASSOWARY = (x = 1.0; Constraint.new { x }.value.is_a? Cassowary::Variable)
-
   attr_reader :resistance
   def initialize(resistance)
     super()
     @resistance = resistance
     # Ohm's Law constraint
-    unless $USING_CASSOWARY
+    unless defined? Cassowary
       always { lead1.voltage - lead2.voltage == resistance.? * lead1.current }
     else
       # using Cassowary
