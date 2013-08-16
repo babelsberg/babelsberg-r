@@ -147,7 +147,8 @@ class TestCircuits(BaseTopazTest):
           return [ r.lead1.voltage, r.lead1.current, r.lead2.voltage, r.lead2.current,
                    b.lead1.voltage, b.lead1.current, b.lead2.voltage, b.lead2.current, b.supply_voltage,
                    g.lead.voltage, g.lead.current, r.resistance] """, skip="cassowary")
-        assert self.unwrap(space, w_res) == [0.0, -0.05, 5.0, 0.05, 0.0, 0.05, 5.0, -0.05, 5.0, 0.0, 0.0, 100.0]
+        rounded_res = [round(f, 2) for f in self.unwrap(space, w_res)]
+        assert rounded_res == [0.0, -0.05, 5.0, 0.05, 0.0, 0.05, 5.0, -0.05, 5.0, 0.0, 0.0, 100]
 
     def test_wheatstone_bridge(self, space):
         w_res = self.execute(space, """
