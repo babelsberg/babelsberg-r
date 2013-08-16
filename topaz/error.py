@@ -9,6 +9,10 @@ class RubyError(Exception):
     def __str__(self):
         return "<RubyError: %s>" % self.w_value
 
+    def bt(self, space):
+        """NOT RPYTHON"""
+        return [space.str_w(s) for s in space.listview(space.send(self.w_value, "backtrace"))]
+
 
 def format_traceback(space, exc, top_filepath):
     w_bt = space.send(exc, "backtrace")
