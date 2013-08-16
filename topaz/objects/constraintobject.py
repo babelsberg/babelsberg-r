@@ -156,7 +156,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
     def method_solver_constraints(self, space):
         vars_w = []
         for w_var in self.constraint_variables_w:
-            if w_var._is_solveable(self.w_solver):
+            if w_var._is_solveable(self.get_solver()):
                 vars_w.append(w_var._get_external_variable(self.get_solver()))
         return space.newarray(vars_w)
 
