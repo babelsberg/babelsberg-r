@@ -575,6 +575,7 @@ class TestConstraintVariableObject(BaseTopazTest):
             True, 20, # after cassowary assigned 20, Z3 is triggered and picks up 20
         ]
 
+    @py.test.mark.xfail
     def test_solver_interaction_assignment2(self, space):
         w_res = space.execute("""
         require "libcassowary"
