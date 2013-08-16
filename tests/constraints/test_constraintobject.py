@@ -14,7 +14,7 @@ class TestConstraintVariableObject(BaseTopazTest):
 
             %s
             """ % (lib, code)))
-        return results
+        return results[0] if len(results) == 1 else results
 
     def test_names(self, space):
         space.execute("ConstraintVariable")
@@ -598,7 +598,7 @@ class TestConstraintVariableObject(BaseTopazTest):
         ]
 
     def test_solver_variable_delegation(self, space):
-        w_cassowary, w_z3 = self.execute(
+        w_cassowary = self.execute(
             space,
             """
             class FloatString < String
@@ -608,7 +608,7 @@ class TestConstraintVariableObject(BaseTopazTest):
 
               def for_constraint(name)
                 @float ||= self.to_f
-                Constraint.new { @float }.value
+                Constraint.new { @float }
               end
             end
 
@@ -617,15 +617,12 @@ class TestConstraintVariableObject(BaseTopazTest):
             always { a > b }
             return a, b
             """,
-            "libcassowary", "libz3")
+            "libcassowary")
         assert (self.unwrap(space, w_cassowary) == [3.9, "2.9"] or
                 self.unwrap(space, w_cassowary) == [1.0, "0.0"])
-        assert (self.unwrap(space, w_z3) == [0, "-1.0"] or
-                self.unwrap(space, w_z3) == [0, "-1"] or
-                self.unwrap(space, w_z3) == [3.9, "2.9"])
 
     def test_solver_ro_variable_delegation(self, space):
-        w_cassowary, w_z3 = self.execute(
+        w_cassowary = self.execute(
             space,
             """
             class FloatString < String
@@ -639,7 +636,7 @@ class TestConstraintVariableObject(BaseTopazTest):
                   @float = 0
                   always { @float == self.to_f }
                 end
-                Constraint.new { @float }.value
+                Constraint.new { @float }
               end
             end
 
@@ -648,13 +645,13 @@ class TestConstraintVariableObject(BaseTopazTest):
             always { a == b }
             return a, b
             """,
-            "libcassowary", "libcassowary")
+            "libcassowary")
         res = self.unwrap(space, w_cassowary)
         assert 2.9 - E <= res[0] <= 2.9 + E
         assert "2.9" == res[1]
 
     def test_solver_ro_variable_delegation_w_update(self, space):
-        w_cassowary, w_z3 = self.execute(
+        w_cassowary = self.execute(
             space,
             """
             class FloatString < String
@@ -667,7 +664,7 @@ class TestConstraintVariableObject(BaseTopazTest):
                   @float = 0
                   @stay = always { @float == self.to_f }
                 end
-                Constraint.new { @float }.value
+                Constraint.new { @float }
               end
 
               def update(float)
@@ -687,7 +684,7 @@ class TestConstraintVariableObject(BaseTopazTest):
             b.update(1.1)
             return res << a << b
             """,
-            "libcassowary", "libcassowary")
+            "libcassowary")
         res = self.unwrap(space, w_cassowary)
         assert 2.9 - E <= res[0] <= 2.9 + E
         assert "1.1" == res[1]

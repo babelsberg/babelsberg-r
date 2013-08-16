@@ -100,12 +100,15 @@ class ConstrainedVariable(W_Root):
 
     def ensure_external_variable(self, space, w_solver):
         w_value = self.load_value(space)
+        w_external_variable = space.w_nil
+
         if not w_solver:
             if space.respond_to(w_value, "constraint_solver"):
                 with space.normal_execution():
                     w_solver = space.send(w_value, "constraint_solver")
                     space.set_current_solver(w_solver)
         self.add_solver(w_solver)
+
         if w_solver and not self._is_solveable(w_solver):
             with space.normal_execution():
                 w_external_variable = space.send(
@@ -113,9 +116,30 @@ class ConstrainedVariable(W_Root):
                     "constraint_variable_for",
                     [w_value]
                 )
-            if w_external_variable is not space.w_nil:
-                self.set_external_variable(space, w_solver, w_external_variable)
-                space.set_instance_var(w_external_variable, self.CONSTRAINT_IVAR, self)
+
+        if w_external_variable is space.w_nil:
+            if space.respond_to(w_value, "for_constraint"):
+                with space.normal_execution():
+                    w_external_constraint = space.send(w_value, "for_constraint", [self.get_name(space)])
+                    if w_external_constraint is not space.w_nil:
+                        w_external_solver = space.send(w_external_constraint, "solver")
+                        if w_solver and w_external_solver is not w_solver:
+                            raise space.error(
+                                space.w_RuntimeError,
+                                "value %s has no interpretation in active solver %s, only in solver %s" % (
+                                    space.send(w_value, "inspect"),
+                                    space.send(w_solver, "inspect"),
+                                    space.send(w_external_solver, "inspect")
+                                )
+                            )
+                        elif not w_solver:
+                            w_solver = w_external_solver
+                            self.add_solver(w_external_solver)
+                        w_external_variable = space.send(w_external_constraint, "value")
+
+        if w_external_variable is not space.w_nil:
+            self.set_external_variable(space, w_solver, w_external_variable)
+            space.set_instance_var(w_external_variable, self.CONSTRAINT_IVAR, self)
 
     def set_external_variable(self, space, w_solver, w_external_variable):
         idx = self.solver_idx(w_solver)

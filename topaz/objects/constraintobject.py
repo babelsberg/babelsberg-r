@@ -178,6 +178,10 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
             space.send(self, "enable")
         return self.w_strength
 
+    @classdef.method("solver")
+    def method_solver(self, space):
+        return self.w_solver or space.w_nil
+
     @classdef.method("initialize")
     def method_initialize(self, space, w_strength=None, w_options=None, block=None):
         if not block:
