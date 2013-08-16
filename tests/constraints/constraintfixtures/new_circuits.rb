@@ -66,12 +66,17 @@ class Wire < TwoLeadedObject
   end
 end
 
-require "libarraysolver"
+class Array
+  def mapsum(&block)
+    return 0 if self.empty?
+    return block[self[0]] + self[1..-1].mapsum(&block)
+  end
+end
 
 def connect(*leads)
   return if leads.empty?
   # all voltages should be equal
   leads[1..-1].each { |a| always { a.voltage == leads[0].voltage } }
   # sum of currents has to be 0
-  always { leads.map(&:current).sum == 0 }
+  always { leads.mapsum(&:current) == 0 }
 end
