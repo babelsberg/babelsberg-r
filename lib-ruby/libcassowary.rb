@@ -111,9 +111,8 @@ class Object
       store = store_class.new
       accessors.collect do |sym|
         store.send(:"#{sym}=", var.send(sym))
-        # TODO: remove these constraints later
         constraints << always { store.send(sym) == var.send(sym) }
-        Constraint.new { store.send(sym) }.constraint_variables
+        Constraint.new(solver: Cassowary::SimplexSolver.instance) { store.send(sym) }.constraint_variables
       end
     end.flatten
   end
@@ -163,7 +162,7 @@ class Object
       temp_constraints = []
       vars = __create_edit_vars_from_accessors(accessors, temp_constraints, block)
     else
-      vars = Constraint.new(&block).constraint_variables
+      vars = Constraint.new(solver: Cassowary::SimplexSolver.instance, &block).constraint_variables
     end
 
     __check_edit_vars(vars)
