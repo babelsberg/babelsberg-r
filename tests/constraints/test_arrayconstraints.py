@@ -85,7 +85,7 @@ class TestArrayConstraints(BaseTopazTest):
             require 'libarraysolver'
 
             a = [0, 10, 20, 30, 40]
-            (0...(a.size - 1)).each do |i|
+            (a.size - 1).times do |i|
               always { a[i] > a[i + 1] }
             end
             always { a.sum == 50 }
