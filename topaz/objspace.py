@@ -497,6 +497,10 @@ class ObjectSpace(object):
                     # TODO: dictionary constraints
                     raise NotImplementedError
 
+        if c_var and self.is_kind_of(c_var.load_value(self), self.w_constraintobject):
+            # XXX: this happens
+            return None
+
         if c_var and self.is_constructing_constraint():
             c_var.ensure_external_variable(self, self.current_solver())
             c_var.add_to_constraint(self, self.current_constraint())
@@ -687,7 +691,7 @@ class ObjectSpace(object):
         w_cls = self.getclass(w_receiver)
         raw_method = w_cls.find_method(self, name)
         if (self.is_constructing_constraint() and
-            self.is_kind_of(w_receiver, self.w_constraintobject)):
+            (self.is_kind_of(w_receiver, self.w_constraintobject) or self.w_constraintobject.is_ancestor_of(w_cls))):
             with self.normal_execution():
                 return self._send_raw(name, raw_method, w_receiver, w_cls, args_w, block)
         else:
