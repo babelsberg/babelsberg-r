@@ -915,7 +915,7 @@ class ObjectSpace(object):
             if c_var.is_solveable(self):
                 w_constraint_object = self.send(c_var.get_external_variable(self), "==", [w_value])
                 w_constraint = self.current_constraint()
-                w_constraint.add_constraint_object(w_constraint)
+                w_constraint.add_constraint_object(w_constraint_object)
                 w_constraint.add_assignment(self, c_var, w_constraint)
             else:
                 c_var.store_value(self, w_value)
