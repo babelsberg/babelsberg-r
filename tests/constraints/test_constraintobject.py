@@ -401,7 +401,7 @@ class TestConstraintVariableObject(BaseTopazTest):
 
         return res, $area_executions
         """
-        [w_res] = self.execute(space, code, "libz3")
+        w_res = self.execute(space, code, "libz3")
         assert self.unwrap(space, w_res) == [
             [
                 101, 1, # invalid point is adjusted
@@ -738,7 +738,7 @@ class TestConstraintVariableObject(BaseTopazTest):
             "libcassowary", "libz3")
         assert self.unwrap(space, w_ca) == 1
         assert self.unwrap(space, w_z3) > 0 and self.unwrap(space, w_z3) < 100
-        with self.raises(space, "RuntimeError"):
+        with self.raises(space, "Cassowary::RequiredFailure"):
             space.execute("""
             require "libcassowary"
             qual = -1
