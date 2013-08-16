@@ -204,10 +204,13 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         return self
 
     def set_solver(self, space, w_solver):
+        assert self.w_solver is None
         if w_solver is space.w_nil:
             self.w_solver = None
         else:
             self.w_solver = w_solver
+            for c_var in self.constraint_variables_w:
+                c_var._set_solver_for_unbound_constraint(self, w_solver)
 
     def get_solver(self):
         return self.w_solver

@@ -233,6 +233,14 @@ class ConstrainedVariable(W_Root):
             solver_constraints_w.append(w_constraint)
             w_constraint.add_constraint_variable(self)
 
+    def _set_solver_for_unbound_constraint(self, w_constraint, w_solver):
+        unbound_constraints_w = self.get_solver_constraints_w(None)
+        assert w_constraint in unbound_constraints_w
+        unbound_constraints_w.remove(w_constraint)
+        solver_constraints_w = self.get_solver_constraints_w(w_solver)
+        assert w_constraint not in solver_constraints_w
+        solver_constraints_w.append(w_constraint)
+
     def load_value(self, space):
         if self.cell:
             return self.cell.get(space, None, 0) or space.w_nil
