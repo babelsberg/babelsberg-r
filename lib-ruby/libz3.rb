@@ -106,28 +106,17 @@ class FalseClass
 end
 
 class Array
-  def alldifferent?
-    return true if self.empty?
-    asts = []
-    each do |element|
-      asts << case element
-      when Fixnum
-        Z3::Instance.make_int_variable(element)
-      when Float
-        Z3::Instance.make_real_variable(element)
-      when true, false
-        Z3::Instance.make_bool_variable(element)
-      when Z3::Z3Pointer
-        element
+  def alldifferent?(to=[])
+    if self.empty?
+      return true
+    elsif defined? Z3 and self[0].is_a?(Z3::Z3Pointer)
+      if self.size == 1
+        return self[0].alldifferent(*to)
       else
-        raise "Cannot solve alldifferent? on this array (no Z3 interpretation for #{element.inspect})"
+        return self[1..-1].alldifferent?(to << self[0])
       end
-    end
-
-    begin
-      return asts.pop.alldifferent(*asts)
-    rescue RuntimeError
-      # we're not constructing constraints
+    else
+      # we're not constructing constraints or Z3 cannot solve this
       return self.uniq.size == self.size
     end
   end
