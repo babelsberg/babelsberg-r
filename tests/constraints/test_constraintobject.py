@@ -20,6 +20,43 @@ class TestConstraintVariableObject(BaseTopazTest):
         out, err = capfd.readouterr()
         assert err.startswith("Warning")
 
+    def test_execution_mode_switching(self, space):
+        w_res = space.execute("""
+        require "libcassowary"
+        class A < ConstraintObject
+          def initialize
+            @a = 1
+          end
+
+          def normal
+            @a
+          end
+
+          def block(&block)
+            @a
+          end
+
+          def splat(*args)
+            @a
+          end
+        end
+
+        class B
+          attr_reader :a
+          def initialize
+            @a = 1
+          end
+        end
+
+        a = A.new
+        b = B.new
+        return [Constraint.new { a.normal }.value,
+                Constraint.new { a.block(&:to_s) }.value,
+                Constraint.new { a.splat 2, 3, 4 }.value,
+                Constraint.new { b.a }.value.is_a?(ConstraintObject) ]
+        """)
+        assert self.unwrap(space, w_res) == [1, 1, 1, True]
+
     def test_local(self, space):
         w_cassowary, w_z3 = self.execute(
             space,
@@ -371,6 +408,8 @@ class TestConstraintVariableObject(BaseTopazTest):
 
         x = true
         y = 10
+        always { b > 10 }
+        always { y > 10 }
         always { a == b > 10 }
         always { x == y > 10 }
         return a, b, x, y
@@ -920,3 +959,110 @@ class TestConstraintVariableObject(BaseTopazTest):
             [True, True],
             [True, True]
         ]
+
+    def test_invalid_multiple_assignment(self, space):
+        with self.raises(space, "RuntimeError", "multiply assigned variable in constraint execution"):
+            space.execute("""
+            require "libcassowary"
+            @sum = -1
+            def foo
+              @sum = 0
+              @sum = 1
+            end
+            always { foo == 1 }
+            """)
+
+    @py.test.mark.xfail
+    def test_lazy_solver_selection(self, space):
+        w_z3, w_cassowary = self.execute(
+            space,
+            """
+            def foo(a = nil)
+              x = nil
+              if a
+                always { x == a.? }
+              else
+                x = 100
+              end
+              return x
+            end
+            return foo, foo(10)
+            """,
+            "libz3", "libcassowary"
+        )
+        assert self.unwrap(space, w_z3) == [100, 10]
+        assert self.unwrap(space, w_cassowary) == [100, 10]
+
+    @py.test.mark.xfail
+    def test_late_type_assignment(self, space):
+        w_z3, w_cassowary = self.execute(
+            space,
+            """
+            x = nil
+            always { x.respond_to? :nil? }
+            x = 10
+            always { x + 10 == 100 }
+            return x
+            """,
+            "libz3", "libcassowary")
+        assert self.unwrap(space, w_z3) == 90
+        assert self.unwrap(space, w_cassowary) == 90
+
+    def test_atomic_assignment(self, space):
+        res_w = self.execute(space,
+        """
+        x = 100
+        y = 100
+        z = 100
+        always { x + y + z == 300 }
+        x, y, z = 10, 90, 200
+        return x, y, z
+        """,
+        "libz3", "libcassowary")
+        w_z3, w_cassowary = [self.unwrap(space, w_res) for w_res in res_w]
+        assert w_cassowary == [10, 90, 200]
+        assert w_cassowary == w_z3
+
+    def test_atomic_assignment2(self, space):
+        res_w = self.execute(space,
+        """
+        x, y, z = 10, 90, 200
+        always { x + y + z == 300 }
+        $res = [[x, y, z]]
+        x, y, z = z, y, x
+        $res << [x, y, z]
+        return $res
+        """,
+        "libcassowary", "libz3")
+        w_cassowary, w_z3 = [self.unwrap(space, w_res) for w_res in res_w]
+        assert w_cassowary[0][0] == w_cassowary[1][2]
+        assert w_cassowary[0][1] == w_cassowary[1][1]
+        assert w_cassowary[0][2] == w_cassowary[1][0]
+        assert w_z3[0][0] == w_z3[1][2]
+        assert w_z3[0][1] == w_z3[1][1]
+        assert w_z3[0][2] == w_z3[1][0]
+
+    def test_atomic_assignment3(self, space):
+        cassowary = self.unwrap(space, space.execute(
+        """
+        require "libcassowary"
+        class Point
+          attr_accessor :x, :y
+          def initialize(a, b)
+            @x = a
+            @y = b
+          end
+        end
+
+        x = Point.new(10, 10)
+        y = Point.new(90, 90)
+        z = Point.new(200, 200)
+        always { x.x + y.x + z.x == 300 }
+        $res = [[x.x, y.x, z.x]]
+        x, y, z = z, y, x
+        $res << [x.x, y.x, z.x]
+        return $res
+        """))
+        assert cassowary[0][0] == cassowary[1][2]
+        assert cassowary[0][1] == cassowary[1][1]
+        assert cassowary[0][2] == cassowary[1][0]

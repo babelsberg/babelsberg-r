@@ -54,22 +54,11 @@ class ConstraintInterpreter(Interpreter):
         else:
             return Interpreter.JUMP_AND(self, space, bytecode, frame, pc, target_pc)
 
-    def SEND(self, space, bytecode, frame, pc, meth_idx, num_args):
-        args_w = frame.popitemsreverse(num_args)
-        w_receiver = frame.pop()
-        w_res = None
-        method = space.symbol_w(bytecode.consts_w[meth_idx])
-        if space.is_kind_of(w_receiver, space.w_constraintobject):
-            with space.normal_execution():
-                w_res = space.send(w_receiver, method, args_w)
-        else:
-            w_res = space.send(w_receiver, method, args_w)
-        frame.push(w_res)
-
 
 class ConstrainedVariable(W_Root):
     CONSTRAINT_IVAR = "__constrained_variable__"
-    _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "w_external_variable"]
+    _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "idx", "w_key",
+                          "w_external_variable"]
 
     def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
         self.w_external_variable = None
@@ -80,8 +69,10 @@ class ConstrainedVariable(W_Root):
         self.idx = idx
         self.w_key = w_key
         self.constraints_w = []
-        self.w_readonly_constraint = None
         self.identical_variables = []
+        self.is_readonly = False
+        self.w_readonly_constraint = None
+        self.w_remembered_value = None
 
         if cell:
             from topaz.closure import ClosureCell
@@ -111,20 +102,19 @@ class ConstrainedVariable(W_Root):
         return False
 
     def make_readonly(self, space):
-        if not self.is_readonly():
+        if not self.w_readonly_constraint:
             self.w_readonly_constraint = space.send(self.w_external_variable, "==", [self.get_i(space)])
             space.send(self.w_readonly_constraint, "enable")
+        self.is_readonly = True
 
-    def make_writable(self, space):
-        if not self.is_writable():
+    def make_assignable(self, space):
+        if self.w_readonly_constraint:
             space.send(self.w_readonly_constraint, "disable")
             self.w_readonly_constraint = None
 
-    def is_readonly(self):
-        return not self.is_writable()
-
-    def is_writable(self):
-        return self.is_solveable() and self.w_readonly_constraint is None
+    def make_writable(self, space):
+        self.make_assignable(space)
+        self.is_readonly = False
 
     def is_solveable(self):
         return self.w_external_variable is not None
@@ -153,23 +143,6 @@ class ConstrainedVariable(W_Root):
             for other in self.identical_variables:
                 other.all_identical_variables(array=array)
         return array
-
-    def set_identical_variables(self, space):
-        if self.identical_variables:
-            all_identical = self.all_identical_variables([])
-            w_value = self.get_i(space)
-
-            for other in all_identical:
-                if not space.eq_w(other.get_i(space), w_value):
-                    if other.is_solveable():
-                        other.suggest_value(space, w_value)
-                    else:
-                        other.recalculate_path(space, w_value)
-                    if not space.eq_w(other.get_i(space), w_value):
-                        raise space.error(
-                            space.w_RuntimeError,
-                            "identity constraint no longer satisfied"
-                        )
 
     def add_to_constraint(self, w_constraint):
         if w_constraint not in self.constraints_w:
@@ -214,18 +187,45 @@ class ConstrainedVariable(W_Root):
             storagestr = "unknown"
         return space.newstr_fromstr("%s-%s" % (storagestr, inspectstr))
 
-    def suggest_value(self, space, w_value):
-        assert self.w_external_variable
-        readonly = self.is_readonly()
-        if readonly:
-            self.make_writable(space)
-        normal_execution = space.is_executing_normally()
-        with space.constraint_execution():
-            space.send(self.w_external_variable, "suggest_value", [w_value])
-            if normal_execution:
-                self.set_identical_variables(space)
-        if readonly:
-            self.make_readonly(space)
+    def begin_assign(self, space, w_value):
+        if self.is_solveable():
+            if self.is_readonly:
+                self.make_writable(space)
+            with space.constraint_execution():
+                space.send(self.w_external_variable, "begin_assign", [w_value])
+        else:
+            self.store_value(space, w_value)
+            self.w_remembered_value = w_value
+
+        for other in self.all_identical_variables([]):
+            other.begin_assign(space, w_value)
+
+    def assign(self, space):
+        if self.is_solveable():
+            with space.constraint_execution():
+                space.send(self.w_external_variable, "assign")
+        else:
+            self.recalculate_path(space, self.w_remembered_value)
+
+        for other in self.all_identical_variables([]):
+            other.assign(space, w_value)
+
+    def end_assign(self, space):
+        if self.is_solveable():
+            with space.constraint_execution():
+                space.send(self.w_external_variable, "end_assign")
+            if self.is_readonly:
+                self.make_readonly(space)
+        else:
+            self.w_remembered_value = None
+
+        for other in self.all_identical_variables([]):
+            other.end_assign(space, w_value)
+
+    def assign_value(self, space, w_value):
+        self.begin_assign(space, w_value)
+        self.assign(space)
+        self.end_assign(space)
 
     def set_i(self, space):
         if self.w_external_variable is not None:

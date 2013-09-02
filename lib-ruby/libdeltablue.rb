@@ -20,36 +20,28 @@ class DeltaRed::Variable < ConstraintObject
     DeltaRed::Formula.new(mapping, block)
   end
 
-  alias prim_equal? equal?
-  # Identity constraint
-  def equal?(other)
-    return true if prim_equal?(other)
-    self.add_predicate -> { self.value.equal? other.value }
-    other.add_predicate -> { self.value.equal? other.value }
-    DeltaRed.constraint do |c|
-      c.formula(other => self) { |o| @value = other.value }
-      c.formula(self => other) { |s| other.__value = self.value }
-    end
-  end
-
-  def __value=(other)
-    @value = other
-  end
-
   def method_missing(name, *args, &block)
     # XXX: Is this really necessary?
     super unless value.respond_to?(name)
     self
   end
 
-  def suggest_value(val)
+  def begin_assign(v)
+    @proposed_value = v
+  end
+
+  def assign
     prev = @value
-    @value = val
+    @value = @proposed_value
     unless predicates.all?(&:call)
       # assign previous value and let deltablue handle the constraints
       @value = prev
-      self.value = val
+      self.value = @proposed_value
     end
+  end
+
+  def end_assign
+    @proposed_value = nil
   end
 end
 

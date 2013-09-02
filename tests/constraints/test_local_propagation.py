@@ -105,20 +105,3 @@ class TestLocalPropagation(BaseTopazTest):
             [20, -20, 0],
             [20, 80, 100]
         ]
-
-    def test_identity_constraint(self, space):
-        w_res = space.execute("""
-        require "libdeltablue"
-        $res = []
-        a = Object.new
-        b = Object.new
-
-        always { a.equal? b }
-        $res << a.object_id << b.object_id
-        a = Object.new
-        $res << a.object_id << b.object_id
-        return $res
-        """)
-        res = self.unwrap(space, w_res)
-        assert res[0] == res[1]
-        assert res[2] == res[3]

@@ -1,11 +1,18 @@
 Z3::Instance = Z3.new
 
 class Z3::Z3Pointer
-  def suggest_value(v)
-    c = self == v
-    c.enable
+  def begin_assign(v)
+    @proposed_value_constraint = self == v
+    Z3::Instance.add_constraint(@proposed_value_constraint)
+  end
+
+  def assign
     Z3::Instance.solve
-    c.disable
+  end
+
+  def end_assign
+    Z3::Instance.remove_constraint(@proposed_value_constraint)
+    @proposed_value_constraint = nil
   end
 
   alias plain_enable enable
@@ -76,8 +83,9 @@ end
 class Array
   def alldifferent?
     return true if self.empty?
-    asts = map do |element|
-      case element
+    asts = []
+    each do |element|
+      asts << case element
       when Fixnum
         Z3::Instance.make_int_variable(element)
       when Float

@@ -263,6 +263,7 @@ class TestCompiler(object):
         COERCE_ARRAY 0
         UNPACK_SEQUENCE_SPLAT 3 1
 
+        BEGIN_MULTI_ASSIGNMENT
         STORE_DEREF 1
         DISCARD_TOP
 
@@ -273,6 +274,7 @@ class TestCompiler(object):
         ROT_TWO
         STORE_INSTANCE_VAR 1
         DISCARD_TOP
+        END_MULTI_ASSIGNMENT
 
         RETURN
         """)
@@ -1689,6 +1691,7 @@ class TestCompiler(object):
         COERCE_ARRAY 0
         UNPACK_SEQUENCE 4
 
+        BEGIN_MULTI_ASSIGNMENT
         LOAD_DEREF 3
         ROT_TWO
         SEND 2 1
@@ -1710,6 +1713,7 @@ class TestCompiler(object):
 
         STORE_DEREF 0
         DISCARD_TOP
+        END_MULTI_ASSIGNMENT
 
         RETURN
         """)
@@ -1726,12 +1730,14 @@ class TestCompiler(object):
         COERCE_ARRAY 0
         UNPACK_SEQUENCE_SPLAT 3 1
 
+        BEGIN_MULTI_ASSIGNMENT
         STORE_DEREF 0
         DISCARD_TOP
         STORE_DEREF 1
         DISCARD_TOP
         STORE_DEREF 2
         DISCARD_TOP
+        END_MULTI_ASSIGNMENT
 
         RETURN
         """)
@@ -1746,7 +1752,9 @@ class TestCompiler(object):
         DUP_TOP
         COERCE_ARRAY 0
         UNPACK_SEQUENCE_SPLAT 1 0
+        BEGIN_MULTI_ASSIGNMENT
         DISCARD_TOP
+        END_MULTI_ASSIGNMENT
 
         RETURN
         """)

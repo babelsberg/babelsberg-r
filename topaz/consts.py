@@ -99,6 +99,9 @@ BYTECODES = [
     ("CONTINUE_LOOP", 1, -1),
     ("BREAK_LOOP", 0, -1),
     ("RAISE_BREAK", 0, -1),
+
+    ("BEGIN_MULTI_ASSIGNMENT", 0, 0),
+    ("END_MULTI_ASSIGNMENT", 0, 0),
 ]
 
 BYTECODE_NAMES = []

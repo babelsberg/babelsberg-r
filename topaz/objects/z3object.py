@@ -260,13 +260,13 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
 
     @classdef.method("alldifferent")
     def method_alldifferent(self, space, args_w):
-        if space.is_constructing_constraint():
+        w_constraint = space.current_constraint()
+        if not w_constraint:
+            raise space.error(space.w_RuntimeError)
+        else:
             asts_w = [self.coerce_constant_arg(space, w_arg) for w_arg in args_w]
             asts_w.append(self.pointer)
             return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_distinct(self.w_z3.ctx, asts_w))
-        else:
-            # normal case handled in Ruby
-            raise space.error(space.w_RuntimeError)
 
     @classdef.method("-@")
     def method_unary_minus(self, space):

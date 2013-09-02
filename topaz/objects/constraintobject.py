@@ -1,5 +1,6 @@
 from rpython.rlib import jit
 
+from topaz.celldict import CellDict, VersionTag
 from topaz.module import ClassDef, ModuleDef
 from topaz.objects.hashobject import W_HashObject
 from topaz.objects.objectobject import W_Object, W_RootObject
@@ -18,8 +19,8 @@ class W_ConstraintMarkerObject(W_Object):
 
     @classdef.method("and")
     def method_and(self, space, w_rhs):
-        if space.is_constructing_constraint():
-            w_constraint = space.current_constraint()
+        w_constraint = space.current_constraint()
+        if w_constraint:
             w_constraint.add_constraint_object(self)
             return w_rhs
         else:
@@ -31,7 +32,7 @@ class W_ConstraintMarkerObject(W_Object):
 
 class W_ConstraintObject(W_ConstraintMarkerObject):
     _attrs_ = ["w_strength", "block", "enabled",
-               "constraint_objects_w", "constraint_variables_w"]
+               "constraint_objects_w", "constraint_variables_w", "assignments_w"]
     classdef = ClassDef("Constraint", W_ConstraintMarkerObject.classdef)
 
     def __init__(self, space):
@@ -41,6 +42,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         self.enabled = False
         self.constraint_objects_w = []
         self.constraint_variables_w = []
+        self.assignments_w = []
 
     def get_constraint_objects(self):
         return self.constraint_objects_w
@@ -57,6 +59,14 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
     def add_constraint_variable(self, w_value):
         if w_value not in self.constraint_variables_w:
             self.constraint_variables_w.append(w_value)
+
+    def add_assignment(self, space, c_var, w_constraint):
+        if c_var in self.assignments_w:
+            raise space.error(
+                space.w_RuntimeError,
+                "multiply assigned variable in constraint execution"
+            )
+        self.assignments_w.append(c_var)
 
     @classdef.method("enable")
     def method_enable(self, space):

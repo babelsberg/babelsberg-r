@@ -101,6 +101,7 @@ class ObjectSpace(object):
 
         self._executionmodes = ExecutionModeHolder(NormalExecution())
         self.constraint_stack = []
+        self.remembered_assignments = RememberedAssignmentsHolder()
 
         self.w_true = W_TrueObject(self)
         self.w_false = W_FalseObject(self)
@@ -498,11 +499,6 @@ class ObjectSpace(object):
                     raise NotImplementedError
 
         if c_var and self.is_constructing_constraint():
-            # No constraint solver variable available for this object
-            # Only keep the block alive if this is a variable that
-            # will not be registered with a solver. This means this
-            # variable is on the path to a constraint, and the block
-            # will have to be re-evaluated when this variable is set
             c_var.add_to_constraint(self.current_constraint())
 
         if c_var:
@@ -690,7 +686,12 @@ class ObjectSpace(object):
 
         w_cls = self.getclass(w_receiver)
         raw_method = w_cls.find_method(self, name)
-        return self._send_raw(name, raw_method, w_receiver, w_cls, args_w, block)
+        if (self.is_constructing_constraint() and
+            self.is_kind_of(w_receiver, self.w_constraintobject)):
+            with self.normal_execution():
+                return self._send_raw(name, raw_method, w_receiver, w_cls, args_w, block)
+        else:
+            return self._send_raw(name, raw_method, w_receiver, w_cls, args_w, block)
 
     def send_super(self, w_cls, w_receiver, name, args_w, block=None):
         raw_method = w_cls.find_method_super(self, name)
@@ -903,23 +904,52 @@ class ObjectSpace(object):
         else:
             return c_var.load_value(self)
 
-    def suggest_value(self, c_var, w_value):
+    def assign_value(self, c_var, w_value):
         if self.is_executing_normally():
-            if c_var.is_solveable():
-                c_var.suggest_value(self, w_value)
+            if self.in_multi_assignment():
+                self.remember_assignment(c_var, w_value)
             else:
-                c_var.recalculate_path(self, w_value)
+                c_var.assign_value(self, w_value)
             return True
-        elif self.is_constructing_constraint() and c_var.is_solveable():
-            # TODO: Track which c_vars have been assigned in this
-            # construction, and raise an error if one is assigned more
-            # than once
-            w_constraint_object = self.send(c_var.w_external_variable, "==", [w_value])
-            w_constraint = self.current_constraint()
-            w_constraint.add_constraint_object(w_constraint)
+        elif self.is_constructing_constraint():
+            if c_var.is_solveable():
+                w_constraint_object = self.send(c_var.w_external_variable, "==", [w_value])
+                w_constraint = self.current_constraint()
+                w_constraint.add_constraint_object(w_constraint)
+                w_constraint.add_assignment(self, c_var, w_constraint)
+            else:
+                c_var.store_value(self, w_value)
             return True
         else:
             return False
+
+    def in_multi_assignment(self):
+        return self.remembered_assignments.get() is not None
+
+    def begin_multi_assignment(self):
+        self.remembered_assignments.begin()
+
+    def remember_assignment(self, c_var, w_value):
+        try:
+            self.remembered_assignments.append(c_var)
+        except RuntimeError:
+            self.end_multi_assignment()
+            raise self.error(
+                self.w_RuntimeError,
+                "invalid use of nested multi-(atomic-)assignments. " +
+                "Multi-assignments to constrained variables cannot be nested"
+            )
+        c_var.begin_assign(self, w_value)
+
+    def end_multi_assignment(self):
+        asgnmts = self.remembered_assignments.end()
+        for cvar in asgnmts.items():
+            cvar.assign(self)
+        for cvar in asgnmts.items():
+            cvar.end_assign(self)
+
+    def current_execution_mode(self):
+        return self._executionmodes.get()
 
     def current_constraint(self):
         if not self.constraint_stack:
@@ -949,11 +979,13 @@ class _ExecutionModeContextManager(object):
         self.w_constraint = w_constraint
 
     def __enter__(self):
-        self.space.constraint_stack.append(self.w_constraint)
+        if self.w_constraint:
+            self.space.constraint_stack.append(self.w_constraint)
         self.space._executionmodes.append(self.executiontype())
 
     def __exit__(self, exc_type, exc_value, tb):
-        self.space.constraint_stack.pop()
+        if self.w_constraint:
+            self.space.constraint_stack.pop()
         self.space._executionmodes.pop()
 
 
@@ -970,7 +1002,9 @@ class ExecutionModeHolder(object):
         self._executionmode = em
 
     def pop(self):
+        em = self._executionmode
         self._executionmode = self._executionmode.prev
+        return em
 
 
 class ExecutionMode(object):
@@ -986,3 +1020,42 @@ class ExecutingConstraints(ExecutionMode):
     pass
 class ConstructingConstraint(ExecutionMode):
     pass
+
+
+class RememberedAssignmentsHolder(object):
+    def __init__(self):
+        self._multi_assignments = None
+
+    def get(self):
+        return jit.promote(self._multi_assignments)
+
+    def begin(self):
+        self._multi_assignments = RememberedAssignments(self._multi_assignments)
+
+    def end(self):
+        ma = self._multi_assignments
+        self._multi_assignments = self._multi_assignments.prev
+        return ma
+
+    def append(self, c_var):
+        self._multi_assignments.append(c_var)
+
+
+class RememberedAssignments(object):
+    _immutable_fields_ = ["prev"]
+
+    def __init__(self, prev):
+        self.prev = prev
+        self._assignments = []
+
+    def append(self, c_var):
+        if self.prev and not self.prev.is_empty():
+            # we have a remembered assignment and are adding a new one
+            raise RuntimeError()
+        self._assignments.append(c_var)
+
+    def is_empty(self):
+        return len(self._assignments) == 0
+
+    def items(self):
+        return self._assignments
