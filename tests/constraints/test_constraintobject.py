@@ -933,16 +933,16 @@ class TestConstraintVariableObject(BaseTopazTest):
         w_res = space.execute("""
         a = Object.new
         b = Object.new
-        always { a.eql? b }
-        return a.object_id == b.object_id
+        always { a is? b }
+        return a.object_id == b.object_id, (a is? b)
         """)
-        assert self.unwrap(space, w_res) == True
+        assert self.unwrap(space, w_res) == [True, True]
 
     def test_identity2(self, space):
         w_res = space.execute("""
         a = Object.new
         b = Object.new
-        c = always { a.eql? b }
+        c = always { a is? b }
         $res = [a.object_id == b.object_id]
         a = x = Object.new
         $res << [a.object_id == b.object_id, a.object_id == x.object_id]
@@ -959,6 +959,45 @@ class TestConstraintVariableObject(BaseTopazTest):
             [True, True],
             [True, True]
         ]
+
+    @py.test.mark.xfail # this will work once interacting solvers eager assignment is enabled
+    def test_identity3(self, space):
+        w_res = space.execute("""
+        require "libcassowary"
+        a = 0
+        b = 5
+        always { a is? b }
+        $res = [a, b]
+        always { a >= 11 }
+        $res << a << b
+        always { b >= 15 }
+        return $res << a << b
+        """)
+        assert self.unwrap(space, w_res) == [0, 0, 11, 11, 15, 15]
+
+    def test_identity4(self, space):
+        # cannot constrain identity of dynamically built objects
+        with self.raises(space, "ArgumentError"):
+            space.execute("""
+            Pt = Struct.new("Pt", :x, :y)
+            @x = @y = 0
+            def top
+              return Pt.new(@x, @y)
+            end
+
+            b = Pt.new(10, 10)
+            always { top is? b }
+            """)
+        with self.raises(space, "ArgumentError"):
+            space.execute("""
+            @x = @y = 10
+            def top
+              return @x + @y
+            end
+
+            b = 20
+            always { top is? b }
+            """)
 
     def test_invalid_multiple_assignment(self, space):
         with self.raises(space, "RuntimeError", "multiply assigned variable in constraint execution"):
