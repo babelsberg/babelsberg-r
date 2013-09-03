@@ -131,19 +131,22 @@ class ConstrainedVariable(W_Root):
     def is_solveable(self):
         return self.w_external_variable is not None
 
-    def constrain_identity(self, other):
-        self.__constrain_identity__(other)
-        other.__constrain_identity__(self)
+    def constrain_identity(self, space, other):
+        self.__constrain_identity__(space, other)
+        other.__begin_assign__(space, space.get_value(self))
+        other.__assign__(space)
+        other.__end_assign__(space)
+        other.__constrain_identity__(space, self)
 
-    def __constrain_identity__(self, other):
+    def __constrain_identity__(self, space, other):
         if other not in self.identical_variables:
             self.identical_variables.append(other)
 
-    def unconstrain_identity(self, other):
-        self.__unconstrain_identity__(other)
-        other.__unconstrain_identity__(self)
+    def unconstrain_identity(self, space, other):
+        self.__unconstrain_identity__(space, other)
+        other.__unconstrain_identity__(space, self)
 
-    def __unconstrain_identity__(self, other):
+    def __unconstrain_identity__(self, space, other):
         try:
             self.identical_variables.remove(other)
         except ValueError:
@@ -200,6 +203,10 @@ class ConstrainedVariable(W_Root):
         return space.newstr_fromstr("%s-%s" % (storagestr, inspectstr))
 
     def begin_assign(self, space, w_value):
+        for other in self.all_identical_variables([]):
+            other.__begin_assign__(space, w_value)
+
+    def __begin_assign__(self, space, w_value):
         if self.is_solveable():
             if self.is_readonly:
                 self.make_writable(space)
@@ -209,20 +216,22 @@ class ConstrainedVariable(W_Root):
             self.store_value(space, w_value)
             self.w_remembered_value = w_value
 
-        for other in self.all_identical_variables([]):
-            other.begin_assign(space, w_value)
-
     def assign(self, space):
+        for other in self.all_identical_variables([]):
+            other.__assign__(space)
+
+    def __assign__(self, space):
         if self.is_solveable():
             with space.constraint_execution():
                 space.send(self.w_external_variable, "assign")
         else:
             self.recalculate_path(space, self.w_remembered_value)
 
-        for other in self.all_identical_variables([]):
-            other.assign(space, w_value)
-
     def end_assign(self, space):
+        for other in self.all_identical_variables([]):
+            other.__end_assign__(space)
+
+    def __end_assign__(self, space):
         if self.is_solveable():
             with space.constraint_execution():
                 space.send(self.w_external_variable, "end_assign")
@@ -230,9 +239,6 @@ class ConstrainedVariable(W_Root):
                 self.make_readonly(space)
         else:
             self.w_remembered_value = None
-
-        for other in self.all_identical_variables([]):
-            other.end_assign(space, w_value)
 
     def assign_value(self, space, w_value):
         self.begin_assign(space, w_value)

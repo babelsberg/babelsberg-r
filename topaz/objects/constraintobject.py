@@ -74,6 +74,13 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
             )
         self.assignments_w.append(c_var)
 
+    @jit.elidable
+    def isidentity(self):
+        for w_constraint_object in self.constraint_objects_w:
+            if not isinstance(w_constraint_object, W_IdentityConstraintObject):
+                return False
+        return True
+
     @classdef.method("enable")
     def method_enable(self, space):
         if not self.enabled:
@@ -124,7 +131,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
 
     @classdef.method("recalculate")
     def method_recalculate(self, space):
-        if self.enabled:
+        if self.enabled and not self.isidentity():
             space.send(self, "disable")
             del self.constraint_objects_w[:]
             self.run_predicate(space)
@@ -191,28 +198,49 @@ class W_IdentityConstraintObject(W_ConstraintMarkerObject):
     classdef = ClassDef("IdentityConstraint", W_ConstraintMarkerObject.classdef)
 
     @classdef.method("initialize")
-    def method_initialize(self, space, w_this, w_that):
-        from topaz.constraintinterpreter import ConstrainedVariable
-        c_this = space.find_instance_var(w_this, ConstrainedVariable.CONSTRAINT_IVAR)
-        c_that = space.find_instance_var(w_that, ConstrainedVariable.CONSTRAINT_IVAR)
-        assert isinstance(c_this, ConstrainedVariable)
-        assert isinstance(c_that, ConstrainedVariable)
+    def method_initialize(self, space, w_this, w_that, w_c_this, w_c_that):
+        w_current_constraint = space.current_constraint()
+        if not w_current_constraint:
+            raise space.error(
+                space.w_RuntimeError,
+                "Identity constraints must be created in constraint expressions"
+            )
+        if w_c_this is space.w_nil or w_c_that is space.w_nil:
+            raise space.error(
+                space.w_ArgumentError,
+                "could not find two variables with an identity to constraint. Maybe one or both sides are not calculated from variables?"
+            )
+        if ((w_c_this.is_solveable() and w_this is not w_c_this.w_external_variable) or
+            (not w_c_this.is_solveable() and w_this is not space.get_value(w_c_this))):
+            raise space.error(
+                space.w_ArgumentError,
+                "the value returned from the left hand side of the identity expression cannot be identity constrained (it may be a calculated value)"
+            )
+        if ((w_c_that.is_solveable() and w_that is not w_c_that.w_external_variable) or
+            (not w_c_that.is_solveable() and w_that is not space.get_value(w_c_that))):
+            raise space.error(
+                space.w_ArgumentError,
+                "the value returned from the right hand side of the identity expression cannot be identity constrained (it may be a calculated value)"
+            )
+        if not w_current_constraint.isidentity():
+            raise space.error(
+                space.w_RuntimeError,
+                "identity constraints are not valid in combination with other constraints in the same constraint expression"
+            )
         self.enabled = False
-        self.c_this = c_this
-        self.c_that = c_that
+        self.c_this = w_c_this
+        self.c_that = w_c_that
 
     @classdef.method("enable")
     def method_enable(self, space):
         if not self.enabled:
-            self.c_this.constrain_identity(self.c_that)
-            with space.constraint_execution():
-                self.c_this.set_identical_variables(space)
+            self.c_this.constrain_identity(space, self.c_that)
             self.enabled = True
 
     @classdef.method("disable")
     def method_disable(self, space):
         if self.enabled:
-            self.c_this.unconstrain_identity(self.c_that)
+            self.c_this.unconstrain_identity(space, self.c_that)
             self.enabled = False
 
     @classdef.singleton_method("allocate")
