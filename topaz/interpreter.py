@@ -773,6 +773,20 @@ class Interpreter(object):
     def END_MULTI_ASSIGNMENT(self, space, bytecode, frame, pc):
         space.end_multi_assignment()
 
+    def DUP_LAST_CVAR(self, space, bytecode, frame, pc):
+        cvar = space.last_constraint_variable()
+        if cvar:
+            frame.push(cvar)
+        else:
+            frame.push(space.w_nil)
+
+    def IS_Q(self, space, bytecode, frame, pc):
+        c_rhs = frame.pop()
+        w_rhs = frame.pop()
+        c_lhs = frame.pop()
+        w_lhs = frame.pop()
+        frame.push(space.newbool(w_rhs is w_lhs))
+
 
 class Return(Exception):
     _immutable_fields_ = ["w_value"]

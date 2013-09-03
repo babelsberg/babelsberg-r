@@ -671,6 +671,22 @@ class And(Node):
         ConstantString("expression").compile(ctx)
 
 
+class Is(Node):
+    def __init__(self, lhs, rhs):
+        self.lhs = lhs
+        self.rhs = rhs
+
+    def compile(self, ctx):
+        self.lhs.compile(ctx)
+        ctx.emit(consts.DUP_LAST_CVAR)
+        self.rhs.compile(ctx)
+        ctx.emit(consts.DUP_LAST_CVAR)
+        ctx.emit(consts.IS_Q)
+
+    def compile_defined(self, ctx):
+        ConstantString("expression").compile(ctx)
+
+
 class BaseSend(Node):
     def __init__(self, receiver, args, block_arg, lineno):
         Node.__init__(self, lineno)

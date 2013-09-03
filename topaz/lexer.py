@@ -57,6 +57,7 @@ class Lexer(object):
         "case": Keyword("CASE", "CASE", EXPR_BEG),
         "when": Keyword("WHEN", "WHEN", EXPR_BEG),
         "end": Keyword("END", "END", EXPR_END),
+        "is?": Keyword("IS", "IS", EXPR_BEG),
         "and": Keyword("AND", "AND", EXPR_BEG),
         "or": Keyword("OR", "OR", EXPR_BEG),
         "not": Keyword("NOT", "NOT", EXPR_BEG),

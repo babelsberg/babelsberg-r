@@ -102,6 +102,8 @@ BYTECODES = [
 
     ("BEGIN_MULTI_ASSIGNMENT", 0, 0),
     ("END_MULTI_ASSIGNMENT", 0, 0),
+    ("DUP_LAST_CVAR", 0, +1),
+    ("IS_Q", 0, -3),
 ]
 
 BYTECODE_NAMES = []

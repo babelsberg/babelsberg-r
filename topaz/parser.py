@@ -140,6 +140,9 @@ class Parser(object):
     def _new_call(self, receiver, method, args, block):
         return BoxAST(ast.Send(receiver, method.getstr(), args, block, method.getsourcepos().lineno))
 
+    def new_is(self, lhs, rhs):
+        return BoxAST(ast.Is(lhs.getast(), rhs.getast()))
+
     def new_and(self, lhs, rhs):
         return BoxAST(ast.And(lhs.getast(), rhs.getast()))
 
@@ -340,7 +343,7 @@ class Parser(object):
         "IF", "UNLESS", "THEN", "ELSIF", "ELSE", "CASE", "WHEN", "WHILE",
         "UNTIL", "FOR", "BREAK", "NEXT", "REDO", "RETRY", "IN", "DO",
         "DO_COND", "DO_BLOCK", "RETURN", "YIELD", "SUPER", "SELF", "NIL",
-        "TRUE", "FALSE", "AND", "OR", "NOT", "IF_MOD", "UNLESS_MOD",
+        "TRUE", "FALSE", "IS", "AND", "OR", "NOT", "IF_MOD", "UNLESS_MOD",
         "WHILE_MOD", "UNTIL_MOD", "RESCUE_MOD", "ALIAS", "DEFINED",
         "lBEGIN", "lEND", "__LINE__", "__FILE__", "__ENCODING__", "DO_LAMBDA",
 
@@ -364,7 +367,7 @@ class Parser(object):
         ("nonassoc", ["LOWEST"]),
         ("nonassoc", ["LBRACE_ARG"]),
         ("nonassoc", ["IF_MOD", "UNLESS_MOD", "WHILE_MOD", "UNTIL_MOD"]),
-        ("left", ["OR", "AND"]),
+        ("left", ["OR", "AND", "IS"]),
         ("right", ["NOT"]),
         ("nonassoc", ["DEFINED"]),
         ("right", ["LITERAL_EQUAL", "OP_ASGN"]),
@@ -686,6 +689,10 @@ class Parser(object):
     @pg.production("expr : command_call")
     def expr_command_call(self, p):
         return p[0]
+
+    @pg.production("expr : expr IS expr")
+    def expr_is(self, p):
+        return self.new_is(p[0], p[2])
 
     @pg.production("expr : expr AND expr")
     def expr_and(self, p):
