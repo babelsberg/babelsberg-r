@@ -956,6 +956,11 @@ class ObjectSpace(object):
             return None
         return self.constraint_stack[-1]
 
+    def last_constraint_variable(self):
+        cc = self.current_constraint()
+        if cc:
+            return cc.last_constraint_variable()
+
     def is_executing_normally(self):
         return isinstance(self._executionmodes.get(), NormalExecution)
 

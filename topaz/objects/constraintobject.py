@@ -32,7 +32,8 @@ class W_ConstraintMarkerObject(W_Object):
 
 class W_ConstraintObject(W_ConstraintMarkerObject):
     _attrs_ = ["w_strength", "block", "enabled",
-               "constraint_objects_w", "constraint_variables_w", "assignments_w"]
+               "constraint_objects_w", "constraint_variables_w", "assignments_w",
+               "last_cvar"]
     classdef = ClassDef("Constraint", W_ConstraintMarkerObject.classdef)
 
     def __init__(self, space):
@@ -43,6 +44,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         self.constraint_objects_w = []
         self.constraint_variables_w = []
         self.assignments_w = []
+        self.last_cvar = None
 
     def get_constraint_objects(self):
         return self.constraint_objects_w
@@ -56,9 +58,13 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
     def has_constraint_objects(self):
         return len(self.constraint_objects_w) > 0
 
-    def add_constraint_variable(self, w_value):
-        if w_value not in self.constraint_variables_w:
-            self.constraint_variables_w.append(w_value)
+    def add_constraint_variable(self, c_var):
+        if c_var not in self.constraint_variables_w:
+            self.constraint_variables_w.append(c_var)
+            self.last_cvar = c_var
+
+    def last_constraint_variable(self):
+        return self.last_cvar
 
     def add_assignment(self, space, c_var, w_constraint):
         if c_var in self.assignments_w:

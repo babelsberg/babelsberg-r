@@ -54,6 +54,18 @@ class ConstraintInterpreter(Interpreter):
         else:
             return Interpreter.JUMP_AND(self, space, bytecode, frame, pc, target_pc)
 
+    def IS_Q(self, space, bytecode, frame, pc):
+        c_rhs = frame.pop()
+        w_rhs = frame.pop()
+        c_lhs = frame.pop()
+        w_lhs = frame.pop()
+        w_ident_constraint = space.send(
+            space.w_identity_constraint,
+            "new",
+            [w_lhs, w_rhs, c_lhs, c_rhs]
+        )
+        frame.push(w_ident_constraint)
+
 
 class ConstrainedVariable(W_Root):
     CONSTRAINT_IVAR = "__constrained_variable__"
