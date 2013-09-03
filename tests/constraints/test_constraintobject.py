@@ -1250,3 +1250,22 @@ class TestConstraintVariableObject(BaseTopazTest):
         assert cassowary[0][0] == cassowary[1][2]
         assert cassowary[0][1] == cassowary[1][1]
         assert cassowary[0][2] == cassowary[1][0]
+
+    def test_no_solver(self, space):
+        w_c, w_z3 = self.execute(
+            space,
+            """
+            a = b = 0
+            x = nil
+            always { a + b == 10 }
+            always(solver: nil) do
+              x = a.to_s
+              true # so the system knows we want the side effect
+            end
+            a = 100
+            return x
+            """,
+            "libcassowary", "libz3"
+        )
+        assert self.unwrap(space, w_c) == "100.0"
+        assert self.unwrap(space, w_z3) == "100"
