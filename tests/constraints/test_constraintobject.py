@@ -1,3 +1,4 @@
+import copy
 import py
 
 from ..base import BaseTopazTest
@@ -6,11 +7,14 @@ E = 0.00000000000001
 
 class TestConstraintVariableObject(BaseTopazTest):
     def execute(self, space, code, *libs):
-        return [space.execute("""
-                require "%s"
+        results = []
+        for lib in libs:
+            results.append(copy.deepcopy(space).execute("""
+            require "%s"
 
-                %s
-                """ % (lib, code)) for lib in libs]
+            %s
+            """ % (lib, code)))
+        return results[0] if len(results) == 1 else results
 
     def test_names(self, space):
         space.execute("ConstraintVariable")
@@ -109,6 +113,17 @@ class TestConstraintVariableObject(BaseTopazTest):
         always { @@b > 10 }
         @@b = 11
         return @@b
+        """)
+        assert self.unwrap(space, w_res) == 11
+
+    def test_double_constraint(self, space):
+        w_res = space.execute("""
+        require "libcassowary"
+        a = 0
+        always { a >= 10 }
+        a = 15
+        always { a <= 11 }
+        return a
         """)
         assert self.unwrap(space, w_res) == 11
 
@@ -386,7 +401,7 @@ class TestConstraintVariableObject(BaseTopazTest):
 
         return res, $area_executions
         """
-        [w_res] = self.execute(space, code, "libz3")
+        w_res = self.execute(space, code, "libz3")
         assert self.unwrap(space, w_res) == [
             [
                 101, 1, # invalid point is adjusted
@@ -416,42 +431,175 @@ class TestConstraintVariableObject(BaseTopazTest):
         """)
         assert self.unwrap(space, w_res) == [True, 11, True, 11]
 
-    @py.test.mark.xfail
     def test_constraint_solver_interaction_different_domains(self, space):
         w_res = space.execute("""
         require "libz3"
         require "libcassowary"
 
-        raise "Test problem" unless 1.for_constraint("name").is_a?(Cassowary::Variable)
+        a = true
+        b = 15
+        always { b < 11 }
+        $res = [[a, b]]
+        always { a == b > 10 }
+        $res << [a, b]
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [[True, 10], [False, 10.0]]
+
+        w_res = space.execute("""
+        require "libz3"
+        require "libcassowary"
 
         a = true
-        b = 10
-        always { b < 11 }
-        always { a == b > 10 }
-        return a, b
+        b = 15
+        always(solver: Cassowary::SimplexSolver.instance) { b < 11 }
+        $res = [[a, b]]
+        always(solver: Z3::Instance) { a == b > 10 }
+        $res << [a, b]
+        return $res
         """)
-        assert self.unwrap(space, w_res) == [False, 10.0]
+        assert self.unwrap(space, w_res) == [[True, 10], [False, 10.0]]
 
-    @py.test.mark.xfail
+        w_res = space.execute("""
+        require "libz3"
+        require "libcassowary"
+
+        a = true
+        b = 15
+        always(solver: Cassowary::SimplexSolver.instance) { b < 11 }
+        $res = [[a, b]]
+        always(solver: Z3::Instance) { a == b > 10 }
+        $res << [a, b]
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [[True, 10], [False, 10.0]]
+
+    def test_constraint_solver_interaction_z3_on_top(self, space):
+        w_res = space.execute("""
+        require "libz3"
+        require "libcassowary"
+
+        class Cassowary::SimplexSolver
+          def weight
+            -1
+          end
+        end
+
+        class Z3
+          def weight
+            1000 # ensure that Z3 is upstream from Cassowary
+          end
+        end
+
+        a = true
+        b = 15
+        always(solver: Cassowary::SimplexSolver.instance) { b <= 10 }
+        $res = [[a, b]]
+        always(solver: Z3::Instance) { a == b >= 10 && a }
+        $res << [a, b]
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [[True, 10], [True, 10.0]]
+
+    def test_inconsistent_constraints_solver_interaction(self, space):
+        with self.raises(space, "RuntimeError", "unsatisfiable constraint system"):
+            space.execute("""
+            require "libz3"
+            require "libcassowary"
+
+            b = 15
+            always(solver: Cassowary::SimplexSolver.instance) { b <= 10 }
+            $res = [b]
+            always(solver: Z3::Instance) { b > 100 }
+            $res << b
+            return $res
+            """)
+
+    def test_constraint_solver_interaction_different_domains_failure(self, space):
+        with self.raises(space, "RuntimeError", "unsatisfiable constraint system"):
+            space.execute("""
+            require "libz3"
+            require "libcassowary"
+
+            class Cassowary::SimplexSolver
+              def weight
+                1000
+              end
+            end
+
+            class Z3
+              def weight
+                -1000 # ensure that Z3 is donwstream from Cassowary
+              end
+            end
+
+            a = true
+            b = 15
+            always(solver: Cassowary::SimplexSolver.instance) { b < 11 }
+            always(solver: Z3::Instance) { a == b > 100 }
+            always(solver: Z3::Instance) { a } # cannot be satisfied, as `b' is readonly from Z3
+            """)
+
     def test_constraint_solver_interaction_same_domain(self, space):
         w_res = space.execute("""
         require "libz3"
-
-        a = 20
-        b = 10
-        always { b > 10 }
-
         require "libcassowary"
-        raise "Test problem" unless 1.for_constraint("name").is_a?(Cassowary::Variable)
 
-        always { a < b }
-
-        return a, b
+        a = 15
+        b = 10
+        always(solver: Z3::Instance) { b > 10 }
+        $res = [a,b]
+        always(solver: Cassowary::SimplexSolver.instance) { a < b }
+        return $res << a << b
         """)
-        assert self.unwrap(space, w_res) == [10.0, 11]
+        assert self.unwrap(space, w_res) == [15, 11, 10, 11]
+
+    def test_solver_interaction_assignment(self, space):
+        w_res = space.execute("""
+        require "libcassowary"
+        require "libz3"
+
+        a = true
+        b = 10
+        always(solver: Cassowary::SimplexSolver.instance) { b >= 11 }
+        $res = [a, b]
+        always(solver: Z3::Instance) { a == (b > 15) }
+        $res << a << b
+        b = 20
+        $res << a << b
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [
+            True, 11, # a is unchanged, b is >= 11
+            False, 11, # Z3 cannot change b, so a is changed to false
+            True, 20, # after cassowary assigned 20, Z3 is triggered and picks up 20
+        ]
+
+    @py.test.mark.xfail
+    def test_solver_interaction_assignment2(self, space):
+        w_res = space.execute("""
+        require "libcassowary"
+        require "libz3"
+
+        a = true
+        b = 10
+        c = 20
+        always(solver: Cassowary::SimplexSolver.instance) { b + c >= 20 }
+        $res = [a, b, c]
+        always(solver: Z3::Instance) { a == (b > 15) }
+        $res << a << b << c
+        c = 1
+        $res << a << b << c
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [
+            True, 10, 20, # everything's fine
+            False, 10, 20, # Z3 cannot change b, so a is changed to false
+            True, 19, 1, # after cassowary assigned 19 to b, Z3 is triggered and picks it up
+        ]
 
     def test_solver_variable_delegation(self, space):
-        w_cassowary, w_z3 = self.execute(
+        w_cassowary = self.execute(
             space,
             """
             class FloatString < String
@@ -461,7 +609,7 @@ class TestConstraintVariableObject(BaseTopazTest):
 
               def for_constraint(name)
                 @float ||= self.to_f
-                Constraint.new { @float }.value
+                Constraint.new { @float }
               end
             end
 
@@ -470,15 +618,12 @@ class TestConstraintVariableObject(BaseTopazTest):
             always { a > b }
             return a, b
             """,
-            "libcassowary", "libz3")
+            "libcassowary")
         assert (self.unwrap(space, w_cassowary) == [3.9, "2.9"] or
                 self.unwrap(space, w_cassowary) == [1.0, "0.0"])
-        assert (self.unwrap(space, w_z3) == [0, "-1.0"] or
-                self.unwrap(space, w_z3) == [0, "-1"] or
-                self.unwrap(space, w_z3) == [3.9, "2.9"])
 
     def test_solver_ro_variable_delegation(self, space):
-        w_cassowary, w_z3 = self.execute(
+        w_cassowary = self.execute(
             space,
             """
             class FloatString < String
@@ -492,7 +637,7 @@ class TestConstraintVariableObject(BaseTopazTest):
                   @float = 0
                   always { @float == self.to_f }
                 end
-                Constraint.new { @float }.value
+                Constraint.new { @float }
               end
             end
 
@@ -501,13 +646,13 @@ class TestConstraintVariableObject(BaseTopazTest):
             always { a == b }
             return a, b
             """,
-            "libcassowary", "libcassowary")
+            "libcassowary")
         res = self.unwrap(space, w_cassowary)
         assert 2.9 - E <= res[0] <= 2.9 + E
         assert "2.9" == res[1]
 
     def test_solver_ro_variable_delegation_w_update(self, space):
-        w_cassowary, w_z3 = self.execute(
+        w_cassowary = self.execute(
             space,
             """
             class FloatString < String
@@ -520,7 +665,7 @@ class TestConstraintVariableObject(BaseTopazTest):
                   @float = 0
                   @stay = always { @float == self.to_f }
                 end
-                Constraint.new { @float }.value
+                Constraint.new { @float }
               end
 
               def update(float)
@@ -540,7 +685,7 @@ class TestConstraintVariableObject(BaseTopazTest):
             b.update(1.1)
             return res << a << b
             """,
-            "libcassowary", "libcassowary")
+            "libcassowary")
         res = self.unwrap(space, w_cassowary)
         assert 2.9 - E <= res[0] <= 2.9 + E
         assert "1.1" == res[1]
@@ -594,7 +739,7 @@ class TestConstraintVariableObject(BaseTopazTest):
             "libcassowary", "libz3")
         assert self.unwrap(space, w_ca) == 1
         assert self.unwrap(space, w_z3) > 0 and self.unwrap(space, w_z3) < 100
-        with self.raises(space, "RuntimeError"):
+        with self.raises(space, "Cassowary::RequiredFailure"):
             space.execute("""
             require "libcassowary"
             qual = -1

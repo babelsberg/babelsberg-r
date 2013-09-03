@@ -1,44 +1,73 @@
 $LOAD_PATH.unshift(File.expand_path("../cassowary/lib/", __FILE__))
 require "cassowary"
 
+class Cassowary::SimplexSolver
+  def weight
+    200
+  end
+
+  def constraint_variable_for(value)
+    case value
+    when Numeric, nil
+      v = Cassowary::Variable.new(value: value || 0)
+      Cassowary::SimplexSolver.instance.add_stay(v)
+      v
+    end
+  end
+end
+
+class Cassowary::Variable
+  def readonly!
+    unless @ro_constraint
+      @ro_constraint = self == value
+      Cassowary::SimplexSolver.instance.add_constraint(@ro_constraint)
+    end
+  end
+
+  def writable!
+    if @ro_constraint
+      Cassowary::SimplexSolver.instance.remove_constraint(@ro_constraint)
+      @ro_constraint = nil
+    end
+  end
+end
+
 class Numeric
-  alias prev_coerce coerce
+  alias coerce_wo_cassowary coerce
   def coerce(other)
     if other.kind_of?(Cassowary::AbstractVariable) || other.kind_of?(Cassowary::Constraint)
       [other, self.as_linear_expression]
     else
-      prev_coerce(other)
+      coerce_wo_cassowary(other)
     end
   end
 end
 
 class Float
-  alias prev_coerce coerce
+  alias coerce_wo_cassowary coerce
   def coerce(other)
     if other.kind_of?(Cassowary::AbstractVariable) || other.kind_of?(Cassowary::Constraint)
       [other, self.as_linear_expression]
     else
-      prev_coerce(other)
+      coerce_wo_cassowary(other)
     end
   end
 end
 
 class Fixnum
-  alias prev_coerce coerce
+  alias coerce_wo_cassowary coerce
   def coerce(other)
     if other.kind_of?(Cassowary::AbstractVariable) || other.kind_of?(Cassowary::Constraint)
       [other, self.as_linear_expression]
     else
-      prev_coerce(other)
+      coerce_wo_cassowary(other)
     end
   end
 end
 
 class Numeric
-  def for_constraint(name)
-    v = Cassowary::Variable.new(name: name, value: self)
-    Cassowary::SimplexSolver.instance.add_stay(v)
-    v
+  def constraint_solver
+    Cassowary::SimplexSolver.instance
   end
 end
 
@@ -82,9 +111,8 @@ class Object
       store = store_class.new
       accessors.collect do |sym|
         store.send(:"#{sym}=", var.send(sym))
-        # TODO: remove these constraints later
         constraints << always { store.send(sym) == var.send(sym) }
-        Constraint.new { store.send(sym) }.constraint_variables
+        Constraint.new(solver: Cassowary::SimplexSolver.instance) { store.send(sym) }.constraint_variables
       end
     end.flatten
   end
@@ -134,7 +162,7 @@ class Object
       temp_constraints = []
       vars = __create_edit_vars_from_accessors(accessors, temp_constraints, block)
     else
-      vars = Constraint.new(&block).constraint_variables
+      vars = Constraint.new(solver: Cassowary::SimplexSolver.instance, &block).constraint_variables
     end
 
     __check_edit_vars(vars)

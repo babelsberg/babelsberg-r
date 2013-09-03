@@ -137,13 +137,25 @@ class NumericArrayConstraintVariable < ArrayConstraintVariable
   end
 end
 
-class Array
-  def for_constraint(name)
-    if self.all? { |e| e.is_a? Numeric } and !self.empty?
-      NumericArrayConstraintVariable.new(self)
-    elsif self.all? { |e| e.is_a?(ConstraintObject) && e.value.is_a?(Numeric) } and !self.empty?
-      NumericArrayConstraintVariable.new(self.map(&:value), self)
+module ArraySolver
+  def self.constraint_variable_for(obj)
+    if obj.is_a? Array
+      if obj.all? { |e| e.is_a? Numeric } and !obj.empty?
+        NumericArrayConstraintVariable.new(obj)
+      elsif obj.all? { |e| e.is_a?(ConstraintObject) && e.value.is_a?(Numeric) } and !obj.empty?
+        NumericArrayConstraintVariable.new(obj.map(&:value), obj)
+      end
     end
+  end
+
+  def self.weight
+    50
+  end
+end
+
+class Array
+  def constraint_solver
+    ArraySolver
   end
 
   def sum

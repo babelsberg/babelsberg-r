@@ -87,12 +87,20 @@ class DeltaRed::Solver < ConstraintObject
   end
 
   Instance = self.new
+
+  def constraint_variable_for(obj)
+    DeltaRed.variables(obj)
+  end
+
+  def weight
+    10
+  end
 end
 
 # Enable DeltaBlue
 class Object
-  def for_constraint(name)
-    DeltaRed.variables(self)
+  def constraint_solver
+    DeltaRed::Solver::Instance
   end
 end
 

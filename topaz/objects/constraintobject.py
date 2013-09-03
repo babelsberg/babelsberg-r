@@ -14,6 +14,24 @@ class W_ConstraintMarkerObject(W_Object):
     _attrs_ = []
     classdef = ClassDef("ConstraintObject", W_Object.classdef)
 
+    def api(classdef, name):
+        @classdef.method(name)
+        def method(self, space, args_w):
+            raise space.error(
+                space.w_NotImplementedError,
+                "%s should have implemented %s" % (
+                    space.getclass(self).name,
+                    name
+                )
+            )
+    api(classdef, "begin_assign") # assert equality constraint
+    api(classdef, "assign")       # run solver
+    api(classdef, "end_assign")   # remove equality constraint
+    api(classdef, "value")        # current value
+    api(classdef, "readonly!")    # make read-only
+    api(classdef, "writable!")    # make writable
+    api(classdef, "finalize")     # remove from solver internal structure
+
     @classdef.singleton_method("allocate")
     def singleton_method_allocate(self, space):
         return W_ConstraintMarkerObject(space, self)
@@ -33,8 +51,8 @@ class W_ConstraintMarkerObject(W_Object):
 
 class W_ConstraintObject(W_ConstraintMarkerObject):
     _attrs_ = ["w_strength", "block", "enabled",
-               "constraint_objects_w", "constraint_variables_w", "assignments_w",
-               "last_cvar"]
+               "constraint_objects_w", "constraint_variables_w",
+               "assignments_w", "w_solver", "last_cvar"]
     classdef = ClassDef("Constraint", W_ConstraintMarkerObject.classdef)
 
     def __init__(self, space):
@@ -151,8 +169,8 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
     def method_solver_constraints(self, space):
         vars_w = []
         for w_var in self.constraint_variables_w:
-            if w_var.is_solveable():
-                vars_w.append(w_var.w_external_variable)
+            if w_var._is_solveable(self.get_solver()):
+                vars_w.append(w_var._get_external_variable(self.get_solver()))
         return space.newarray(vars_w)
 
     @classdef.method("predicate")
@@ -173,16 +191,42 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
             space.send(self, "enable")
         return self.w_strength
 
+    @classdef.method("solver")
+    def method_solver(self, space):
+        return self.w_solver or space.w_nil
+
     @classdef.method("initialize")
-    def method_initialize(self, space, w_strength=None, block=None):
+    def method_initialize(self, space, w_strength=None, w_options=None, block=None):
         if not block:
             raise space.error(space.w_ArgumentError, "no constraint predicate given")
         if self.block:
             raise space.error(space.w_ArgumentError, "cannot re-initialize Constraint")
-        self.w_strength = w_strength
+        if w_strength and space.is_kind_of(w_strength, space.w_hash):
+            w_options = w_strength
+            w_strength = space.send(w_strength, "[]", [space.newsymbol("priority")])
+            if w_strength is space.w_nil:
+                w_strength = None
+
         self.block = block
+        self.w_strength = w_strength
+        self.w_solver = None
+        if w_options:
+            self.set_solver(space, space.send(w_options, "[]", [space.newsymbol("solver")]))
+
         self.run_predicate(space)
         return self
+
+    def set_solver(self, space, w_solver):
+        assert self.w_solver is None
+        if w_solver is space.w_nil:
+            self.w_solver = None
+        else:
+            self.w_solver = w_solver
+            for c_var in self.constraint_variables_w:
+                c_var._set_solver_for_unbound_constraint(self, w_solver)
+
+    def get_solver(self):
+        return self.w_solver
 
     @classdef.singleton_method("allocate")
     def singleton_method_allocate(self, space):
@@ -213,14 +257,14 @@ class W_IdentityConstraintObject(W_ConstraintMarkerObject):
             )
         assert isinstance(w_c_this, ConstrainedVariable)
         assert isinstance(w_c_that, ConstrainedVariable)
-        if ((w_c_this.is_solveable() and w_this is not w_c_this.w_external_variable) or
-            (not w_c_this.is_solveable() and w_this is not space.get_value(w_c_this))):
+        if ((w_c_this.is_solveable(space) and w_this is not w_c_this.get_external_variable(space)) or
+            (not w_c_this.is_solveable(space) and w_this is not space.get_value(w_c_this))):
             raise space.error(
                 space.w_ArgumentError,
                 "the value returned from the left hand side of the identity expression cannot be identity constrained (it may be a calculated value)"
             )
-        if ((w_c_that.is_solveable() and w_that is not w_c_that.w_external_variable) or
-            (not w_c_that.is_solveable() and w_that is not space.get_value(w_c_that))):
+        if ((w_c_that.is_solveable(space) and w_that is not w_c_that.get_external_variable(space)) or
+            (not w_c_that.is_solveable(space) and w_that is not space.get_value(w_c_that))):
             raise space.error(
                 space.w_ArgumentError,
                 "the value returned from the right hand side of the identity expression cannot be identity constrained (it may be a calculated value)"

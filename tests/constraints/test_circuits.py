@@ -1,3 +1,4 @@
+import copy
 import os
 import py
 
@@ -7,7 +8,7 @@ from ..base import BaseTopazTest
 class TestCircuits(BaseTopazTest):
     def execute(self, space, code):
         file = os.path.abspath(os.path.join(__file__, "..", "constraintfixtures", "circuits.rb"))
-        w_cassowary = space.execute("""
+        w_cassowary = copy.deepcopy(space).execute("""
         require "libcassowary"
         require "%s"
         %s

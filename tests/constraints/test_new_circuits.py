@@ -1,3 +1,4 @@
+import copy
 import os
 import py
 
@@ -5,20 +6,25 @@ from ..base import BaseTopazTest
 
 
 class TestCircuits(BaseTopazTest):
-    def execute(self, space, code):
+    def execute(self, space, code, skip=None):
         file = os.path.abspath(os.path.join(__file__, "..", "constraintfixtures", "new_circuits.rb"))
-        w_cassowary = space.execute("""
-        require "libcassowary"
-        require "%s"
-        %s
-        """ % (file, code))
-        w_z3 = space.execute("""
-        require "libz3"
-        require "%s"
-        %s
-        """ % (file, code))
-        assert self.unwrap(space, w_cassowary) == self.unwrap(space, w_z3)
-        return w_z3
+        w_cassowary = None
+        w_z3 = None
+        if skip != "cassowary":
+            w_cassowary = copy.deepcopy(space).execute("""
+            require "libcassowary"
+            require "%s"
+            %s
+            """ % (file, code))
+        if skip != "z3":
+            w_z3 = space.execute("""
+            require "libz3"
+            require "%s"
+            %s
+            """ % (file, code))
+        if skip is None:
+            assert self.unwrap(space, w_cassowary) == self.unwrap(space, w_z3)
+        return w_cassowary or w_z3
 
     def test_ground(self, space):
         w_res = self.execute(space, """
@@ -129,7 +135,6 @@ class TestCircuits(BaseTopazTest):
                    g.lead.voltage, g.lead.current] """)
         assert self.unwrap(space, w_res) == [0.0, -0.05, 5.0, 0.05, 0.0, 0.05, 5.0, -0.05, 5.0, 0.0, 0.0]
 
-    @py.test.mark.skipif("True") # crashes Z3
     def test_find_resistance(self, space):
         w_res = self.execute(space, """
           g = Ground.new
@@ -141,8 +146,9 @@ class TestCircuits(BaseTopazTest):
           always { r.lead2.current == 0.05 }
           return [ r.lead1.voltage, r.lead1.current, r.lead2.voltage, r.lead2.current,
                    b.lead1.voltage, b.lead1.current, b.lead2.voltage, b.lead2.current, b.supply_voltage,
-                   g.lead.voltage, g.lead.current, r.resistance] """)
-        assert self.unwrap(space, w_res) == [0.0, -0.05, 5.0, 0.05, 0.0, 0.05, 5.0, -0.05, 5.0, 0.0, 0.0, 100.0]
+                   g.lead.voltage, g.lead.current, r.resistance] """, skip="cassowary")
+        rounded_res = [round(f, 2) for f in self.unwrap(space, w_res)]
+        assert rounded_res == [0.0, -0.05, 5.0, 0.05, 0.0, 0.05, 5.0, -0.05, 5.0, 0.0, 0.0, 100]
 
     def test_wheatstone_bridge(self, space):
         w_res = self.execute(space, """

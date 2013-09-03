@@ -13,6 +13,9 @@ class Z3Exception(Exception):
     pass
 
 
+MAX_REAL_INT = 2**32 - 1 # hard in Z3
+
+
 class W_Z3Object(W_RootObject):
     _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved", "next_id"]
     _immutable_fields_ = ["ctx", "solver"]
@@ -85,12 +88,13 @@ class W_Z3Object(W_RootObject):
             int_num = num.toint()
             int_den = den.toint()
         except OverflowError:
-            raise space.error(
-                space.w_ArgumentError,
-                "%s is too large to be a Z3 constant" % space.str_w(
-                    space.send(w_value, "inspect")
-                )
-            )
+            int_num = 1
+            int_den = 1
+
+        while int_num > MAX_REAL_INT or int_den > MAX_REAL_INT:
+            int_num = int_num >> 2
+            int_den = int_den >> 2
+
         return W_Z3Ptr(space, self, rz3.z3_mk_real(self.ctx, int_num, int_den))
 
     @classdef.method("make_int_variable")
