@@ -211,19 +211,17 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         self.w_strength = w_strength
         self.w_solver = None
         if w_options:
-            self.set_solver(space, space.send(w_options, "[]", [space.newsymbol("solver")]))
+            if space.is_true(space.send(w_options, "has_key?", [space.newsymbol("solver")])):
+                self.set_solver(space, space.send(w_options, "[]", [space.newsymbol("solver")]))
 
         self.run_predicate(space)
         return self
 
     def set_solver(self, space, w_solver):
         assert self.w_solver is None
-        if w_solver is space.w_nil:
-            self.w_solver = None
-        else:
-            self.w_solver = w_solver
-            for c_var in self.constraint_variables_w:
-                c_var._set_solver_for_unbound_constraint(self, w_solver)
+        self.w_solver = w_solver
+        for c_var in self.constraint_variables_w:
+            c_var._set_solver_for_unbound_constraint(self, w_solver)
 
     def get_solver(self):
         return self.w_solver

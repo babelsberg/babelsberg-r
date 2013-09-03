@@ -62,3 +62,8 @@ Right solution
         self.run(space, tmpdir, "send_more_money.rb")
         out, err = capfd.readouterr()
         assert out.split('\n')[-2] == u"Working solution"
+
+    def test_linked_list(self, space, tmpdir, capfd):
+        self.run(space, tmpdir, "linked_list.rb")
+        out, err = capfd.readouterr()
+        assert not out # no error
