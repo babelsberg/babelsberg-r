@@ -1,6 +1,7 @@
 from rpython.rlib import jit
 
 from topaz.celldict import CellDict, VersionTag
+from topaz.constraintinterpreter import ConstrainedVariable
 from topaz.module import ClassDef, ModuleDef
 from topaz.objects.hashobject import W_HashObject
 from topaz.objects.objectobject import W_Object, W_RootObject
@@ -210,6 +211,8 @@ class W_IdentityConstraintObject(W_ConstraintMarkerObject):
                 space.w_ArgumentError,
                 "could not find two variables with an identity to constraint. Maybe one or both sides are not calculated from variables?"
             )
+        assert isinstance(w_c_this, ConstrainedVariable)
+        assert isinstance(w_c_that, ConstrainedVariable)
         if ((w_c_this.is_solveable() and w_this is not w_c_this.w_external_variable) or
             (not w_c_this.is_solveable() and w_this is not space.get_value(w_c_this))):
             raise space.error(
