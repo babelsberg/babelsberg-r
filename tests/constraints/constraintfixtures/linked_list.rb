@@ -22,15 +22,6 @@ class DoublyLinkedListCell < ListCell
 
   def initialize(*args)
     super
-    this = self # XXX: we don't have constraints on `self'
-    # TODO: move the condition into the always. the real test is,
-    # whether the condition is always satisfied when the list is
-    # modified
-    # TODO: readonly annotations need to work with identity
-    # constraints, so we can write:
-    #   always { @next.prev is? this.? } if @next
-    # always { this is? @next.prev } if @next
-
     # XXX: this is an alternate solution, but this works with the
     # condition, by re-evalutating as needed, and without identity
     # constraints
