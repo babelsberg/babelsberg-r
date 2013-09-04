@@ -2016,3 +2016,29 @@ class TestCompiler(object):
         BUILD_LAMBDA
         RETURN
         """)
+
+    def test_is_q(self, space):
+        bc = self.assert_compiles(space, """
+        a = b = nil
+        -> { a.n is? b }
+        """, """
+        LOAD_CONST 0
+        STORE_DEREF 0
+        STORE_DEREF 1
+        DISCARD_TOP
+        LOAD_CONST 1
+        LOAD_CLOSURE 0
+        LOAD_CLOSURE 1
+        BUILD_BLOCK 2
+        BUILD_LAMBDA
+        RETURN
+        """)
+        self.assert_compiled(bc.consts_w[1], """
+        LOAD_DEREF 0
+        SEND 0 0
+        DUP_LAST_CVAR
+        LOAD_DEREF 1
+        DUP_LAST_CVAR
+        IS_Q
+        RETURN
+        """)
