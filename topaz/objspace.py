@@ -457,10 +457,12 @@ class ObjectSpace(object):
             top_parent_interp, regexp_match_cell, is_lambda=False
         )
 
-    def _findconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
+    def _findconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None, w_self=None):
         c_var = None
         if cell:
             c_var = cell.get_constraint()
+        elif w_self:
+            c_var = w_self.get_constraint()
         elif w_owner:
             if ivar:
                 c_var = w_owner.find_constraint_var(self, ivar)
@@ -476,15 +478,18 @@ class ObjectSpace(object):
         assert c_var is None or isinstance(c_var, ConstrainedVariable)
         return c_var
 
-    def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
-        c_var = self._findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar, idx=idx, w_key=w_key)
+    def newconstraintvariable(self, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None, w_self=None):
+        c_var = self._findconstraintvariable(cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar, idx=idx, w_key=w_key, w_self=w_self)
 
         if not c_var and self.is_constructing_constraint():
             c_var = ConstrainedVariable(
-                self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar, idx=idx, w_key=w_key
+                self, cell=cell, w_owner=w_owner, ivar=ivar, cvar=cvar,
+                idx=idx, w_key=w_key, w_self=w_self
             )
             if cell:
                 cell.set_constraint(c_var)
+            elif w_self:
+                w_self.set_constraint(c_var)
             elif w_owner:
                 if ivar:
                     w_owner.set_constraint_var(self, ivar, c_var)

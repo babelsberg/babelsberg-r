@@ -3,11 +3,20 @@ from rpython.rlib import jit
 from topaz.celldict import CellDict
 from topaz.coerce import Coerce
 from topaz.interpreter import Interpreter
-from topaz.objects.objectobject import W_Root
+from topaz.objects.objectobject import W_Root, W_Object
 from topaz.objects.moduleobject import W_ModuleObject
 
 
 class ConstraintInterpreter(Interpreter):
+    def LOAD_SELF(self, space, bytecode, frame, pc):
+        w_self = w_res = frame.w_self
+        jit.promote(space.getclass(w_self))
+        if isinstance(w_self, W_Object):
+            c_var = space.newconstraintvariable(w_self=w_self)
+            if c_var and c_var.is_solveable(space):
+                w_res = c_var.get_external_variable(space)
+        frame.push(w_res)
+
     def LOAD_DEREF(self, space, bytecode, frame, pc, idx):
         # This must be normal LOAD_DEREF for the arguments of frames
         # below the primitive call to __constraint__. If the arguments
@@ -71,9 +80,9 @@ class ConstraintInterpreter(Interpreter):
 
 class ConstrainedVariable(W_Root):
     CONSTRAINT_IVAR = "__constrained_variable__"
-    _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "idx", "w_key"]
+    _immutable_fields_ = ["cell", "w_owner", "ivar", "cvar", "idx", "w_key", "w_self"]
 
-    def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None):
+    def __init__(self, space, cell=None, w_owner=None, ivar=None, cvar=None, idx=-1, w_key=None, w_self=None):
         self.solvers_w = []
         self.constraints_w = []
         self.external_variables_w = []
@@ -84,6 +93,7 @@ class ConstrainedVariable(W_Root):
         self.cvar = cvar
         self.idx = idx
         self.w_key = w_key
+        self.w_self = w_self
         self.constraints_w = []
         self.identical_variables = []
         self.w_readonly_constraint = None
@@ -94,7 +104,7 @@ class ConstrainedVariable(W_Root):
             from topaz.closure import ClosureCell
             assert isinstance(cell, ClosureCell)
 
-        if not cell and not (w_owner and (ivar or cvar or idx >= 0 or w_key)):
+        if not cell and not w_self and not (w_owner and (ivar or cvar or idx >= 0 or w_key)):
             raise RuntimeError("Invalid ConstraintVariableObject initialization")
 
         self.ensure_external_variable(space, space.current_solver())
@@ -288,6 +298,8 @@ class ConstrainedVariable(W_Root):
     def load_value(self, space):
         if self.cell:
             return self.cell.get(space, None, 0) or space.w_nil
+        elif self.w_self:
+            return self.w_self
         elif self.ivar is not None:
             return self.w_owner.find_instance_var(space, self.ivar) or space.w_nil
         elif self.cvar is not None:
@@ -300,6 +312,8 @@ class ConstrainedVariable(W_Root):
     def store_value(self, space, w_value):
         if self.cell:
             self.cell.set(space, None, 0, w_value)
+        elif self.w_self:
+            raise NotImplementedError("cannot set self!?!")
         elif self.ivar is not None:
             self.w_owner.set_instance_var(space, self.ivar, w_value)
         elif self.cvar is not None:
@@ -313,6 +327,8 @@ class ConstrainedVariable(W_Root):
         inspectstr = space.any_to_s(self.load_value(space))
         if self.cell:
             storagestr = "local"
+        elif self.w_self:
+            storagestr = "self"
         elif self.ivar is not None:
             storagestr = "ivar(%s)" % self.ivar
         elif self.cvar is not None:

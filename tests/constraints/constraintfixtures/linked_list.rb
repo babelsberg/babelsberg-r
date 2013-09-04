@@ -39,7 +39,7 @@ class DoublyLinkedListCell < ListCell
     #   true # have to return true to tell the system that this is
     #        # satisfies the constraint we want
     # end
-    always { @next.nil? or (@next.prev is? this) }
+    always { @next.nil? or (@next.prev is? self) }
   end
 end
 

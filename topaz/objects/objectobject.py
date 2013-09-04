@@ -164,7 +164,7 @@ class W_RootObject(W_BaseObject):
 
 
 class W_Object(W_RootObject):
-    _attrs_ = ["map", "object_storage", "unboxed_storage"]
+    _attrs_ = ["map", "object_storage", "unboxed_storage", "self_constraint"]
 
     def __init__(self, space, klass=None):
         if klass is None:
@@ -172,12 +172,14 @@ class W_Object(W_RootObject):
         self.map = space.fromcache(mapdict.MapTransitionCache).get_class_node(klass)
         self.object_storage = None
         self.unboxed_storage = None
+        self.self_constraint = None
 
     def __deepcopy__(self, memo):
         obj = super(W_Object, self).__deepcopy__(memo)
         obj.map = copy.deepcopy(self.map, memo)
         obj.object_storage = copy.deepcopy(self.object_storage, memo)
         obj.unboxed_storage = copy.deepcopy(self.unboxed_storage, memo)
+        obj.self_constraint = copy.deepcopy(self.self_constraint, memo)
         return obj
 
     def getclass(self, space):
@@ -250,3 +252,9 @@ class W_Object(W_RootObject):
     def copy_constraint_vars(self, space, w_other):
         assert isinstance(w_other, W_Object)
         w_other.map.copy_constraint_vars(space, w_other, self)
+
+    def get_constraint(self):
+        return self.self_constraint
+
+    def set_constraint(self, cvar):
+        self.self_constraint = cvar
