@@ -153,6 +153,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
         if self.enabled:
             if self.isidentity():
                 for w_constraint_object in self.constraint_objects_w:
+                    assert isinstance(w_constraint_object, W_IdentityConstraintObject)
                     if (w_constraint_object.c_this is w_c_cause or
                         w_constraint_object.c_that is w_c_cause):
                         # do not recalculate if an assignment to one
