@@ -11,7 +11,8 @@ class ConstraintInterpreter(Interpreter):
     def LOAD_SELF(self, space, bytecode, frame, pc):
         w_self = w_res = frame.w_self
         jit.promote(space.getclass(w_self))
-        if isinstance(w_self, W_Object):
+        # TODO: XXX: This next check is stupid, think of something
+        if isinstance(w_self, W_Object) and not space.respond_to(w_self, "for_constraint"):
             c_var = space.newconstraintvariable(w_self=w_self)
             if c_var and c_var.is_solveable(space):
                 w_res = c_var.get_external_variable(space)
