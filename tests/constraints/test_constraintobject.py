@@ -552,7 +552,11 @@ class TestConstraintVariableObject(BaseTopazTest):
         always(solver: Cassowary::SimplexSolver.instance) { a < b }
         return $res << a << b
         """)
-        assert self.unwrap(space, w_res) == [15, 11, 10, 11]
+        assert (
+            self.unwrap(space, w_res) == [15, 11, 10, 11] or
+            # depending on whether Cassowary manipulates a or b
+            self.unwrap(space, w_res) == [15, 11, 15, 16]
+        )
 
     def test_solver_interaction_assignment(self, space):
         w_res = space.execute("""
