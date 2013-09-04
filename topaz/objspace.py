@@ -510,7 +510,7 @@ class ObjectSpace(object):
         if c_var:
             if self.is_constructing_constraint():
                 c_var.ensure_external_variable(self, self.current_solver())
-            if not self.is_executing_normally():
+            if self.current_constraint():
                 c_var.add_to_constraint(self, self.current_constraint())
 
         if c_var:
