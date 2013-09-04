@@ -502,7 +502,7 @@ class ObjectSpace(object):
             # XXX: this happens
             return None
 
-        if c_var and self.is_constructing_constraint():
+        if c_var and self.is_constructing_constraint() or self.is_executing_constraint():
             c_var.ensure_external_variable(self, self.current_solver())
             c_var.add_to_constraint(self, self.current_constraint())
 
@@ -985,6 +985,9 @@ class ObjectSpace(object):
 
     def is_constructing_constraint(self):
         return isinstance(self._executionmodes.get(), ConstructingConstraint)
+
+    def is_executing_constraint(self):
+        return isinstance(self._executionmodes.get(), ExecutingConstraints)
 
     def normal_execution(self):
         return _ExecutionModeContextManager(self, NormalExecution)

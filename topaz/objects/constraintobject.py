@@ -80,7 +80,7 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
     def add_constraint_variable(self, c_var):
         if c_var not in self.constraint_variables_w:
             self.constraint_variables_w.append(c_var)
-            self.last_cvar = c_var
+        self.last_cvar = c_var
 
     def last_constraint_variable(self):
         return self.last_cvar
@@ -149,8 +149,16 @@ class W_ConstraintObject(W_ConstraintMarkerObject):
             return space.w_nil
 
     @classdef.method("recalculate")
-    def method_recalculate(self, space):
-        if self.enabled and not self.isidentity():
+    def method_recalculate(self, space, w_c_cause):
+        if self.enabled:
+            if self.isidentity():
+                for w_constraint_object in self.constraint_objects_w:
+                    if (w_constraint_object.c_this is w_c_cause or
+                        w_constraint_object.c_that is w_c_cause):
+                        # do not recalculate if an assignment to one
+                        # of the identity-constrained variables is
+                        # happening
+                        return
             space.send(self, "disable")
             del self.constraint_objects_w[:]
             self.run_predicate(space)

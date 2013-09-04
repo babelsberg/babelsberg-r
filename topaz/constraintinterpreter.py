@@ -275,7 +275,7 @@ class ConstrainedVariable(W_Root):
         solver_constraints_w = self.get_solver_constraints_w(space.current_solver())
         if w_constraint not in solver_constraints_w:
             solver_constraints_w.append(w_constraint)
-            w_constraint.add_constraint_variable(self)
+        w_constraint.add_constraint_variable(self)
 
     def _set_solver_for_unbound_constraint(self, w_constraint, w_solver):
         unbound_constraints_w = self.get_solver_constraints_w(None)
@@ -414,4 +414,4 @@ class ConstrainedVariable(W_Root):
 
     def recalculate_path(self, space, constraints_w):
         for w_constraint in constraints_w:
-            space.send(w_constraint, "recalculate")
+            space.send(w_constraint, "recalculate", [self])

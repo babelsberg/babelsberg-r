@@ -1144,6 +1144,20 @@ class TestConstraintVariableObject(BaseTopazTest):
             always { top is? b }
             """)
 
+    def test_identity_recalc(self, space):
+        w_res = space.execute("""
+        Cell = Struct.new("Cell", :v, :n)
+        second = Cell.new(1, nil)
+        list = Cell.new(0, second)
+        $res = [(list.n is? second)]
+        always { list.n is? second }
+        $res << (list.n is? second)
+        list = Cell.new(1, nil)
+        $res << (list.n is? second)
+        return $res
+        """)
+        assert self.unwrap(space, w_res) == [True, True, True]
+
     def test_invalid_multiple_assignment(self, space):
         with self.raises(space, "RuntimeError", "multiply assigned variable in constraint execution"):
             space.execute("""
