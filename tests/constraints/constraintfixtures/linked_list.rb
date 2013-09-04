@@ -34,11 +34,12 @@ class DoublyLinkedListCell < ListCell
     # XXX: this is an alternate solution, but this works with the
     # condition, by re-evalutating as needed, and without identity
     # constraints
-    always(solver: nil) do
-      @next.prev = self if @next
-      true # have to return true to tell the system that this is
-           # satisfies the constraint we want
-    end
+    # always(solver: nil) do
+    #   @next.prev = self if @next
+    #   true # have to return true to tell the system that this is
+    #        # satisfies the constraint we want
+    # end
+    always { @next.nil? or (@next.prev is? this) }
   end
 end
 

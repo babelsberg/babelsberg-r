@@ -287,13 +287,13 @@ class W_IdentityConstraintObject(W_ConstraintMarkerObject):
     @classdef.method("enable")
     def method_enable(self, space):
         if not self.enabled:
-            self.c_this.constrain_identity(space, self.c_that)
+            self.c_that.constrain_identity(space, self.c_this)
             self.enabled = True
 
     @classdef.method("disable")
     def method_disable(self, space):
         if self.enabled:
-            self.c_this.unconstrain_identity(space, self.c_that)
+            self.c_that.unconstrain_identity(space, self.c_this)
             self.enabled = False
 
     @classdef.singleton_method("allocate")
