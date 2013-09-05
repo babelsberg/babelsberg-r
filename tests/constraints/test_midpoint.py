@@ -60,7 +60,8 @@ class TestConstraintVariableObject(BaseTopazTest):
         p1 = Point.new(0,10)
         p2 = Point.new(20,30)
         m = MidpointLine.new(p1,p2)
-        # first test point * and /, then the midpoint line
-        return [(p1*2).x, (p1*2).y, (p2/10).x, (p2/10).y, m.midpoint.x, m.midpoint.y ]
+        return p1.x, p1.y, p2.x, p2.y, m.midpoint.x, m.midpoint.y
         """)
-        assert self.unwrap(space, w_res) == [0,20,2,3,10,20]
+        res = self.unwrap(space, w_res)
+        assert (res[0] + res[2]) / 2.0 == res[4]
+        assert (res[1] + res[3]) / 2.0 == res[5]
