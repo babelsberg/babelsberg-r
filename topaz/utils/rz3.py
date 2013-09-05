@@ -296,13 +296,16 @@ z3_ast_dec_ref = rffi.llexternal("Z3_dec_ref", [Z3_context, Z3_ast], lltype.Void
 
 # Errors
 z3_get_error_code = rffi.llexternal("Z3_get_error_code", [Z3_context], rffi.INT, compilation_info=eci)
+_z3_ast_to_string = rffi.llexternal("Z3_ast_to_string", [Z3_context, Z3_ast], rffi.CCHARP, compilation_info=eci)
+def z3_ast_to_string(ctx, ast):
+    return rffi.charp2str(_z3_ast_to_string(ctx, ast))
 
-
-# def wrap(func):
-#     def foo(*args):
-#         print func.__name__
-#         return func(*args)
-#     return foo
-# for func in globals().keys():
-#     if hasattr(globals()[func], '__call__'):
-#         globals()[func] = wrap(globals()[func])
+if False:
+    def wrap(func):
+        def foo(*args):
+            print func.__name__
+            return func(*args)
+        return foo
+    for func in globals().keys():
+        if hasattr(globals()[func], '__call__'):
+            globals()[func] = wrap(globals()[func])
