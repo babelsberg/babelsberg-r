@@ -170,11 +170,9 @@ class ConstrainedVariable(W_Root):
 
     def set_external_variable(self, space, w_solver, w_external_variable):
         idx = self.solver_idx(w_solver)
-        assert len(self.external_variables_w) >= idx
-        if len(self.external_variables_w) == idx:
-            self.external_variables_w.append(w_external_variable)
-        else:
-            self.external_variables_w[idx] = w_external_variable
+        if len(self.external_variables_w) <= idx:
+            self.external_variables_w += [None] * (idx - len(self.external_variables_w) + 1)
+        self.external_variables_w[idx] = w_external_variable
         self.update_readonly_annotations(space, w_solver)
 
     def get_external_variable(self, space):
