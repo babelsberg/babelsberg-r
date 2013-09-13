@@ -425,7 +425,24 @@ class ConstrainedVariable(W_Root):
 
     def get_i(self, space):
         self.set_i(space)
-        return self.load_value(space)
+        w_value = self.load_value(space)
+        if len(self.solvers_w) > 1:
+            self.update_downstream_variables(space, w_value)
+        return w_value
+
+    def update_downstream_variables(self, space, w_value):
+        self.make_assignable(space)
+        defining_variable = self.defining_variable(space)
+        for w_external_variable in self.external_variables_w:
+            if w_external_variable and w_external_variable is not defining_variable:
+                space.send(w_external_variable, "begin_assign", [w_value])
+                space.send(w_external_variable, "assign")
+                space.send(w_external_variable, "end_assign")
+        self.make_not_assignable(space)
+        for i, cs_w in enumerate(self.constraints_w):
+            if (len(self.external_variables_w) < i + 1 or
+                self.external_variables_w[i] is None):
+                self.recalculate_path(space, cs_w)
 
     def recalculate_path(self, space, constraints_w):
         for w_constraint in constraints_w:
