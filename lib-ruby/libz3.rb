@@ -81,7 +81,7 @@ class Z3
       return Z3::Instance.make_int_variable(value)
     when TrueClass, FalseClass
       Z3::Instance.make_bool_variable(value)
-    when Numeric
+    when Numeric, nil
       return Z3::Instance.make_real_variable(value.to_f)
     end
   end
