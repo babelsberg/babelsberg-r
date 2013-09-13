@@ -16,12 +16,13 @@ class Z3Exception(Exception):
 MAX_REAL_INT = 2**32 - 1 # hard in Z3
 
 
-class W_Z3Object(W_RootObject):
+class W_Z3Object(W_Object):
     _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved", "next_id"]
     _immutable_fields_ = ["ctx", "solver"]
     classdef = ClassDef("Z3", W_Object.classdef)
 
-    def __init__(self):
+    def __init__(self, space, klass=None):
+        W_Object.__init__(self, space, klass=klass)
         cfg = rz3.z3_mk_config()
         rz3.z3_set_param_value(cfg, "MODEL", "true")
         ctx = rz3.z3_mk_context(cfg)
@@ -33,15 +34,6 @@ class W_Z3Object(W_RootObject):
         self.enabled_constraints = []
         self.is_solved = False
         self.next_id = 0
-
-    def getsingletonclass(self, space):
-        raise space.error(space.w_TypeError, "can't define singleton on Z3")
-
-    def find_instance_var(self, space, name):
-        return space.w_nil
-
-    def set_instance_var(self, space, name, w_value):
-        raise space.error(space.w_TypeError, "can't add instance variables to Z3")
 
     @classdef.setup_class
     def setup_class(cls, space, w_cls):
@@ -64,7 +56,7 @@ class W_Z3Object(W_RootObject):
     @classdef.singleton_method("allocate")
     def method_allocate(self, space):
         # TODO: context config passing
-        return W_Z3Object()
+        return W_Z3Object(space)
 
     @classdef.method("make_real_variable")
     def make_real_variable(self, space, w_value):
