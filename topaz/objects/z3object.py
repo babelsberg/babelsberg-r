@@ -254,6 +254,27 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         ast = rz3.z3_mk_ite(self.w_z3.ctx, cond.pointer, then.pointer, self.pointer)
         return W_Z3Ptr(space, self.w_z3, ast)
 
+    @classdef.method("if_true")
+    def method_if_true(self, space, w_then):
+        assert isinstance(w_then, W_Z3Ptr)
+        false_case = rz3.z3_mk_true(self.ctx)
+        ast = rz3.z3_mk_ite(self.w_z3.ctx, self.pointer, w_then.pointer, false_case)
+        return W_Z3Ptr(space, self.w_z3, ast)
+
+    @classdef.method("if_false")
+    def method_if_true(self, space, w_then):
+        assert isinstance(w_then, W_Z3Ptr)
+        true_case = rz3.z3_mk_true(self.ctx)
+        ast = rz3.z3_mk_ite(self.w_z3.ctx, self.pointer, true_case, w_then.pointer)
+        return W_Z3Ptr(space, self.w_z3, ast)
+
+    @classdef.method("ite")
+    def method_if_true(self, space, w_true, w_false):
+        assert isinstance(w_true, W_Z3Ptr)
+        assert isinstance(w_false, W_Z3Ptr)
+        ast = rz3.z3_mk_ite(self.w_z3.ctx, self.pointer, w_true.pointer, w_false.pointer)
+        return W_Z3Ptr(space, self.w_z3, ast)
+
     @classdef.method("alldifferent")
     def method_alldifferent(self, space, args_w):
         w_constraint = space.current_constraint()
