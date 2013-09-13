@@ -109,7 +109,8 @@ class Object
   alias prim_always always
 
   def always(strength_or_hash = nil, &block)
-    if strength_or_hash.is_a?(Hash)
+    if strength_or_hash.is_a?(Hash) &&
+        (strength_or_hash[:predicate] || strength_or_hash[:methods])
       predicate = strength_or_hash[:predicate]
       strength = strength_or_hash[:priority] || strength_or_hash[:strength]
       methods = strength_or_hash[:methods]
@@ -118,11 +119,12 @@ class Object
       elsif block and predicate.nil?
         predicate = block
       end
-      DeltaRed::Solver::Instance.add_constraint(predicate, strength, methods)
+      solver = strength_or_hash[:solver] || DeltaRed::Solver::Instance
+      solver.add_constraint(predicate, strength, methods)
     else
       if strength_or_hash.nil?
         prim_always(&block)
-      elsif !strength_or_hash.is_a?(Hash)
+      else
         prim_always(strength_or_hash, &block)
       end
     end
