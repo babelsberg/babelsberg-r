@@ -1,19 +1,24 @@
 from __future__ import absolute_import
 
 from rpython.rlib.rfloat import float_as_rbigint_ratio
+from rpython.rlib.rarithmetic import intmask, r_uint
 
 from topaz.coerce import Coerce
 from topaz.module import ClassDef
 from topaz.objects.objectobject import W_RootObject, W_Object
 from topaz.objects.constraintobject import W_ConstraintMarkerObject
 from topaz.utils import rz3
+from topaz.system import IS_64BIT
 
 
 class Z3Exception(Exception):
     pass
 
 
-MAX_REAL_INT = 2**32 - 1 # hard in Z3
+if IS_64BIT:
+    MAX_REAL_INT = 2**32 - 1 # hard in Z3
+else:
+    MAX_REAL_INT = intmask(2**31 - 1) # hard in Z3
 
 
 class W_Z3Object(W_Object):

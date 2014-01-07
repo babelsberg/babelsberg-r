@@ -25,8 +25,10 @@ z3_dir = os.path.abspath(os.path.join(
 z3_include_path = os.path.join(z3_dir, "src", "api")
 z3_build_path = os.path.join(z3_dir, "build")
 z3_exe = os.path.join(z3_build_path, "z3")
+z3_lib = "z3"
 if WINNT:
     z3_exe += ".exe"
+    z3_lib = "libz3"
 
 if not os.path.isfile(z3_exe):
     old_dir = os.getcwd()
@@ -61,7 +63,7 @@ if not os.path.isfile(z3_exe):
 eci = ExternalCompilationInfo(
     includes=["z3.h"],
     include_dirs=[z3_include_path],
-    libraries=["z3"],
+    libraries=[z3_lib],
     library_dirs=[z3_build_path]
     # separate_module_files=["rupypy/utils/re/rffi_helper.c"]
 )
