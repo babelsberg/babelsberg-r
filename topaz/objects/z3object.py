@@ -165,12 +165,32 @@ class W_Z3Object(W_Object):
                 try:
                     return space.newint(rz3.z3_get_numeral_int(self.ctx, interp_ast))
                 except rz3.Z3Error:
-                    return space.newfloat(rz3.z3_get_numeral_real(self.ctx, interp_ast))
+                    return self.get_rounded_real(space, interp_ast)
             elif kind == 1: # Z3_APP_AST ... XXX: bools, in our case
-                result = rz3.z3_get_bool_value(self.ctx, interp_ast)
-                return space.newbool(result == 1) # 1 is Z3_L_TRUE
+                if rz3.z3_is_algebraic_number(self.ctx, interp_ast) == 1:
+                    # XXX TODO: number, but doesn't fit into real??
+                    # XXX: TODO: find a good precision
+                    return self.get_rounded_real(space, interp_ast, precision=5)
+                else:
+                    result = rz3.z3_get_bool_value(self.ctx, interp_ast)
+                    return space.newbool(result == 1) # 1 is Z3_L_TRUE
             else:
                 raise NotImplementedError("Ast type %d" % kind)
+
+    def get_rounded_real(self, space, interp_ast, precision=-1):
+        if precision == -1:
+            try:
+                return space.newfloat(rz3.z3_get_numeral_real(self.ctx, interp_ast))
+            except rz3.Z3Error:
+                precision = 5
+
+        try:
+            real_ast = rz3.z3_get_algebraic_number_upper(self.ctx, interp_ast, precision)
+            return space.newfloat(rz3.z3_get_numeral_real(self.ctx, real_ast))
+        except rz3.Z3Error:
+            # XXX: Last chance
+            real_ast = rz3.z3_get_algebraic_number_upper(self.ctx, interp_ast, 1)
+            return space.newfloat(rz3.z3_get_numeral_real(self.ctx, real_ast))
 
 
 class W_Z3Ptr(W_ConstraintMarkerObject):

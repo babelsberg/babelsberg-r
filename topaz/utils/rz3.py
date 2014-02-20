@@ -127,21 +127,34 @@ def z3_get_numeral_int(ctx, ast):
 if _64BIT:
     _z3_get_numeral_real = rffi.llexternal(
         "Z3_get_numeral_rational_int64",
-        [Z3_context, Z3_ast, rffi.INTP, rffi.INTP],
+        [Z3_context, Z3_ast, rffi.LONGP, rffi.LONGP],
         rffi.INT,
         compilation_info=eci
     )
     def z3_get_numeral_real(ctx, ast):
-        nom = lltype.malloc(rffi.INTP.TO, 1, flavor='raw', zero=True)
-        den = lltype.malloc(rffi.INTP.TO, 1, flavor='raw', zero=True)
+        from rpython.rlib.rfloat import INFINITY
+        from math import copysign
+
+        nom = lltype.malloc(rffi.LONGP.TO, 1, flavor='raw', zero=True)
+        den = lltype.malloc(rffi.LONGP.TO, 1, flavor='raw', zero=True)
         status = _z3_get_numeral_real(ctx, ast, nom, den)
         fnom = float(int(nom[0]))
         fden = float(int(den[0]))
         lltype.free(nom, flavor='raw')
         lltype.free(den, flavor='raw')
-        if status != 1:
+        if fnom == 0.0 and fden == 0.0:
+            return 0
+        elif fden == 0.0:
+            sign = copysign(1.0, fnom)
+            if sign > 0:
+                return copysign(INFINITY, fden)
+            else:
+                return copysign(INFINITY, -fden)
+        elif status != 1:
             raise Z3Error("result does not fit into int-type")
         else:
+            if fnom == 0 or fden == 0:
+                return 0
             return fnom / fden
 else:
     _z3_get_denominator = rffi.llexternal("Z3_get_denominator", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
@@ -152,6 +165,9 @@ else:
         nom = z3_get_numeral_int(ctx, nom_ast)
         den = z3_get_numeral_int(ctx, den_ast)
         return float(nom) / float(den)
+
+z3_is_algebraic_number = rffi.llexternal("Z3_is_algebraic_number", [Z3_context, Z3_ast], rffi.INT, compilation_info=eci)
+z3_get_algebraic_number_upper = rffi.llexternal("Z3_get_algebraic_number_upper", [Z3_context, Z3_ast, rffi.UINT], Z3_ast, compilation_info=eci)
 
 z3_get_ast_kind = rffi.llexternal("Z3_get_ast_kind", [Z3_context, Z3_ast], rffi.INT, compilation_info=eci)
 z3_get_app_decl = rffi.llexternal("Z3_get_app_decl", [Z3_context, Z3_ast], Z3_func_decl, compilation_info=eci)
