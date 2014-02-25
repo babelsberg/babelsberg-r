@@ -173,24 +173,106 @@ class W_Z3Object(W_Object):
                     return self.get_rounded_real(space, interp_ast, precision=5)
                 else:
                     result = rz3.z3_get_bool_value(self.ctx, interp_ast)
-                    return space.newbool(result == 1) # 1 is Z3_L_TRUE
+                    if result == -1:
+                        return space.w_false
+                    elif result == 1:
+                        return space.w_true
+                    else:
+                        strresult = rz3.z3_ast_to_string(self.ctx, interp_ast)
+                        return space.newfloat(self.parse_and_execute(strresult))
             else:
                 raise NotImplementedError("Ast type %d" % kind)
 
-    def get_rounded_real(self, space, interp_ast, precision=-1):
-        if precision == -1:
-            try:
-                return space.newfloat(rz3.z3_get_numeral_real(self.ctx, interp_ast))
-            except rz3.Z3Error:
-                precision = 5
+    def parse_and_execute(self, sexp):
+        sexp = sexp.strip()
+        from string import whitespace
+        atom_end = [' ', '"', "'", ')', '(', '\x0b', '\n', '\r', '\x0c', '\t']
 
-        try:
-            real_ast = rz3.z3_get_algebraic_number_upper(self.ctx, interp_ast, precision)
-            return space.newfloat(rz3.z3_get_numeral_real(self.ctx, real_ast))
-        except rz3.Z3Error:
-            # XXX: Last chance
-            real_ast = rz3.z3_get_algebraic_number_upper(self.ctx, interp_ast, 1)
-            return space.newfloat(rz3.z3_get_numeral_real(self.ctx, real_ast))
+        stack, atom, i, length = [], [], 0, len(sexp)
+        while i < length:
+            c = sexp[i]
+            reading_tuple = len(atom) > 0
+            if not reading_tuple:
+                if c == '(':
+                    stack.append([])
+                elif c == ')':
+                    pred = len(stack) - 2
+                    if pred >= 0:
+                        stack[pred].append(str(self._evaluate_sexpr(stack.pop())))
+                    else:
+                        assert i + 1 == length
+                        return self._evaluate_sexpr(stack.pop())
+                elif c in whitespace:
+                    pass
+                else:
+                    atom.append(c)
+            else:
+                if c in atom_end:
+                    stack[-1].append("".join(atom))
+                    atom = []
+                    continue
+                else:
+                    atom.append(c)
+            i += 1
+        if not stack and atom:
+            try:
+                return self._eval_arg("".join(atom))
+            except ValueError:
+                pass
+
+        raise NotImplementedError("whatever this is %s" % sexp)
+
+    def _evaluate_sexpr(self, l):
+        import math
+        assert len(l) > 1
+        op = l[0]
+        args = [self._eval_arg(i) for i in l[1:]]
+        if op == "sin":
+            return math.sin(args[0])
+        elif op == "cos":
+            return math.cos(args[0])
+        elif op == "tan":
+            return math.tan(args[0])
+        elif op == "asin":
+            return math.asin(args[0])
+        elif op == "acos":
+            return math.acos(args[0])
+        elif op == "atan":
+            return math.atan(args[0])
+        elif op == "+":
+            return args[0] + args[1]
+        elif op == "-":
+            return args[0] - args[1]
+        elif op == "*":
+            return args[0] * args[1]
+        elif op == "/":
+            return args[0] / args[1]
+        elif op == "**":
+            return math.pow(args[0], args[1])
+        else:
+            raise NotImplementedError("%s in sexprs returned from Z3" % op)
+
+    def _eval_arg(self, arg):
+        if "/" in arg:
+             nom, den = arg.split("/")
+             return float(nom)/float(den)
+        else:
+             return float(arg)
+
+    def get_rounded_real(self, space, interp_ast, precision=-1):
+        # TODO: figure out if we can do this more efficiently
+        # if precision == -1:
+        #     try:
+        #         return space.newfloat(rz3.z3_get_numeral_real(self.ctx, interp_ast))
+        #     except rz3.Z3Error:
+        #         precision = 10
+
+        # try:
+        #     real_ast = rz3.z3_get_algebraic_number_upper(self.ctx, interp_ast, precision)
+        #     return space.newfloat(rz3.z3_get_numeral_real(self.ctx, real_ast))
+        # except rz3.Z3Error:
+        strresult = rz3.z3_ast_to_string(self.ctx, interp_ast)
+        return space.newfloat(self.parse_and_execute(strresult))
 
 
 class W_Z3Ptr(W_ConstraintMarkerObject):
@@ -265,6 +347,37 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
     method_rem = new_binop(classdef, "remainder", rz3.z3_mk_rem)
     method_or = new_binop(classdef, "or", rz3.z3_mk_or)
     # method_and = new_binop(classdef, "and", rz3.z3_mk_and)
+
+    def new_trigop(classdef, name):
+        @classdef.method(name)
+        def method(self, space):
+            try:
+                decl = self.getdecl(self.w_z3.ctx)
+            except Z3Exception:
+                raise space.error(space.w_RuntimeError, "cannot create %s" % name)
+
+            w_new_ast = space.send(self.w_z3, "make_real_variable", [space.newfloat(0.0)])
+            try:
+                newdecl = w_new_ast.getdecl(self.w_z3.ctx)
+            except Z3Exception:
+                raise space.error(space.w_RuntimeError, "cannot create %s" % name)
+
+            trig_ast = rz3.z3_parse_smtlib2_string(
+                self.w_z3.ctx,
+                "(assert (= newdecl (%s this)))" % name,
+                {"this": decl, "newdecl": newdecl}
+            )
+            err = rz3.z3_get_error_code(self.w_z3.ctx)
+            if err != 0:
+                raise space.error(space.w_RuntimeError, "error in smtlib parsing %s" % name)
+            space.send(self.w_z3, "add_constraint", [W_Z3Ptr(space, self.w_z3, trig_ast)])
+            return w_new_ast
+    method_sin = new_trigop(classdef, "sin")
+    method_cos = new_trigop(classdef, "cos")
+    method_tan = new_trigop(classdef, "tan")
+    method_asin = new_trigop(classdef, "asin")
+    method_acos = new_trigop(classdef, "acos")
+    method_atan = new_trigop(classdef, "atan")
 
     @classdef.method("abs")
     def method_abs(self, space):
