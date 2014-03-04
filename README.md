@@ -1,7 +1,7 @@
 Babelsberg/R
 ============
 
-A [Topaz](http://www.topazruby.com)-based implementation of Babelsberg
+A [Topaz](http://www.topazruby.com)-based implementation of Babelsberg, licensed under [MIT](https://github.com/timfel/babelsberg-r/blob/interacting-solvers/LICENSE)
 
 See also [Babelsberg/JS](https://github.com/timfel/babelsberg-js)
 
