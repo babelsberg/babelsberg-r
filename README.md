@@ -84,3 +84,5 @@ puzzle solvers, and a simulation of the Lively Engine.
 
 Papers about this implementation are forthcoming and a freely accessible technical report
 will be published shortly.
+
+Created under a grant from Hasso Plattner Institute <img src="http://upload.wikimedia.org/wikipedia/de/c/c9/Hpi_logo.png" alt="HPI Logo" width="50" height="50"/>
