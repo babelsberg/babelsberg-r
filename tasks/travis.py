@@ -113,8 +113,8 @@ def run_translate_tests(env):
 
 def run_translate_jit_tests(env):
     invoke.run("PYTHONPATH={rpython_path}:$PYTHONPATH python {rpython_path}/rpython/bin/rpython --batch -Ojit targettopaz.py".format(**env))
-    run_specs("`pwd`/bin/topaz")
-    invoke.run("PYTHONPATH={rpython_path}:$PYTHONPATH py.test -s --topaz=bin/topaz tests/jit/".format(**env))
+    # run_specs("`pwd`/bin/topaz")
+    invoke.run("LD_LIBRARY_PATH=dependencies/z3/build PYTHONPATH={rpython_path}:$PYTHONPATH py.test -s --topaz=bin/topaz tests/jit/".format(**env))
 
 
 def run_specs(binary, prefix=""):
