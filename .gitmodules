@@ -4,3 +4,6 @@
 [submodule "lib-ruby/deltablue"]
 	path = lib-ruby/deltablue
 	url = git://github.com/timfel/deltared.git
+[submodule "dependencies/z3"]
+	path = dependencies/z3
+	url = https://github.com/timfel/z3.git
