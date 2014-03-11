@@ -247,7 +247,10 @@ class W_Z3Object(W_Object):
         elif op == "+":
             return args[0] + args[1]
         elif op == "-":
-            return args[0] - args[1]
+            if len(args) == 1:
+                return -args[0]
+            else:
+                return args[0] - args[1]
         elif op == "*":
             return args[0] * args[1]
         elif op == "/":
@@ -258,7 +261,9 @@ class W_Z3Object(W_Object):
             raise NotImplementedError("%s in sexprs returned from Z3" % op)
 
     def _eval_arg(self, arg):
-        if "/" in arg:
+        if arg == "RootObject[]":
+            return 1.0
+        elif "/" in arg:
              nom, den = arg.split("/")
              return float(nom)/float(den)
         else:
