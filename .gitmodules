@@ -1,9 +1,9 @@
-[submodule "dependencies/z3"]
-	path = dependencies/z3
-	url = https://git01.codeplex.com/forks/timfelgentreff/z3
 [submodule "lib-ruby/cassowary"]
 	path = lib-ruby/cassowary
 	url = git://github.com/timfel/cassowary-ruby
 [submodule "lib-ruby/deltablue"]
 	path = lib-ruby/deltablue
 	url = git://github.com/timfel/deltared.git
+[submodule "dependencies/z3"]
+	path = dependencies/z3
+	url = https://github.com/timfel/z3.git
