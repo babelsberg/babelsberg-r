@@ -171,6 +171,7 @@ z3_get_algebraic_number_upper = rffi.llexternal("Z3_get_algebraic_number_upper",
 
 z3_get_ast_kind = rffi.llexternal("Z3_get_ast_kind", [Z3_context, Z3_ast], rffi.INT, compilation_info=eci)
 z3_get_app_decl = rffi.llexternal("Z3_get_app_decl", [Z3_context, Z3_ast], Z3_func_decl, compilation_info=eci)
+z3_func_decl_to_ast = rffi.llexternal("Z3_func_decl_to_ast", [Z3_context, Z3_func_decl], Z3_ast, compilation_info=eci)
 
 # Sorts
 Z3_sort = rffi.COpaquePtr("Z3_sort")
@@ -223,6 +224,7 @@ def multiop(name):
 multiop("Z3_mk_add")
 multiop("Z3_mk_sub")
 multiop("Z3_mk_mul")
+
 
 # Numerals
 z3_mk_real = rffi.llexternal("Z3_mk_real", [Z3_context, rffi.INT, rffi.INT], Z3_ast, compilation_info=eci)
@@ -315,6 +317,46 @@ z3_get_error_code = rffi.llexternal("Z3_get_error_code", [Z3_context], rffi.INT,
 _z3_ast_to_string = rffi.llexternal("Z3_ast_to_string", [Z3_context, Z3_ast], rffi.CCHARP, compilation_info=eci)
 def z3_ast_to_string(ctx, ast):
     return rffi.charp2str(_z3_ast_to_string(ctx, ast))
+
+# SMT-Lib
+Z3_symbolP = rffi.VOIDPP
+Z3_func_declP = rffi.VOIDPP
+Z3_sortP = rffi.VOIDPP
+
+_z3_parse_smtlib2_string = rffi.llexternal(
+    "Z3_parse_smtlib2_string",
+    [Z3_context, rffi.CCHARP,
+     rffi.UINT, Z3_symbolP, Z3_sortP,
+     rffi.UINT, Z3_symbolP, Z3_func_declP],
+    Z3_ast,
+    compilation_info=eci
+)
+def z3_parse_smtlib2_string(ctx, string, decls):
+    size = len(decls)
+    csymbols = lltype.malloc(Z3_symbolP.TO, size, flavor="raw")
+    cdecls   = lltype.malloc(Z3_func_declP.TO, size, flavor="raw")
+    idx = 0
+    for key in decls:
+        csymbols[idx] = z3_mk_string_symbol(ctx, key)
+        cdecls[idx] = decls[key]
+        idx += 1
+
+    return _z3_parse_smtlib2_string(
+        ctx,
+        string,
+        0, lltype.nullptr(Z3_symbolP.TO), lltype.nullptr(Z3_sortP.TO),
+        size,
+        csymbols,
+        cdecls
+    )
+
+z3_get_smtlib_num_formulas = rffi.llexternal("Z3_get_smtlib_num_formulas", [Z3_context], rffi.UINT, compilation_info=eci)
+z3_get_smtlib_formula = rffi.llexternal("Z3_get_smtlib_formula", [Z3_context, rffi.UINT], Z3_ast, compilation_info=eci)
+z3_get_smtlib_num_assumptions = rffi.llexternal("Z3_get_smtlib_num_assumptions", [Z3_context], rffi.UINT, compilation_info=eci)
+z3_get_smtlib_assumption = rffi.llexternal("Z3_get_smtlib_assumption", [Z3_context, rffi.UINT], Z3_ast, compilation_info=eci)
+z3_get_smtlib_num_decls = rffi.llexternal("Z3_get_smtlib_num_decls", [Z3_context], rffi.UINT, compilation_info=eci)
+z3_get_smtlib_decl = rffi.llexternal("Z3_get_smtlib_decl", [Z3_context, rffi.UINT], Z3_func_decl, compilation_info=eci)
+
 
 if False:
     def wrap(func):
