@@ -99,7 +99,7 @@ def upload_build():
 
 
 def run_own_tests(env):
-    invoke.run("PYTHONPATH=$PYTHONPATH:{rpython_path} py.test -s ".format(**env))
+    invoke.run("PYTHONPATH=$PYTHONPATH:{rpython_path} py.test -s tests/constraints/ ".format(**env))
 
 
 def run_rubyspec_untranslated(env):
