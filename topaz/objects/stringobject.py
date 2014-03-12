@@ -223,9 +223,10 @@ class MutableStringStrategy(StringStrategy):
         elif newline is not None and len(newline) == 0:
             ch = storage[-1]
             i = len(storage) - 1
-            while i >= 1 and ch in linebreaks:
-                i -= 1
-                ch = storage[i]
+            if ch != "\r":
+                while i >= 1 and ch in linebreaks:
+                    i -= 1
+                    ch = storage[i]
             if i < len(storage) - 1:
                 i += 1
                 changed = True
@@ -1211,7 +1212,7 @@ class W_StringObject(W_Object):
         if w_newline is None:
             w_newline = space.globals.get(space, "$/")
         if w_newline is space.w_nil:
-            return self
+            return space.w_nil
         newline = space.str_w(space.convert_type(w_newline, space.w_string, "to_str"))
         if newline and newline in "\n\r":
             newline = None
