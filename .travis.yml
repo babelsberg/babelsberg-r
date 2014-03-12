@@ -4,7 +4,7 @@ python:
 env:
     matrix:
         - TEST_TYPE=own
-        - TEST_TYPE=translate
+        - TEST_TYPE=translate-jit
 install:
     - pip install requests invoke
     - invoke travis.install_requirements
