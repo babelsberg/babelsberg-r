@@ -31,7 +31,7 @@ class AttributeReader(W_FunctionObject):
                 return c_var.get_external_variable(space)
             else:
                 return space.get_value(c_var)
-        return space.find_instance_var(w_obj, self.varname)
+        return space.find_instance_var(w_obj, self.varname) or space.w_nil
 
 
 class AttributeWriter(W_FunctionObject):

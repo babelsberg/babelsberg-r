@@ -35,3 +35,8 @@ load_bootstrap.call("top_self.rb")
 
 load_bootstrap.call("constraint_variable.rb")
 load_bootstrap.call("constraint.rb")
+
+# ffi
+load_bootstrap.call("ffitopaz/pointer.rb")
+load_bootstrap.call("ffitopaz/errors.rb")
+load_bootstrap.call("ffitopaz/ffi.rb")
