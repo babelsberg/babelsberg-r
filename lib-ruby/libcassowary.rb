@@ -10,6 +10,7 @@ class Cassowary::SimplexSolver
     case value
     when Numeric, nil
       v = Cassowary::Variable.new(value: value || 0)
+      v.solver = self
       Cassowary::SimplexSolver.instance.add_stay(v)
       v
     end
@@ -17,6 +18,8 @@ class Cassowary::SimplexSolver
 end
 
 class Cassowary::Variable
+  attr_accessor :solver
+
   def readonly!
     unless @ro_constraint
       @ro_constraint = self == value
