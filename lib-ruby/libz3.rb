@@ -83,6 +83,8 @@ class Z3
       Z3::Instance.make_bool_variable(value)
     when Numeric, nil
       return Z3::Instance.make_real_variable(value.to_f)
+    when String
+      return Z3::Instance.make_string_variable(value)
     end
   end
 end
@@ -100,6 +102,12 @@ class TrueClass
 end
 
 class FalseClass
+  def constraint_solver
+    Z3::Instance
+  end
+end
+
+class String
   def constraint_solver
     Z3::Instance
   end

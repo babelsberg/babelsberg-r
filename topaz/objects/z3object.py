@@ -7,7 +7,7 @@ from topaz.coerce import Coerce
 from topaz.module import ClassDef
 from topaz.objects.objectobject import W_RootObject, W_Object
 from topaz.objects.constraintobject import W_ConstraintMarkerObject
-from topaz.utils import rz3
+from topaz.utils import rz3, rz3str
 from topaz.system import IS_64BIT
 
 
@@ -22,27 +22,39 @@ else:
 
 
 class W_Z3Object(W_Object):
-    _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved", "next_id"]
-    _immutable_fields_ = ["ctx", "solver"]
+    _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved", "next_id",
+               "real_sort", "int_sort", "bool_sort", "string_theory", "string_sort"]
+    _immutable_fields_ = ["ctx", "solver",
+                          "real_sort", "int_sort", "bool_sort", "string_theory", "string_sort"]
     classdef = ClassDef("Z3", W_Object.classdef)
 
     def __init__(self, space, klass=None):
         W_Object.__init__(self, space, klass=klass)
-        cfg = rz3.z3_mk_config()
+        self.cfg = rz3.z3_mk_config()
         rz3.z3_set_param_value(cfg, "MODEL", "true")
         ctx = rz3.z3_mk_context(cfg)
         rz3.z3_del_config(cfg)
-        solver = rz3.z3_mk_solver(ctx)
-        rz3.z3_solver_inc_ref(ctx, solver)
+        # solver = rz3.z3_mk_solver(ctx)
+        # rz3.z3_solver_inc_ref(ctx, solver)
         self.ctx = ctx
         self.solver = solver
         self.enabled_constraints = []
         self.is_solved = False
         self.next_id = 0
 
+        self.real_sort = rz3.z3_mk_real_sort(self.ctx)
+        self.int_sort = rz3.z3_mk_int_sort(self.ctx)
+        self.bool_sort = rz3.z3_mk_bool_sort(self.ctx)
+        self.string_theory = rz3str.z3_mk_str_theory(self.ctx)
+        self.string_sort = rz3str.z3_get_string_sort_from_theory(self.string_theory)
+
     @classdef.setup_class
     def setup_class(cls, space, w_cls):
         w_ptr_cls = space.getclassfor(W_Z3Ptr)
+        space.set_const(w_cls, w_ptr_cls.name, w_ptr_cls)
+        w_ptr_cls = space.getclassfor(W_Z3StrPtr)
+        space.set_const(w_cls, w_ptr_cls.name, w_ptr_cls)
+        w_ptr_cls = space.getclassfor(W_AbstractZ3Ptr)
         space.set_const(w_cls, w_ptr_cls.name, w_ptr_cls)
 
     def make_variable(self, space, w_object, ctx, ty):
@@ -52,10 +64,10 @@ class W_Z3Object(W_Object):
         return W_Z3Ptr(space, self, rz3.z3_mk_const(ctx, sym, ty), w_object)
 
     def assert_ptr(self, space, w_pointer):
-        if not isinstance(w_pointer, W_Z3Ptr):
+        if not isinstance(w_pointer, W_AbstractZ3Ptr):
             raise space.error(
                 space.w_TypeError,
-                "expected %s, got %s" % (space.getclassfor(W_Z3Ptr).name, space.getclass(w_pointer).name)
+                "expected %s, got %s" % (space.getclassfor(W_AbstractZ3Ptr).name, space.getclass(w_pointer).name)
             )
 
     @classdef.singleton_method("allocate")
@@ -66,7 +78,7 @@ class W_Z3Object(W_Object):
     @classdef.method("make_real_variable")
     def make_real_variable(self, space, w_value):
         space.convert_type(w_value, space.w_float, "to_f") # Just for the error raising
-        ty = rz3.z3_mk_real_sort(self.ctx)
+        ty = self.real_sort
         return self.make_variable(space, w_value, self.ctx, ty)
 
     @classdef.method("make_real")
@@ -96,21 +108,22 @@ class W_Z3Object(W_Object):
 
     @classdef.method("make_int_variable")
     def make_real_variable(self, space, w_value):
-        space.convert_type(w_value, space.w_fixnum, "to_int") # Just for the error raising
-        ty = rz3.z3_mk_int_sort(self.ctx)
+        if w_value is not space.w_nil:
+            space.convert_type(w_value, space.w_fixnum, "to_int") # Just for the error raising
+        ty = self.int_sort
         return self.make_variable(space, w_value, self.ctx, ty)
 
     @classdef.method("make_int")
     def make_real(self, space, w_value):
         value = space.int_w(space.convert_type(w_value, space.w_fixnum, "to_int"))
-        ty = rz3.z3_mk_int_sort(self.ctx)
+        ty = self.int_sort
         return W_Z3Ptr(space, self, rz3.z3_mk_int(self.ctx, value, ty))
 
     @classdef.method("make_bool_variable")
     def make_bool_variable(self, space, w_value):
         if w_value is not space.w_true and w_value is not space.w_false and w_value is not space.w_nil:
             raise space.error(space.w_TypeError, "can't convert %s into bool" % space.getclass(w_value).name)
-        ty = rz3.z3_mk_bool_sort(self.ctx)
+        ty = self.bool_sort
         return self.make_variable(space, w_value, self.ctx, ty)
 
     @classdef.method("make_bool", value="bool")
@@ -119,6 +132,22 @@ class W_Z3Object(W_Object):
             return W_Z3Ptr(space, self, rz3.z3_mk_true(self.ctx))
         else:
             return W_Z3Ptr(space, self, rz3.z3_mk_false(self.ctx))
+
+    @classdef.method("make_string", value="str")
+    def make_string(self, space, value):
+        ptr = rz3str.z3_mk_str_value(self.string_theory, value)
+        # Do we need to add length axiom?
+        return W_Z3StrPtr(space, self, ptr)
+
+    @classdef.method("make_string_variable")
+    def make_string(self, space, w_value):
+        if w_value is space.w_nil:
+            value = "t_"
+        else:
+            value = Coerce.str(space, w_value)
+        ptr = rz3str.z3_mk_str_var(self.string_theory, "%s%s" % (value, self.next_id))
+        self.next_id += 1
+        return W_Z3StrPtr(space, self, ptr)
 
     @classdef.method("add_constraint")
     def method_add_constraint(self, space, w_other):
@@ -139,11 +168,14 @@ class W_Z3Object(W_Object):
     @classdef.method("solve")
     def method_solve(self, space):
         self.is_solved = False
-        rz3.z3_solver_reset(self.ctx, self.solver)
+        # rz3.z3_solver_reset(self.ctx, self.solver)
         for constraint in self.enabled_constraints:
             assert isinstance(constraint, W_Z3Ptr)
-            rz3.z3_solver_assert(self.ctx, self.solver, constraint.pointer)
+            # rz3.z3_solver_assert(self.ctx, self.solver, constraint.pointer)
+            rz3str.z3_assert_cnstr(self.ctx, constraint.pointer)
+        solve_result = rz3str.z3_check(self.ctx)
         solve_result = rz3.z3_solver_check(self.ctx, self.solver)
+        rz3str.z3_str_final_check(self.string_theory)
         if solve_result < 0:
             raise space.error(space.w_RuntimeError, "unsatisfiable constraint system")
         elif solve_result == 0:
@@ -177,16 +209,32 @@ class W_Z3Object(W_Object):
                     # XXX: TODO: find a good precision
                     return self.get_rounded_real(space, interp_ast, precision=5)
                 else:
-                    result = rz3.z3_get_bool_value(self.ctx, interp_ast)
-                    if result == -1:
-                        return space.w_false
-                    elif result == 1:
-                        return space.w_true
-                    else:
+                    z3_sort = rz3.z3_get_sort(self.ctx, interp_ast)
+                    if z3_sort == self.bool_sort:
+                        result = rz3.z3_get_bool_value(self.ctx, interp_ast)
+                        if result == -1:
+                            return space.w_false
+                        elif result == 1:
+                            return space.w_true
+                        else:
+                            raise space.error(space.w_RuntimeError, "invalid sort?")
+                    elif z3_sort == self.string_sort:
+                        rz3str.z3_str_final_check(self.string_theory)
+                        # return space.newstr_fromstr(rz3.z3_model_to_string(self.ctx, model))
+                        return space.newstr_fromstr(rz3.z3_ast_to_string(self.ctx, interp_ast))
+                    else: # if z3_sort == self.real_sort: # try to print and parse
                         strresult = rz3.z3_ast_to_string(self.ctx, interp_ast)
                         return space.newfloat(self.parse_and_execute(strresult))
             else:
                 raise NotImplementedError("Ast type %d" % kind)
+
+    @classdef.method("get_model")
+    def method_get_model(self, space):
+        if not self.is_solved:
+            return space.w_nil
+        else:
+            model = rz3.z3_solver_get_model(self.ctx, self.solver)
+            return space.newstr_fromstr(rz3.z3_model_to_string(self.ctx, model))
 
     def parse_and_execute(self, sexp):
         sexp = sexp.strip()
@@ -285,13 +333,13 @@ class W_Z3Object(W_Object):
         return space.newfloat(self.parse_and_execute(strresult))
 
 
-class W_Z3Ptr(W_ConstraintMarkerObject):
+class W_AbstractZ3Ptr(W_ConstraintMarkerObject):
     _attrs_ = ["w_z3", "pointer", "w_value"]
     _immutable_fields_ = ["w_z3", "pointer"]
-    classdef = ClassDef("Z3Pointer", W_ConstraintMarkerObject.classdef)
+    classdef = ClassDef("AbstractZ3Pointer", W_ConstraintMarkerObject.classdef)
 
     def __init__(self, space, w_z3, pointer, w_value=None):
-        W_Object.__init__(self, space, space.getclassfor(W_Z3Ptr))
+        W_Object.__init__(self, space, space.getclassfor(W_AbstractZ3Ptr))
         self.w_z3 = w_z3
         self.pointer = pointer
         self.w_value = w_value
@@ -299,6 +347,9 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
 
     def __del__(self):
         rz3.z3_ast_dec_ref(self.w_z3.ctx, self.pointer)
+
+    def getclass(self, space):
+        return space.getclassobject(self.classdef)
 
     def getsingletonclass(self, space):
         raise space.error(space.w_TypeError, "can't define singleton")
@@ -310,6 +361,38 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
             raise Z3Exception
         return decl
 
+    # classdef.undefine_allocator()
+
+    @classdef.method("enable")
+    def method_enable(self, space):
+        space.send(
+            self.w_z3,
+            "add_constraint",
+            [self]
+        )
+        return self
+
+    @classdef.method("disable")
+    def method_enable(self, space):
+        space.send(
+            self.w_z3,
+            "remove_constraint",
+            [self]
+        )
+        return self
+
+    @classdef.method("value")
+    def method_value(self, space):
+        w_value = space.send(self.w_z3, "[]", [self])
+        if w_value is space.w_nil:
+            return self.w_value or space.w_nil
+        elif self.w_value:
+            self.w_value = w_value
+        return w_value
+
+
+class W_Z3Ptr(W_AbstractZ3Ptr):
+    classdef = ClassDef("Z3Pointer", W_AbstractZ3Ptr.classdef)
     classdef.undefine_allocator()
 
     def coerce_constant_arg(self, space, w_arg):
@@ -434,29 +517,71 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         ast = rz3.z3_mk_unary_minus(self.w_z3.ctx, self.pointer)
         return W_Z3Ptr(space, self.w_z3, ast)
 
-    @classdef.method("enable")
-    def method_enable(self, space):
-        space.send(
-            self.w_z3,
-            "add_constraint",
-            [self]
-        )
-        return self
 
-    @classdef.method("disable")
-    def method_enable(self, space):
-        space.send(
-            self.w_z3,
-            "remove_constraint",
-            [self]
-        )
-        return self
+class W_Z3StrPtr(W_AbstractZ3Ptr):
+    classdef = ClassDef("Z3StrPointer", W_AbstractZ3Ptr.classdef)
+    classdef.undefine_allocator()
 
-    @classdef.method("value")
-    def method_value(self, space):
-        w_value = space.send(self.w_z3, "[]", [self])
-        if w_value is space.w_nil:
-            return self.w_value or space.w_nil
-        elif self.w_value:
-            self.w_value = w_value
-        return w_value
+    def coerce_constant_arg(self, space, w_arg):
+        w_z3ptr_cls = space.getclassfor(W_Z3StrPtr)
+        if not space.is_kind_of(w_arg, w_z3ptr_cls):
+            if space.is_kind_of(w_arg, space.w_string):
+                w_other = space.send(self.w_z3, "make_string", [w_arg])
+        else:
+            w_other = w_arg
+
+        if not space.is_kind_of(w_other, w_z3ptr_cls):
+            raise space.error(space.w_TypeError, "%s can't be coerced into %s::%s" % (
+                    space.getclass(w_arg).name,
+                    space.w_z3.name,
+                    w_z3ptr_cls.name
+            ))
+        else:
+            assert isinstance(w_other, W_Z3StrPtr)
+            return w_other
+
+    def new_op(classdef, mname, name, res_constructor="make_string_variable"):
+        @classdef.method(mname)
+        def method(self, space, w_other):
+            w_other = self.coerce_constant_arg(space, w_other)
+            try:
+                other_decl = w_other.getdecl(self.w_z3.ctx)
+            except Z3Exception:
+                raise space.error(space.w_RuntimeError, "cannot create %s" % name)
+            try:
+                decl = self.getdecl(self.w_z3.ctx)
+            except Z3Exception:
+                raise space.error(space.w_RuntimeError, "cannot create %s" % name)
+            w_new_ast = space.send(self.w_z3, res_constructor, [space.w_nil])
+            try:
+                newdecl = w_new_ast.getdecl(self.w_z3.ctx)
+            except Z3Exception:
+                raise space.error(space.w_RuntimeError, "cannot create %s" % name)
+
+            trig_ast = rz3.z3_parse_smtlib2_string(
+                self.w_z3.ctx,
+                "(assert (= newdecl (%s this other)))" % name,
+                {"this": decl, "other": other_decl, "newdecl": newdecl}
+            )
+            err = rz3.z3_get_error_code(self.w_z3.ctx)
+            if err != 0:
+                raise space.error(space.w_RuntimeError, "error in smtlib parsing %s" % name)
+            space.send(self.w_z3, "add_constraint", [W_Z3Ptr(space, self.w_z3, trig_ast)])
+            return w_new_ast
+    method_plus = new_op(classdef, "+", "Concat")
+    method_eq = new_op(classdef, "==", "=", "make_bool_variable")
+    method_length = new_op(classdef, "length", "Length", "make_int_variable")
+    method_size = new_op(classdef, "size", "Length", "make_int_variable")
+
+    # @classdef.method("+")
+    # def method_plus(self, space, w_other):
+    #     other = self.coerce_constant_arg(space, w_other)
+    #     ast = rz3str.z3_mk_str_concat(self.w_z3.string_theory, self.pointer, other)
+    #     return W_Z3StrPtr(space, self.w_z3, ast)
+
+    # @classdef.method("==")
+    # def method_equals(self, space, w_other):
+    #     other = self.coerce_constant_arg(space, w_other)
+    #     ast = rz3.z3_mk_eq(self.w_z3.ctx, self.pointer, other)
+    #     # ast = rz3str.z3str_mk_eq(self.w_z3.string_theory, self.pointer, other)
+    #     return W_Z3Ptr(space, self.w_z3, ast)

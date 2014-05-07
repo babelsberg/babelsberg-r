@@ -1,10 +1,14 @@
 import os
 import platform
 import sys
+import ctypes
 
 from rpython.rtyper.tool import rffi_platform
-from rpython.rtyper.lltypesystem import rffi, lltype
+from rpython.rtyper.lltypesystem import rffi, lltype, ll2ctypes
 from rpython.translator.tool.cbuild import ExternalCompilationInfo
+
+
+ll2ctypes.load_library_kwargs['mode'] = ctypes.RTLD_GLOBAL
 
 
 class Z3Error(Exception):
@@ -180,6 +184,7 @@ Z3_sort = rffi.COpaquePtr("Z3_sort")
 z3_mk_int_sort = rffi.llexternal("Z3_mk_int_sort", [Z3_context], Z3_sort, compilation_info=eci)
 z3_mk_real_sort = rffi.llexternal("Z3_mk_real_sort", [Z3_context], Z3_sort, compilation_info=eci)
 z3_mk_bool_sort = rffi.llexternal("Z3_mk_bool_sort", [Z3_context], Z3_sort, compilation_info=eci)
+z3_get_sort = rffi.llexternal("Z3_get_sort", [Z3_context, Z3_ast], Z3_sort, compilation_info=eci)
 
 # Bool
 z3_mk_not = rffi.llexternal("Z3_mk_not", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
@@ -282,6 +287,9 @@ z3_model_has_interp = rffi.llexternal(
     Z3_bool,
     compilation_info=eci
 )
+_z3_model_to_string = rffi.llexternal("Z3_model_to_string", [Z3_context, Z3_model], rffi.CCHARP, compilation_info=eci)
+def z3_model_to_string(ctx, model):
+    return rffi.charp2str(_z3_model_to_string(ctx, model))
 
 # Solvers
 Z3_solver = rffi.COpaquePtr("Z3_solver")
