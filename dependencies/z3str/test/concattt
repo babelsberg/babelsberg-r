@@ -1,0 +1,3 @@
+(declare-variable y String)
+
+(assert (= (Concat y "xx") "txx"))
