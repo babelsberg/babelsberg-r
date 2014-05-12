@@ -6,7 +6,8 @@ from rpython.rtyper.tool import rffi_platform
 from rpython.rtyper.lltypesystem import rffi, lltype
 from rpython.translator.tool.cbuild import ExternalCompilationInfo
 
-from topaz.utils.rz3 import Z3_context, Z3_sort, Z3_ast, Z3_astP, Z3_func_decl, Z3_bool, z3_lib, z3_build_path, Z3Error
+from topaz.utils.rz3 import Z3_context, Z3_sort, Z3_ast, Z3_astP, Z3_func_decl,\
+    Z3_bool, z3_lib, z3_build_path, Z3Error, Z3_model
 from topaz.system import IS_WINDOWS, IS_POSIX, IS_LINUX, IS_64BIT
 
 
@@ -110,3 +111,6 @@ str_reduce_method("indexof", nullptr=True)
 # Old api
 z3_assert_cnstr = rffi.llexternal("Z3_assert_cnstr", [Z3_context, Z3_ast], lltype.Void, compilation_info=eci)
 z3_check = rffi.llexternal("Z3_check", [Z3_context], Z3_bool, compilation_info=eci)
+z3_check_and_get_model = rffi.llexternal("my_check_and_get_model", [Z3_context], Z3_model, compilation_info=eci)
+z3_push = rffi.llexternal("Z3_push", [Z3_context], lltype.Void, compilation_info=eci)
+z3_pop = rffi.llexternal("Z3_pop", [Z3_context], lltype.Void, compilation_info=eci)

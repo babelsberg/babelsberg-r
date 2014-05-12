@@ -659,21 +659,15 @@ void __printZ3Node(Z3_theory t, Z3_ast node)
  */
 extern "C" Z3_ast get_eqc_value(Z3_theory t, Z3_ast n)
 {
-    Z3_context ctx = Z3_theory_get_context(t);
-    printf("searching eqc value for: %s\n", Z3_ast_to_string(ctx, n));
     Z3_ast curr = n;
     do
     {
-	printf("  trying %s ...", Z3_ast_to_string(ctx, curr));
         if (Z3_theory_is_value(t, curr))
         {
-	    printf("  possible ...");
             if (my_Z3_ConstStr == getNodeType(t, curr)) {
-		printf("  const!\n");
                 return curr;
 	    }
         }
-	printf("\n");
         curr = Z3_theory_get_eqc_next(t, curr);
     } while (curr != n);
     return n;
@@ -4797,5 +4791,16 @@ extern "C" Z3_ast my_mk_str_eq(Z3_theory t, Z3_ast l, Z3_ast r)
 	return NULL;
     } else {
 	return out;
+    }
+}
+
+extern "C" Z3_model my_check_and_get_model(Z3_context ctx)
+{
+    Z3_model m = (Z3_model)calloc(sizeof(Z3_model), 1);
+    Z3_lbool result = Z3_check_and_get_model(ctx, &m);
+    if (result == Z3_TRUE) {
+	return m;
+    } else {
+	return NULL;
     }
 }

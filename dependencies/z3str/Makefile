@@ -21,8 +21,8 @@ fat: $(SOURCE)
 	rm *.o
 
 shared: $(SOURCE)
-	g++ -DDEBUGLOG -rdynamic -c -fPIC -O3 -fopenmp -I$(INCLUDE) -L$(LIB) -lz3 $(THEORY) -o z3str.o
-	g++ -DDEBUGLOG -shared -rdynamic -Wl,-soname,libz3str.so -O3 -fopenmp -I$(INCLUDE) -L$(LIB) -lz3 -o libz3str.so z3str.o
+	g++ -rdynamic -c -fPIC -O3 -fopenmp -I$(INCLUDE) -L$(LIB) -lz3 $(THEORY) -o z3str.o
+	g++ -shared -rdynamic -Wl,-soname,libz3str.so -O3 -fopenmp -I$(INCLUDE) -L$(LIB) -lz3 -o libz3str.so z3str.o
 
 dynamic: $(SOURCE)
 	g++ -O3 -DDEBUGLOG -fopenmp -I$(INCLUDE) -L$(LIB) $(SOURCE) -lz3  -o str_dynamc 
