@@ -460,3 +460,14 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         elif self.w_value:
             self.w_value = w_value
         return w_value
+
+    @classdef.method("make_enum_sort")	
+    def method_make_enum_sort(self, space, args_w):
+#        temp_names = []
+#        i = 0
+#        for item in args_w:
+#            temp_names.append(rz3.z3_mk_string_symbol(self.w_z3.ctx, str(i))) #item.__id__)))
+#            i += 1
+#            
+        a_name = rz3.z3_mk_string_symbol(self.w_z3.ctx, "asdf")
+        return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_enumeration_sort(self.w_z3.ctx, a_name, args_w))
