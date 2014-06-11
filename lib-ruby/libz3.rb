@@ -128,13 +128,13 @@ end
 
 class Object
   def in(coll)
-    coll.get_enum_sort()
+    return coll.get_enum_sort()
   end
 end
 
-class Collection
+class Array
   def get_enum_sort()
-    @z3enum = @z3enum | Z3:Instance.make_enum_sort(*(self.to_a))
+    @z3enum = @z3enum | Z3::Instance.make_enum_sort(*(self.to_a))
     return @z3enum
   end
 end
