@@ -9,7 +9,7 @@ import subprocess
 
 # "solver" should point to the binary built.
 # e.g. "/home/z3-str/str"
-solver = os.path.join(os.path.abspath(os.path.dirname(__file__)), "str_dynamc")
+solver = os.path.join(os.path.abspath(os.path.dirname(__file__)), "str_static")
 
 #===================================================================
 

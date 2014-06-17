@@ -24,6 +24,13 @@ shared: $(SOURCE)
 	g++ -rdynamic -c -fPIC -O3 -fopenmp -I$(INCLUDE) -L$(LIB) -lz3 $(THEORY) -o z3str.o
 	g++ -shared -rdynamic -Wl,-soname,libz3str.so -O3 -fopenmp -I$(INCLUDE) -L$(LIB) -lz3 -o libz3str.so z3str.o
 
+static: $(SOURCE)
+	ar x $(LIB)/libz3.a
+	g++ -c -fPIC -O3 -fopenmp -I$(INCLUDE) -L$(LIB) -lrt $(THEORY) -o strtheory.o
+	g++ -c -fPIC -O3 -fopenmp -I$(INCLUDE) -L$(LIB) -lrt $(MAIN) -o strmain.o
+	g++ -O3 -fopenmp -I$(INCLUDE) -L$(LIB) *.o -lrt -o str_static
+	rm *.o
+
 dynamic: $(SOURCE)
 	g++ -O3 -DDEBUGLOG -fopenmp -I$(INCLUDE) -L$(LIB) $(SOURCE) -lz3  -o str_dynamc 
 
