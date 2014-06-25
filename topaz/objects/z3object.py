@@ -294,6 +294,11 @@ class W_Z3Object(W_Object):
 #            
         a_name = rz3.z3_mk_string_symbol(self.ctx, "asdf")
         return W_Z3Ptr(space, self, rz3.z3_mk_enumeration_sort(self.ctx, a_name, args_w))
+		
+
+    @classdef.method("make_enum_variable")
+    def make_enum_variable(self, space, w_value):
+        return self.make_variable(space, w_value, self.ctx, rz3.z3_get_sort(self.ctx, w_value.pointer))
 
 
 class W_Z3Ptr(W_ConstraintMarkerObject):
@@ -471,3 +476,5 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         elif self.w_value:
             self.w_value = w_value
         return w_value
+		
+	

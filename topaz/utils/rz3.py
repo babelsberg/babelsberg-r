@@ -202,7 +202,14 @@ z3_mk_real_sort = rffi.llexternal("Z3_mk_real_sort", [Z3_context], Z3_sort, comp
 z3_mk_bool_sort = rffi.llexternal("Z3_mk_bool_sort", [Z3_context], Z3_sort, compilation_info=eci)
 
 z3_sort_to_ast = rffi.llexternal("Z3_sort_to_ast", [Z3_context, Z3_sort], Z3_ast, compilation_info=eci)
+_z3_get_sort = rffi.llexternal("Z3_get_sort", [Z3_context, Z3_ast], Z3_sort, compilation_info=eci)
 _z3_mk_enumeration_sort = rffi.llexternal("Z3_mk_enumeration_sort", [Z3_context, Z3_symbol, rffi.UINT, Z3_symbolP, Z3_func_declP, Z3_func_declP], Z3_sort, compilation_info=eci)
+
+def z3_get_sort(ctx, ast):
+    print "AST:\n"
+    print ast
+    return _z3_get_sort(ctx, ast)
+	
 def z3_mk_enumeration_sort(ctx, name, names):
     size = len(names)
 
@@ -213,7 +220,7 @@ def z3_mk_enumeration_sort(ctx, name, names):
 
     for i in range(0, size):
         llnames[i] = z3_mk_string_symbol(ctx, str(i))#names[i].__id__)
-      
+    
     return z3_sort_to_ast(
 	    ctx, 
 		_z3_mk_enumeration_sort(
