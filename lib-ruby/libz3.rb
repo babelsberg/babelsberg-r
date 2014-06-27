@@ -81,8 +81,6 @@ class Z3
       return Z3::Instance.make_int_variable(value)
     when TrueClass, FalseClass
       Z3::Instance.make_bool_variable(value)
-	when Z3EnumerationSort
-	  return Z3::Instance.make_enum_variable(value.z3enum)
     when Numeric, nil
       return Z3::Instance.make_real_variable(value.to_f)
     end
@@ -124,39 +122,4 @@ class Array
   end
 end
 
-def domain(block) 
-
-end
-
-
-class Object
-  
-end
-
-class Array
-  def get_enum_sort()
-    @z3enum = @z3enum | Z3::Instance.make_enum_sort(*(self.to_a))
-    return @z3enum
-  end
-end
-	
-class Z3EnumerationSort
-  attr_accessor :z3enum
-  def constraint_solver
-    Z3::Instance
-  end
-  
-  def initialize(args)
-    @z3enum = Z3::Instance.make_enum_sort(args)
-  end
-  
-  def in(coll)
-    return self #@z3enum
-  end
-  
- # def for_constraint(name)
- #   return ConstraintVariable.new { @z3enum }
-    #@enum ||= @z3enum
- # end
-end
 puts "Z3 constraint solver loaded."

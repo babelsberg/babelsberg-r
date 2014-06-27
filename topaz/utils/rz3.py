@@ -220,19 +220,15 @@ def z3_mk_enumeration_sort(ctx, name, names):
 
     for i in range(0, size):
         llnames[i] = z3_mk_string_symbol(ctx, str(i))#names[i].__id__)
-    
-    return z3_sort_to_ast(
-	    ctx, 
-		_z3_mk_enumeration_sort(
+
+    return _z3_mk_enumeration_sort(
             ctx,
             name,
             size,
             llnames,
             consts,
-            testers
-        )
-	)
-
+            testers)
+    
 # Bool
 z3_mk_not = rffi.llexternal("Z3_mk_not", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
 

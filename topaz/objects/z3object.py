@@ -22,7 +22,7 @@ else:
 
 
 class W_Z3Object(W_Object):
-    _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved", "next_id"]
+    _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved", "next_id", "custom_sorts"]
     _immutable_fields_ = ["ctx", "solver"]
     classdef = ClassDef("Z3", W_Object.classdef)
 
@@ -37,6 +37,7 @@ class W_Z3Object(W_Object):
         self.ctx = ctx
         self.solver = solver
         self.enabled_constraints = []
+	self.custom_sorts = {}
         self.is_solved = False
         self.next_id = 0
 
@@ -284,22 +285,21 @@ class W_Z3Object(W_Object):
         strresult = rz3.z3_ast_to_string(self.ctx, interp_ast)
         return space.newfloat(self.parse_and_execute(strresult))
 	
-    @classdef.method("make_enum_sort")	
-    def make_enum_sort(self, space, args_w):
+    def make_enum_sort(self, space, w_domain):
 #        temp_names = []
 #        i = 0
 #        for item in args_w:
 #            temp_names.append(rz3.z3_mk_string_symbol(self.w_z3.ctx, str(i))) #item.__id__)))
 #            i += 1
-#            
-        a_name = rz3.z3_mk_string_symbol(self.ctx, "asdf")
-        return W_Z3Ptr(space, self, rz3.z3_mk_enumeration_sort(self.ctx, a_name, args_w))
-		
 
-    @classdef.method("make_enum_variable")
-    def make_enum_variable(self, space, w_value):
-        return self.make_variable(space, w_value, self.ctx, rz3.z3_get_sort(self.ctx, w_value.pointer))
-
+	### XXX: Leak
+	try:
+            return self.custom_sorts[w_domain] 
+	except KeyError:
+	    sym = rz3.z3_mk_int_symbol(self.ctx, self.next_id)
+            self.next_id += 1
+            self.custom_sorts[w_domain] = rz3.z3_mk_enumeration_sort(self.ctx, sym, space.listview(w_domain))
+            return self.custom_sorts[w_domain] 
 
 class W_Z3Ptr(W_ConstraintMarkerObject):
     _attrs_ = ["w_z3", "pointer", "w_value"]
@@ -476,5 +476,11 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         elif self.w_value:
             self.w_value = w_value
         return w_value
-		
-	
+
+    @classdef.method("in")
+    def method_in(self, space, w_domain):
+	import pdb; pdb.set_trace()
+        sort = self.w_z3.make_enum_sort(space, w_domain)
+        rz3.z3_ast_dec_ref(self.w_z3.ctx, self.pointer)
+        self.pointer = self.w_z3.make_variable(space, self.w_value, self.w_z3.ctx, sort)
+	return self

@@ -19,8 +19,9 @@ colours = [:Black, :Brown, :Blue, :White]
 #print "shoes:#{shoes}"
 #print "hat:#{hat}"
 #print "pants:#{pants}"
-shoes = Z3EnumerationSort.new([:Black, :Brown, :Blue, :White])
+#shoes = Z3EnumerationSort.new([:Black, :Brown, :Blue, :White])
 #print "#{(shoes.in colours).w_z3}"
 #shoes.extend(Z3EnumerationSortMeister)
+shoes = 1
 always {shoes.in colours}
 print "hallo"
