@@ -6,7 +6,6 @@ from rpython.rtyper.tool import rffi_platform
 from rpython.rtyper.lltypesystem import rffi, lltype
 from rpython.translator.tool.cbuild import ExternalCompilationInfo
 
-
 class Z3Error(Exception):
     pass
 
@@ -205,11 +204,6 @@ z3_sort_to_ast = rffi.llexternal("Z3_sort_to_ast", [Z3_context, Z3_sort], Z3_ast
 _z3_get_sort = rffi.llexternal("Z3_get_sort", [Z3_context, Z3_ast], Z3_sort, compilation_info=eci)
 _z3_mk_enumeration_sort = rffi.llexternal("Z3_mk_enumeration_sort", [Z3_context, Z3_symbol, rffi.UINT, Z3_symbolP, Z3_func_declP, Z3_func_declP], Z3_sort, compilation_info=eci)
 
-def z3_get_sort(ctx, ast):
-    print "AST:\n"
-    print ast
-    return _z3_get_sort(ctx, ast)
-	
 def z3_mk_enumeration_sort(ctx, name, names):
     size = len(names)
 
@@ -221,14 +215,18 @@ def z3_mk_enumeration_sort(ctx, name, names):
     for i in range(0, size):
         llnames[i] = z3_mk_string_symbol(ctx, str(i))#names[i].__id__)
 
-    return _z3_mk_enumeration_sort(
+    sort = _z3_mk_enumeration_sort(
             ctx,
             name,
             size,
             llnames,
             consts,
             testers)
-    
+
+    z3_ast_inc_ref(ctx, z3_sort_to_ast(ctx, sort))
+
+    return sort   
+
 # Bool
 z3_mk_not = rffi.llexternal("Z3_mk_not", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
 
@@ -316,6 +314,24 @@ z3_model_has_interp = rffi.llexternal(
     Z3_bool,
     compilation_info=eci
 )
+_z3_model_eval = rffi.llexternal(
+    "Z3_model_eval",
+    [Z3_context, Z3_model, Z3_ast, Z3_bool, Z3_astP],
+    Z3_bool,
+    compilation_info=eci
+)
+def z3_model_eval(ctx, model, ast, completion):
+    evaluated_ast = lltype.malloc(Z3_astP.TO, 1, flavor="raw")
+    z3_completion =  1 if completion else 0
+
+    _z3_model_eval(ctx, model, ast, z3_completion, evaluated_ast)
+    result_ast = rffi.cast(Z3_ast, evaluated_ast[0])
+    z3_ast_inc_ref(ctx, result_ast)
+    # add free
+    import pdb; pdb.set_trace
+
+    return result_ast
+
 
 # Solvers
 Z3_solver = rffi.COpaquePtr("Z3_solver")

@@ -6,7 +6,7 @@ from rpython.rlib.rarithmetic import intmask, r_uint
 from topaz.coerce import Coerce
 from topaz.module import ClassDef
 from topaz.objects.objectobject import W_RootObject, W_Object
-from topaz.objects.constraintobject import W_ConstraintMarkerObject
+from topaz.objects.constraintobject import W_ConstraintMarkerObject, W_ConstraintObject
 from topaz.utils import rz3
 from topaz.system import IS_64BIT
 
@@ -143,7 +143,8 @@ class W_Z3Object(W_Object):
         rz3.z3_solver_reset(self.ctx, self.solver)
         for constraint in self.enabled_constraints:
             assert isinstance(constraint, W_Z3Ptr)
-            rz3.z3_solver_assert(self.ctx, self.solver, constraint.pointer)
+            if(not constraint.is_enum_constraint):
+                rz3.z3_solver_assert(self.ctx, self.solver, constraint.pointer)
         solve_result = rz3.z3_solver_check(self.ctx, self.solver)
         if solve_result < 0:
             raise space.error(space.w_RuntimeError, "unsatisfiable constraint system")
@@ -163,10 +164,16 @@ class W_Z3Object(W_Object):
                 decl = w_ast.getdecl(self.ctx)
             except Z3Exception:
                 return space.w_nil
+
+            if(w_ast.is_enum_constraint):
+                interp_ast = rz3.z3_model_eval(self.ctx, model, w_ast.pointer, True)
+                return w_ast.get_value_from_ast(space, interp_ast)
+
             if rz3.z3_model_has_interp(self.ctx, model, decl) == 0:
                 return space.w_nil
             interp_ast = rz3.z3_model_get_const_interp(self.ctx, model, decl)
             kind = rz3.z3_get_ast_kind(self.ctx, interp_ast)
+
             if kind == 0: # Z3_NUMERAL_AST
                 try:
                     return space.newint(rz3.z3_get_numeral_int(self.ctx, interp_ast))
@@ -293,16 +300,17 @@ class W_Z3Object(W_Object):
 #            i += 1
 
 	### XXX: Leak
-	try:
+        try:
             return self.custom_sorts[w_domain] 
-	except KeyError:
-	    sym = rz3.z3_mk_int_symbol(self.ctx, self.next_id)
-            self.next_id += 1
-            self.custom_sorts[w_domain] = rz3.z3_mk_enumeration_sort(self.ctx, sym, space.listview(w_domain))
-            return self.custom_sorts[w_domain] 
+        except KeyError:
+	        sym = rz3.z3_mk_int_symbol(self.ctx, self.next_id)
+
+        self.next_id += 1
+        self.custom_sorts[w_domain] = rz3.z3_mk_enumeration_sort(self.ctx, sym, space.listview(w_domain))
+        return self.custom_sorts[w_domain] 
 
 class W_Z3Ptr(W_ConstraintMarkerObject):
-    _attrs_ = ["w_z3", "pointer", "w_value"]
+    _attrs_ = ["w_z3", "pointer", "w_value", "is_enum_constraint", "w_domain"]
     _immutable_fields_ = ["w_z3", "pointer"]
     classdef = ClassDef("Z3Pointer", W_ConstraintMarkerObject.classdef)
 
@@ -311,6 +319,7 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         self.w_z3 = w_z3
         self.pointer = pointer
         self.w_value = w_value
+        self.is_enum_constraint = False
         rz3.z3_ast_inc_ref(self.w_z3.ctx, self.pointer)
 
     def __del__(self):
@@ -479,8 +488,23 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
 
     @classdef.method("in")
     def method_in(self, space, w_domain):
-	import pdb; pdb.set_trace()
+        self.is_enum_constraint = True
+        self.w_domain = w_domain
         sort = self.w_z3.make_enum_sort(space, w_domain)
         rz3.z3_ast_dec_ref(self.w_z3.ctx, self.pointer)
-        self.pointer = self.w_z3.make_variable(space, self.w_value, self.w_z3.ctx, sort)
+        sym = rz3.z3_mk_int_symbol(self.w_z3.ctx, self.w_z3.next_id)
+        self.w_z3.next_id += 1
+        self.pointer =  rz3.z3_mk_const(self.w_z3.ctx, sym, sort)
+	     
+        w_constraint_object = W_ConstraintObject(space)
+        w_constraint_object.is_enum_constraint = True
+        w_constraint_object.add_constraint_variable(self)
+
+        return w_constraint_object
+
 	return self
+
+    def get_value_from_ast(self, space, interpreted_ast):
+        ast_str = rz3.z3_ast_to_string(self.w_z3.ctx, interpreted_ast)
+        index = int(ast_str[1:-1])
+        return space.send(self.w_domain, "at", [space.newint(index)])
