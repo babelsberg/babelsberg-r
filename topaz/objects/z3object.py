@@ -166,6 +166,7 @@ class W_Z3Object(W_Object):
             except Z3Exception:
                 return space.w_nil
 
+            assert isinstance(w_ast, W_Z3Ptr)
             if(w_ast.is_enum_variable):
                 interp_ast = rz3.z3_model_eval(self.ctx, model, w_ast.pointer, True)
                 return w_ast.get_value_from_ast(space, interp_ast)
@@ -551,7 +552,9 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
 
     def get_value_from_ast(self, space, interpreted_ast):
         ast_str = rz3.z3_ast_to_string(self.w_z3.ctx, interpreted_ast)
-        index = int(ast_str[1:-1])
+        end = len(ast_str)-1
+        assert end >= 2
+        index = int(ast_str[1:end])
         return space.send(self.w_domain, "at", [space.newint(index)])
 
 	return self

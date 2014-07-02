@@ -1,9 +1,6 @@
 require "libz3"
 
-shoes  = 0
-hat    = 0
-shirt  = 0
-pants  = 0
+shoes, hat, shirt, pants = [0]*4
 
 colours = [:Black, :Brown, :Blue, :White]
 always {shoes.in colours}
