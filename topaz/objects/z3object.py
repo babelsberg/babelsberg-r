@@ -540,6 +540,14 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         w_constraint_object.add_constraint_variable(self)
 
         return w_constraint_object
+		
+    @classdef.method("multior")
+    def method_multior(self, space, w_list):
+        t_list = space.listview(w_list)
+        r_list = []
+        for i in range(0, len(t_list)):
+            r_list.append(self.method_eq(space, t_list[i]))
+        return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_multior(self.w_z3.ctx, r_list))
 
     def get_value_from_ast(self, space, interpreted_ast):
         ast_str = rz3.z3_ast_to_string(self.w_z3.ctx, interpreted_ast)

@@ -12,13 +12,15 @@ always {pants.in colours}
 always {hat.in colours}
 #
 always {shoes == hat}
-#always {shoes != pants}
+always {shoes != pants}
 always {shoes != shirt}
-#always {shirt != pants}
+always {shirt != pants}
 #
 always { (shoes == :Brown) or (shoes == :Black) }
-always { (shirt == :Brown) or (shirt == :Blue) or (shirt == :White) }
+always { (shirt == :Blue) or (shirt == :White) or (shirt == :Brown) }
 always { hat == :Brown }
+#always { shoes.multior([:Brown, :Black])}
+#always { shirt.multior([:Brown, :Blue, :White])}
 #
 print "shirt:#{shirt}\n"
 print "shoes:#{shoes}\n"
