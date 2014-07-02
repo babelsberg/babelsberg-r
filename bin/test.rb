@@ -10,31 +10,21 @@ always {shoes.in colours}
 always {shirt.in colours}
 always {pants.in colours}
 always {hat.in colours}
-#
+
 always {shoes == hat}
 always {shoes != pants}
 always {shoes != shirt}
 always {shirt != pants}
-#
-always { (shoes == :Brown) or (shoes == :Black) }
-always { (shirt == :Blue) or (shirt == :White) or (shirt == :Brown) }
-always { hat == :Brown }
-#always { shoes.multior([:Brown, :Black])}
-#always { shirt.multior([:Brown, :Blue, :White])}
-#
-print "shirt:#{shirt}\n"
-print "shoes:#{shoes}\n"
-print "hat:#{hat}\n"
-print "pants:#{pants}\n"
-#shoes = Z3EnumerationSort.new([:Black, :Brown, :Blue, :White])
-#print "#{(shoes.in colours).w_z3}"
-#shoes.extend(Z3EnumerationSortMeister)
-#shoes = 42
-#hat = 20
-#always { shoes.in colours }
-#always { hat.in colours }
-#always { shoes != hat }
 
-#print "hallo\n"
-#print hat.to_s + "\n"
-#print shoes.to_s + "\n"
+# Alternative
+# always { (shoes == :Brown) or (shoes == :Black) }
+# always { (shirt == :Blue) or (shirt == :White) or (shirt == :Brown) }
+
+always { hat == :Brown }
+always { shoes.one_of [:Brown, :Black] }
+always { shirt.one_of [:White, :Blue, :Brown] }
+
+print "shirt:\t#{shirt}\n"
+print "shoes:\t#{shoes}\n"
+print "hat:\t#{hat}\n"
+print "pants:\t#{pants}\n"

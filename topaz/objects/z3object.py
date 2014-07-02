@@ -541,8 +541,8 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
 
         return w_constraint_object
 		
-    @classdef.method("multior")
-    def method_multior(self, space, w_list):
+    @classdef.method("one_of")
+    def method_one_of(self, space, w_list):
         t_list = space.listview(w_list)
         r_list = []
         for i in range(0, len(t_list)):
