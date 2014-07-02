@@ -1,9 +1,9 @@
 require "libz3"
 
-shoes = 0
-hat  = 0
+shoes  = 0
+hat    = 0
 shirt  = 0
-pants = 0
+pants  = 0
 
 colours = [:Black, :Brown, :Blue, :White]
 always {shoes.in colours}
@@ -12,13 +12,13 @@ always {pants.in colours}
 always {hat.in colours}
 #
 always {shoes == hat}
-always {shoes != pants}
+#always {shoes != pants}
 always {shoes != shirt}
-always {shirt != pants}
+#always {shirt != pants}
 #
-#always { (shoes == :Brown) || (shoes == :Black) }
-#always { (shirt == :Brown) || (shirt == :Blue) || (shirt == :White) }
-#always { hat == :Brown }
+always { (shoes == :Brown) or (shoes == :Black) }
+always { (shirt == :Brown) or (shirt == :Blue) or (shirt == :White) }
+always { hat == :Brown }
 #
 print "shirt:#{shirt}\n"
 print "shoes:#{shoes}\n"

@@ -173,6 +173,10 @@ z3_get_algebraic_number_upper = rffi.llexternal("Z3_get_algebraic_number_upper",
 z3_get_ast_kind = rffi.llexternal("Z3_get_ast_kind", [Z3_context, Z3_ast], rffi.INT, compilation_info=eci)
 z3_get_app_decl = rffi.llexternal("Z3_get_app_decl", [Z3_context, Z3_ast], Z3_func_decl, compilation_info=eci)
 z3_func_decl_to_ast = rffi.llexternal("Z3_func_decl_to_ast", [Z3_context, Z3_func_decl], Z3_ast, compilation_info=eci)
+z3_mk_app = rffi.llexternal("Z3_mk_app", [Z3_context, Z3_func_decl, rffi.UINT, Z3_astP], Z3_ast, compilation_info=eci)
+
+def z3_func_declp_to_ast(ctx, func_decl_p):
+    return z3_func_decl_to_ast(ctx, rffi.cast(Z3_func_decl, func_decl_p))
 
 # Symbols
 Z3_symbol = rffi.COpaquePtr("Z3_symbol")
@@ -223,9 +227,16 @@ def z3_mk_enumeration_sort(ctx, name, names):
             consts,
             testers)
 
+    # Free the buffers!
+    result_consts = []
+    for i in range(0, size):
+        tmp_const = z3_mk_app(ctx, rffi.cast(Z3_func_decl, consts[i]), 0, rffi.cast(Z3_astP, 0))
+        z3_ast_inc_ref(ctx, tmp_const)
+        result_consts.append(tmp_const)
+
     z3_ast_inc_ref(ctx, z3_sort_to_ast(ctx, sort))
 
-    return sort   
+    return (sort, result_consts)
 
 # Bool
 z3_mk_not = rffi.llexternal("Z3_mk_not", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
@@ -327,8 +338,6 @@ def z3_model_eval(ctx, model, ast, completion):
     _z3_model_eval(ctx, model, ast, z3_completion, evaluated_ast)
     result_ast = rffi.cast(Z3_ast, evaluated_ast[0])
     z3_ast_inc_ref(ctx, result_ast)
-    # add free
-    import pdb; pdb.set_trace
 
     return result_ast
 

@@ -22,7 +22,7 @@ else:
 
 
 class W_Z3Object(W_Object):
-    _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved", "next_id", "custom_sorts"]
+    _attrs_ = ["ctx", "solver", "enabled_constraints", "is_solved", "next_id", "custom_sorts", "custom_sorts_consts"]
     _immutable_fields_ = ["ctx", "solver"]
     classdef = ClassDef("Z3", W_Object.classdef)
 
@@ -37,7 +37,8 @@ class W_Z3Object(W_Object):
         self.ctx = ctx
         self.solver = solver
         self.enabled_constraints = []
-	self.custom_sorts = {}
+        self.custom_sorts = {}
+        self.custom_sorts_consts = {}
         self.is_solved = False
         self.next_id = 0
 
@@ -143,7 +144,7 @@ class W_Z3Object(W_Object):
         rz3.z3_solver_reset(self.ctx, self.solver)
         for constraint in self.enabled_constraints:
             assert isinstance(constraint, W_Z3Ptr)
-            if(not constraint.is_enum_constraint):
+            if(not constraint.is_enum_variable):
                 rz3.z3_solver_assert(self.ctx, self.solver, constraint.pointer)
         solve_result = rz3.z3_solver_check(self.ctx, self.solver)
         if solve_result < 0:
@@ -165,7 +166,7 @@ class W_Z3Object(W_Object):
             except Z3Exception:
                 return space.w_nil
 
-            if(w_ast.is_enum_constraint):
+            if(w_ast.is_enum_variable):
                 interp_ast = rz3.z3_model_eval(self.ctx, model, w_ast.pointer, True)
                 return w_ast.get_value_from_ast(space, interp_ast)
 
@@ -306,11 +307,13 @@ class W_Z3Object(W_Object):
 	        sym = rz3.z3_mk_int_symbol(self.ctx, self.next_id)
 
         self.next_id += 1
-        self.custom_sorts[w_domain] = rz3.z3_mk_enumeration_sort(self.ctx, sym, space.listview(w_domain))
+        sort_tuple = rz3.z3_mk_enumeration_sort(self.ctx, sym, space.listview(w_domain))
+        self.custom_sorts[w_domain] = sort_tuple[0]
+        self.custom_sorts_consts[w_domain] = sort_tuple[1]
         return self.custom_sorts[w_domain] 
 
 class W_Z3Ptr(W_ConstraintMarkerObject):
-    _attrs_ = ["w_z3", "pointer", "w_value", "is_enum_constraint", "w_domain"]
+    _attrs_ = ["w_z3", "pointer", "w_value", "is_enum_variable", "w_domain"]
     _immutable_fields_ = ["w_z3", "pointer"]
     classdef = ClassDef("Z3Pointer", W_ConstraintMarkerObject.classdef)
 
@@ -319,7 +322,7 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         self.w_z3 = w_z3
         self.pointer = pointer
         self.w_value = w_value
-        self.is_enum_constraint = False
+        self.is_enum_variable = False
         rz3.z3_ast_inc_ref(self.w_z3.ctx, self.pointer)
 
     def __del__(self):
@@ -360,18 +363,21 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
             return w_other.pointer
 
     def new_binop(classdef, name, func):
+
         @classdef.method(name)
         def method(self, space, w_other):
             other = self.coerce_constant_arg(space, w_other)
             ast = func(self.w_z3.ctx, self.pointer, other)
             return W_Z3Ptr(space, self.w_z3, ast)
+
         method.__name__ = "method_%s" % func.__name__
         return method
+
+    gen_method_eq = new_binop(classdef, "==", rz3.z3_mk_eq)
+    gen_method_ne = new_binop(classdef, "!=", rz3.z3_mk_ne)
     method_lt = new_binop(classdef, "<", rz3.z3_mk_lt)
     method_gt = new_binop(classdef, ">", rz3.z3_mk_gt)
     method_pow = new_binop(classdef, "**", rz3.z3_mk_power)
-    method_eq = new_binop(classdef, "==", rz3.z3_mk_eq)
-    method_eq = new_binop(classdef, "!=", rz3.z3_mk_ne)
     method_ge = new_binop(classdef, ">=", rz3.z3_mk_ge)
     method_le = new_binop(classdef, "<=", rz3.z3_mk_le)
     method_add = new_binop(classdef, "+", rz3.z3_mk_add)
@@ -382,6 +388,37 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
     method_rem = new_binop(classdef, "remainder", rz3.z3_mk_rem)
     method_or = new_binop(classdef, "or", rz3.z3_mk_or)
     # method_and = new_binop(classdef, "and", rz3.z3_mk_and)
+
+    def is_enum_variable_with_constant(self, w_one_arg, w_second_arg):
+        if(isinstance(w_one_arg, W_Z3Ptr) and isinstance(w_second_arg, W_Z3Ptr)):
+             return False 
+        if(w_one_arg.is_enum_variable):
+             return True
+        return False
+
+    def get_const_for_domain_value(self, space, w_other):
+        index = space.int_w(space.send(self.w_domain, "index", [w_other]))
+        return self.w_z3.custom_sorts_consts[self.w_domain][index]
+
+    @classdef.method("!=")
+    def method_ne(self, space, w_other):
+        if(self.is_enum_variable_with_constant(self, w_other)):
+            # Determine ast for const of value
+            value_ast = self.get_const_for_domain_value(space, w_other)
+
+            return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_ne(self.w_z3.ctx, self.pointer, value_ast))
+        else:
+            return self.gen_method_ne(space, w_other)
+
+    @classdef.method("==")
+    def method_eq(self, space, w_other):
+        if(self.is_enum_variable_with_constant(self, w_other)):
+            # Determine ast for const of value
+            value_ast = self.get_const_for_domain_value(space, w_other)
+
+            return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_eq(self.w_z3.ctx, self.pointer, value_ast))
+        else:
+            return self.gen_method_eq(space, w_other)
 
     def new_trigop(classdef, name):
         @classdef.method(name)
@@ -488,23 +525,26 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
 
     @classdef.method("in")
     def method_in(self, space, w_domain):
-        self.is_enum_constraint = True
+        self.is_enum_variable = True
         self.w_domain = w_domain
+
         sort = self.w_z3.make_enum_sort(space, w_domain)
         rz3.z3_ast_dec_ref(self.w_z3.ctx, self.pointer)
+
         sym = rz3.z3_mk_int_symbol(self.w_z3.ctx, self.w_z3.next_id)
         self.w_z3.next_id += 1
         self.pointer =  rz3.z3_mk_const(self.w_z3.ctx, sym, sort)
 	     
         w_constraint_object = W_ConstraintObject(space)
-        w_constraint_object.is_enum_constraint = True
+        w_constraint_object.is_enum_variable = True
         w_constraint_object.add_constraint_variable(self)
 
         return w_constraint_object
-
-	return self
 
     def get_value_from_ast(self, space, interpreted_ast):
         ast_str = rz3.z3_ast_to_string(self.w_z3.ctx, interpreted_ast)
         index = int(ast_str[1:-1])
         return space.send(self.w_domain, "at", [space.newint(index)])
+
+	return self
+
