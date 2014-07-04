@@ -346,7 +346,7 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
     method_gt = new_binop(classdef, ">", rz3.z3_mk_gt)
     method_pow = new_binop(classdef, "**", rz3.z3_mk_power)
     method_eq = new_binop(classdef, "==", rz3.z3_mk_eq)
-    method_eq = new_binop(classdef, "!=", rz3.z3_mk_ne)
+    method_neq = new_binop(classdef, "!=", rz3.z3_mk_ne)
     method_ge = new_binop(classdef, ">=", rz3.z3_mk_ge)
     method_le = new_binop(classdef, "<=", rz3.z3_mk_le)
     method_add = new_binop(classdef, "+", rz3.z3_mk_add)
@@ -355,6 +355,7 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
     method_mul = new_binop(classdef, "*", rz3.z3_mk_mul)
     method_mod = new_binop(classdef, "%", rz3.z3_mk_mod)
     method_rem = new_binop(classdef, "remainder", rz3.z3_mk_rem)
+
     method_or = new_binop(classdef, "or", rz3.z3_mk_or)
     # method_and = new_binop(classdef, "and", rz3.z3_mk_and)
 
