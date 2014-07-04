@@ -8,6 +8,10 @@ from topaz.objects.moduleobject import W_ModuleObject
 
 
 class ConstraintInterpreter(Interpreter):
+    def __init__(self):
+        Interpreter.__init__(self)
+        self.junction_stack = [] # stack for keeping lhs's or "or" and "and" bytecodes
+
     def LOAD_SELF(self, space, bytecode, frame, pc):
         w_self = w_res = frame.w_self
         jit.promote(space.getclass(w_self))
@@ -61,18 +65,38 @@ class ConstraintInterpreter(Interpreter):
     def JUMP_AND(self, space, bytecode, frame, pc, target_pc):
         w_lhs = frame.peek()
         if space.is_kind_of(w_lhs, space.w_constraintobject):
-            space.send(w_lhs, "and", [frame.pop()])
+            self.junction_stack.append(frame.pop())
             return pc
         else:
+            self.junction_stack.append(None)
             return Interpreter.JUMP_AND(self, space, bytecode, frame, pc, target_pc)
+
+    def JUMP_AND_END(self, space, bytecode, frame, pc):
+        w_lhs = self.junction_stack.pop()
+        if w_lhs:
+            w_rhs = frame.pop()
+            frame.push(space.send(w_lhs, "and", [w_rhs]))
+        # else leaves w_lhs on stack, as should be for &&
+        return pc
 
     def JUMP_OR(self, space, bytecode, frame, pc, target_pc):
         w_lhs = frame.peek()
         if space.is_kind_of(w_lhs, space.w_constraintobject):
-            space.send(w_lhs, "or", [frame.pop()])
+            self.junction_stack.append(frame.pop())
             return pc
         else:
+            self.junction_stack.append(None)
             return Interpreter.JUMP_OR(self, space, bytecode, frame, pc, target_pc)
+
+    def JUMP_OR_END(self, space, bytecode, frame, pc):
+        w_lhs = self.junction_stack.pop()
+        w_rhs = frame.pop()
+        if w_lhs:
+            frame.push(space.send(w_lhs, "or", [w_rhs]))
+        else:
+            frame.push(w_lhs) # mimic short-circuit semantics, leaving
+                              # first argument to OR on stack
+        return pc
 
     def IS_Q(self, space, bytecode, frame, pc):
         c_rhs = frame.pop()

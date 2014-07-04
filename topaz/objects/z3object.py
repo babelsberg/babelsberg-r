@@ -142,6 +142,7 @@ class W_Z3Object(W_Object):
         rz3.z3_solver_reset(self.ctx, self.solver)
         for constraint in self.enabled_constraints:
             assert isinstance(constraint, W_Z3Ptr)
+            # print rz3.z3_ast_to_string(self.ctx, constraint.pointer)
             rz3.z3_solver_assert(self.ctx, self.solver, constraint.pointer)
         solve_result = rz3.z3_solver_check(self.ctx, self.solver)
         if solve_result < 0:
@@ -355,9 +356,8 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
     method_mul = new_binop(classdef, "*", rz3.z3_mk_mul)
     method_mod = new_binop(classdef, "%", rz3.z3_mk_mod)
     method_rem = new_binop(classdef, "remainder", rz3.z3_mk_rem)
-
     method_or = new_binop(classdef, "or", rz3.z3_mk_or)
-    # method_and = new_binop(classdef, "and", rz3.z3_mk_and)
+    method_and = new_binop(classdef, "and", rz3.z3_mk_and)
 
     def new_trigop(classdef, name):
         @classdef.method(name)
