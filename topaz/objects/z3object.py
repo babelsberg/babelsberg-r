@@ -303,8 +303,11 @@ class W_Z3Object(W_Object):
             self.next_id += 1
     
             w_domain_unique = space.send(w_domain, "uniq", [])
-            domain_unique_ids = map(lambda x: space.int_w(space.send(x, "object_id", [])), space.listview(w_domain_unique))
-
+            domain_u_list = space.listview(w_domain_unique)
+            domain_unique_ids = []
+            for i in range(0, len(domain_u_list)):
+                domain_unique_ids.append(space.int_w(space.send(domain_u_list[i], "object_id", [])))
+            
             sort_tuple = rz3.z3_mk_enumeration_sort(self.ctx, sym, domain_unique_ids)
 
             self.custom_sorts_consts[w_domain] = {}
