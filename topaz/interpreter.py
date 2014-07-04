@@ -678,6 +678,7 @@ class Interpreter(object):
             return self.jump(space, bytecode, frame, pc, target_pc)
 
     JUMP_AND = JUMP_IF_FALSE
+    JUMP_OR = JUMP_IF_TRUE
 
     def DISCARD_TOP(self, space, bytecode, frame, pc):
         frame.pop()

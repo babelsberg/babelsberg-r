@@ -49,6 +49,20 @@ class W_ConstraintMarkerObject(W_Object):
                 [space.newstr_fromstr("and"), w_rhs]
             )
 
+    @classdef.method("or")
+    def method_or(self, space, w_rhs):
+        w_constraint = space.current_constraint()
+        if w_constraint:
+            w_constraint.add_constraint_object(self)
+            return self
+        else:
+            return space.send(
+                self,
+                "method_missing",
+                [space.newstr_fromstr("or"), w_rhs]
+            )
+
+
 class W_ConstraintObject(W_ConstraintMarkerObject):
     _attrs_ = ["w_strength", "block", "enabled",
                "constraint_objects_w", "constraint_variables_w",

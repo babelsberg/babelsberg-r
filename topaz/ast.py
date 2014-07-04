@@ -640,7 +640,7 @@ class Or(Node):
 
         self.lhs.compile(ctx)
         ctx.emit(consts.DUP_TOP)
-        ctx.emit_jump(consts.JUMP_IF_TRUE, end)
+        ctx.emit_jump(consts.JUMP_OR, end)
         ctx.use_next_block(otherwise)
         ctx.emit(consts.DISCARD_TOP)
         self.rhs.compile(ctx)
