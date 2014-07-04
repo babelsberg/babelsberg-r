@@ -217,7 +217,7 @@ def z3_mk_enumeration_sort(ctx, name, names):
     llnames = lltype.malloc(Z3_symbolP.TO, size, flavor="raw")
 
     for i in range(0, size):
-        llnames[i] = z3_mk_string_symbol(ctx, str(i))#names[i].__id__)
+        llnames[i] = z3_mk_string_symbol(ctx, str(names[i]))
 
     sort = _z3_mk_enumeration_sort(
             ctx,

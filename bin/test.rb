@@ -2,7 +2,7 @@ require "libz3"
 
 shoes, hat, shirt, pants = [0]*4
 
-colours = [:Black, :Brown, :Blue, :White]
+colours = [:Blue, :Black, :Brown, :White]
 always {shoes.in colours}
 always {shirt.in colours}
 always {pants.in colours}
@@ -15,7 +15,7 @@ always {shirt != pants}
 
 # Alternative
 # always { (shoes == :Brown) or (shoes == :Black) }
-# always { (shirt == :Blue) or (shirt == :White) or (shirt == :Brown) }
+# always { ((shirt == :Brown) or (shirt == :Blue)) or (shirt == :White) }
 
 always { hat == :Brown }
 always { shoes.one_of [:Brown, :Black] }

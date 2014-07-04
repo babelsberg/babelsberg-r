@@ -295,11 +295,6 @@ class W_Z3Object(W_Object):
         return space.newfloat(self.parse_and_execute(strresult))
 	
     def make_enum_sort(self, space, w_domain):
-#        temp_names = []
-#        i = 0
-#        for item in args_w:
-#            temp_names.append(rz3.z3_mk_string_symbol(self.w_z3.ctx, str(i))) #item.__id__)))
-#            i += 1
 
 	### XXX: Leak
         try:
@@ -307,11 +302,19 @@ class W_Z3Object(W_Object):
         except KeyError:
 	        sym = rz3.z3_mk_int_symbol(self.ctx, self.next_id)
 
-        self.next_id += 1
-        sort_tuple = rz3.z3_mk_enumeration_sort(self.ctx, sym, space.listview(w_domain))
-        self.custom_sorts[w_domain] = sort_tuple[0]
-        self.custom_sorts_consts[w_domain] = sort_tuple[1]
-        return self.custom_sorts[w_domain] 
+            self.next_id += 1
+        
+            w_domain_unique = space.send(w_domain, "uniq", [])
+            domain_unique_ids = map(lambda x: space.int_w(space.send(x, "object_id", [])), space.listview(w_domain_unique))
+
+            sort_tuple = rz3.z3_mk_enumeration_sort(self.ctx, sym, domain_unique_ids)
+
+            self.custom_sorts_consts[w_domain] = {}
+            for i in range(0, len(sort_tuple[1])):
+                self.custom_sorts_consts[w_domain][space.send(w_domain_unique, "at", [space.newint(i)])] = sort_tuple[1][i]
+
+            self.custom_sorts[w_domain] = sort_tuple[0]
+            return self.custom_sorts[w_domain] 
 
 class W_Z3Ptr(W_ConstraintMarkerObject):
     _attrs_ = ["w_z3", "pointer", "w_value", "is_enum_variable", "w_domain"]
@@ -399,8 +402,7 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         return False
 
     def get_const_for_domain_value(self, space, w_other):
-        index = space.int_w(space.send(self.w_domain, "index", [w_other]))
-        return self.w_z3.custom_sorts_consts[self.w_domain][index]
+        return self.w_z3.custom_sorts_consts[self.w_domain][w_other]
 
     @classdef.method("!=")
     def method_ne(self, space, w_other):
@@ -410,7 +412,7 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
 
             return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_ne(self.w_z3.ctx, self.pointer, value_ast))
         else:
-            return self.gen_method_ne(space, w_other)
+            return self.gen_method_neq(space, w_other)
 
     @classdef.method("==")
     def method_eq(self, space, w_other):
@@ -536,7 +538,7 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         sym = rz3.z3_mk_int_symbol(self.w_z3.ctx, self.w_z3.next_id)
         self.w_z3.next_id += 1
         self.pointer =  rz3.z3_mk_const(self.w_z3.ctx, sym, sort)
-	     
+
         w_constraint_object = W_ConstraintObject(space)
         w_constraint_object.is_enum_variable = True
         w_constraint_object.add_constraint_variable(self)
@@ -556,7 +558,11 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         end = len(ast_str)-1
         assert end >= 2
         index = int(ast_str[1:end])
-        return space.send(self.w_domain, "at", [space.newint(index)])
+        
+        # TODO: make better
+        for w_obj in space.listview(self.w_domain):
+            if space.int_w(space.send(w_obj, "object_id", [])) == index:
+                return w_obj
 
 	return self
 
