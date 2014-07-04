@@ -66,6 +66,14 @@ class ConstraintInterpreter(Interpreter):
         else:
             return Interpreter.JUMP_AND(self, space, bytecode, frame, pc, target_pc)
 
+    def JUMP_OR(self, space, bytecode, frame, pc, target_pc):
+        w_lhs = frame.peek()
+        if space.is_kind_of(w_lhs, space.w_constraintobject):
+            space.send(w_lhs, "or", [frame.pop()])
+            return pc
+        else:
+            return Interpreter.JUMP_OR(self, space, bytecode, frame, pc, target_pc)
+
     def IS_Q(self, space, bytecode, frame, pc):
         c_rhs = frame.pop()
         w_rhs = frame.pop()
