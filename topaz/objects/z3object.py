@@ -295,15 +295,13 @@ class W_Z3Object(W_Object):
         return space.newfloat(self.parse_and_execute(strresult))
 	
     def make_enum_sort(self, space, w_domain):
-
-	### XXX: Leak
+	    ### XXX: Leak
         try:
             return self.custom_sorts[w_domain] 
         except KeyError:
-	        sym = rz3.z3_mk_int_symbol(self.ctx, self.next_id)
-
+            sym = rz3.z3_mk_int_symbol(self.ctx, self.next_id)
             self.next_id += 1
-        
+    
             w_domain_unique = space.send(w_domain, "uniq", [])
             domain_unique_ids = map(lambda x: space.int_w(space.send(x, "object_id", [])), space.listview(w_domain_unique))
 
