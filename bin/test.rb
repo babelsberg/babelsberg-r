@@ -18,8 +18,8 @@ always {shirt != pants}
 # always { ((shirt == :Brown) or (shirt == :Blue)) or (shirt == :White) }
 
 always { hat == :Brown }
-always { shoes.one_of [:Brown, :Black] }
-always { shirt.one_of [:White, :Blue, :Brown] }
+always { shoes.one_of :Brown, :Black }
+always { shirt.one_of :White, :Blue, :Brown }
 
 print "shirt:\t#{shirt}\n"
 print "shoes:\t#{shoes}\n"

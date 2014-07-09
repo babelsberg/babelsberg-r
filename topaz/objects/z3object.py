@@ -146,8 +146,6 @@ class W_Z3Object(W_Object):
             assert isinstance(constraint, W_Z3Ptr)
             if(not constraint.is_enum_variable):
                 rz3.z3_solver_assert(self.ctx, self.solver, constraint.pointer)
-            rz3.z3_solver_assert(self.ctx, self.solver, constraint.pointer)
-
         solve_result = rz3.z3_solver_check(self.ctx, self.solver)
         if solve_result < 0:
             raise space.error(space.w_RuntimeError, "unsatisfiable constraint system")
@@ -393,8 +391,9 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
     method_mul = new_binop(classdef, "*", rz3.z3_mk_mul)
     method_mod = new_binop(classdef, "%", rz3.z3_mk_mod)
     method_rem = new_binop(classdef, "remainder", rz3.z3_mk_rem)
+
     method_or = new_binop(classdef, "or", rz3.z3_mk_or)
-    method_and = new_binop(classdef, "and", rz3.z3_mk_and)
+    # method_and = new_binop(classdef, "and", rz3.z3_mk_and)
 
     def is_enum_variable_with_constant(self, w_one_arg, w_second_arg):
         if(isinstance(w_one_arg, W_Z3Ptr) and isinstance(w_second_arg, W_Z3Ptr)):
@@ -548,12 +547,9 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         return w_constraint_object
 		
     @classdef.method("one_of")
-    def method_one_of(self, space, w_list):
-        t_list = space.listview(w_list)
-        r_list = []
-        for i in range(0, len(t_list)):
-            r_list.append(self.method_eq(space, t_list[i]))
-        return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_multior(self.w_z3.ctx, r_list))
+    def method_one_of(self, space, args_w):
+        z3PtrList = map(lambda x: self.method_eq(space, x), args_w)
+        return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_multior(self.w_z3.ctx, z3PtrList))
 
     def get_value_from_ast(self, space, interpreted_ast):
         ast_str = rz3.z3_ast_to_string(self.w_z3.ctx, interpreted_ast)
