@@ -83,9 +83,7 @@ BYTECODES = [
     ("JUMP_IF_TRUE", 1, -1),
     ("JUMP_IF_FALSE", 1, -1),
     ("JUMP_AND", 1, -1),
-    ("JUMP_AND_END", 0, 0),
     ("JUMP_OR", 1, -1),
-    ("JUMP_OR_END", 0, 0),
 
     ("DISCARD_TOP", 0, -1),
     ("DUP_TOP", 0, +1),
