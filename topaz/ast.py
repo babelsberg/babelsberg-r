@@ -644,6 +644,7 @@ class Or(Node):
         ctx.use_next_block(otherwise)
         ctx.emit(consts.DISCARD_TOP)
         self.rhs.compile(ctx)
+        ctx.emit(consts.JUMP_OR_END)
         ctx.use_next_block(end)
 
     def compile_defined(self, ctx):
@@ -665,6 +666,7 @@ class And(Node):
         ctx.use_next_block(otherwise)
         ctx.emit(consts.DISCARD_TOP)
         self.rhs.compile(ctx)
+        ctx.emit(consts.JUMP_AND_END)
         ctx.use_next_block(end)
 
     def compile_defined(self, ctx):

@@ -679,6 +679,8 @@ class Interpreter(object):
 
     JUMP_AND = JUMP_IF_FALSE
     JUMP_OR = JUMP_IF_TRUE
+    def JUMP_AND_END(self, space, bytecode, frame, pc): pass
+    def JUMP_OR_END(self, space, bytecode, frame, pc): pass
 
     def DISCARD_TOP(self, space, bytecode, frame, pc):
         frame.pop()

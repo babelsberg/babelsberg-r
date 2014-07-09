@@ -1467,11 +1467,12 @@ class TestCompiler(object):
         LOAD_CONST 1
         SEND 2 1
         DUP_TOP
-        JUMP_OR 27
+        JUMP_OR 28
         DISCARD_TOP
         LOAD_CONST 3
         LOAD_CONST 4
         SEND 5 1
+        JUMP_OR_END
 
         RETURN
         """)
@@ -1482,11 +1483,12 @@ class TestCompiler(object):
         LOAD_CONST 1
         SEND 2 1
         DUP_TOP
-        JUMP_AND 27
+        JUMP_AND 28
         DISCARD_TOP
         LOAD_CONST 3
         LOAD_CONST 4
         SEND 5 1
+        JUMP_AND_END
 
         RETURN
         """)
