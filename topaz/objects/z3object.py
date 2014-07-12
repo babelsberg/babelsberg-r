@@ -9,6 +9,7 @@ from topaz.objects.objectobject import W_RootObject, W_Object
 from topaz.objects.constraintobject import W_ConstraintMarkerObject, W_ConstraintObject
 from topaz.utils import rz3
 from topaz.system import IS_64BIT
+from topaz.objects.intobject import W_FixnumObject
 
 
 class Z3Exception(Exception):
@@ -533,21 +534,35 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
 
     @classdef.method("in")
     def method_in(self, space, w_domain):
-        self.is_enum_variable = True
-        self.w_domain = w_domain
+        arr_domain = space.listview(w_domain)
+        allInt = True
+        for i in range(0,len(arr_domain)):
+            if not isinstance(arr_domain[i], W_FixnumObject):
+                allInt = False
+                
+        if allInt:
+            z3PtrList = []
+            
+            for i in range(0, len(arr_domain)):
+                z3PtrList.append(self.method_eq(space, arr_domain[i]))
+                
+            return W_Z3Ptr(space, self.w_z3,rz3.z3_mk_multior(self.w_z3.ctx, z3PtrList))
+        else: 
+            self.is_enum_variable = True
+            self.w_domain = w_domain
 
-        sort = self.w_z3.make_enum_sort(space, w_domain)
-        rz3.z3_ast_dec_ref(self.w_z3.ctx, self.pointer)
+            sort = self.w_z3.make_enum_sort(space, w_domain)
+            rz3.z3_ast_dec_ref(self.w_z3.ctx, self.pointer)
 
-        sym = rz3.z3_mk_int_symbol(self.w_z3.ctx, self.w_z3.next_id)
-        self.w_z3.next_id += 1
-        self.pointer =  rz3.z3_mk_const(self.w_z3.ctx, sym, sort)
+            sym = rz3.z3_mk_int_symbol(self.w_z3.ctx, self.w_z3.next_id)
+            self.w_z3.next_id += 1
+            self.pointer =  rz3.z3_mk_const(self.w_z3.ctx, sym, sort)
 
-        w_constraint_object = W_ConstraintObject(space)
-        w_constraint_object.is_enum_variable = True
-        w_constraint_object.add_constraint_variable(self)
+            w_constraint_object = W_ConstraintObject(space)
+            w_constraint_object.is_enum_variable = True
+            w_constraint_object.add_constraint_variable(self)
 
-        return w_constraint_object
+            return w_constraint_object
 		
     @classdef.method("one_of")
     def method_one_of(self, space, args_w):
