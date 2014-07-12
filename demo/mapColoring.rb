@@ -1,5 +1,11 @@
 require "libz3"
-require "./bin/polygon.rb"
+require "./demo/polygon.rb"
+
+class Symbol
+  def constraint_solver
+    Z3::Instance
+  end
+end
 
 class Polygon
     @@colors = [:blue, :green, :yellow, :red]
@@ -12,19 +18,17 @@ class Polygon
 
 end
 
-
 polygons = createMap()
-polygons.each do |onePolygon|
+    polygons.each do |onePolygon|
     polygons.each do |anotherPolygon|
         if(onePolygon != anotherPolygon && onePolygon.neighbourOf?(anotherPolygon) )
             always { onePolygon.color != anotherPolygon.color }
         end
     end
-end
-
-svg = render(polygons)
-
-f = File.open("./resultMap.svg", "w")
-f.write(svg)
-f.close()
-
+    svg = render(polygons)
+    f = File.open("./demo/resultMap.svg", "w")
+    f.write(svg)
+    f.close()
+    sleep(1)
+    puts "Round"
+    end

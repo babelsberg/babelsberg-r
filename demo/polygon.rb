@@ -1,4 +1,3 @@
-
     class Polygon
         @@colors = [:blue, :green, :yellow, :red]
 
@@ -238,8 +237,7 @@
                     :yellow => "ffec00", :blue => "#009ee0" }
 
 
-    @completeMap = %Q{<?xml version="1.0" encoding="UTF-8" standalone="no"?>
-<!-- Created with Inkscape (http://www.inkscape.org/) -->
+    @completeMap = %Q{
 <svg
    xmlns:svg="http://www.w3.org/2000/svg"
    xmlns="http://www.w3.org/2000/svg"
@@ -460,4 +458,3 @@
    style="fill:none;stroke:#000000;stroke-width:5.21361017;stroke-linecap:round"
    id="rect2525" /></svg>
     }
-
