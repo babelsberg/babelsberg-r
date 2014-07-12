@@ -1,4 +1,5 @@
 require "libz3"
+require "./bin/polygon.rb"
 
 class Edge
 
