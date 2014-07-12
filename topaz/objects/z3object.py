@@ -307,7 +307,9 @@ class W_Z3Object(W_Object):
             domain_u_list = space.listview(w_domain_unique)
             domain_unique_ids = []
             for i in range(0, len(domain_u_list)):
-                domain_unique_ids.append(space.int_w(space.send(domain_u_list[i], "object_id", [])))
+                oid = space.int_w(space.send(domain_u_list[i], "object_id", []))
+                domain_unique_ids.append(oid)
+
             
             sort_tuple = rz3.z3_mk_enumeration_sort(self.ctx, sym, domain_unique_ids)
 
@@ -575,14 +577,16 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         ast_str = rz3.z3_ast_to_string(self.w_z3.ctx, interpreted_ast)
         end = len(ast_str)-1
         assert end >= 2
-        index = int(ast_str[1:end])
-        
+        if(ast_str[0] == "|"):
+            # |index|
+            index = int(ast_str[1:end])
+        else:
+            # index
+            index = int(ast_str)
+
         # TODO: make better
         for w_obj in space.listview(self.w_domain):
             if space.int_w(space.send(w_obj, "object_id", [])) == index:
                 return w_obj
 
         raise space.error(space.w_RuntimeError, "Solution to constraint is not in the domain for this variable")
-
-	return self
-
