@@ -404,7 +404,10 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         return False
 
     def get_const_for_domain_value(self, space, w_other):
-        return self.w_z3.custom_sorts_consts[self.w_domain][w_other]
+        try:
+            return self.w_z3.custom_sorts_consts[self.w_domain][w_other]
+        except KeyError:
+            raise space.error(space.w_RuntimeError, "Unsatisfiable constraint system: Used element which is not part of domain")
 
     @classdef.method("!=")
     def method_ne(self, space, w_other):
@@ -578,6 +581,8 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         for w_obj in space.listview(self.w_domain):
             if space.int_w(space.send(w_obj, "object_id", [])) == index:
                 return w_obj
+
+        raise space.error(space.w_RuntimeError, "Solution to constraint is not in the domain for this variable")
 
 	return self
 
