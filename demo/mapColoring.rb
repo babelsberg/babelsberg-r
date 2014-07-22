@@ -19,16 +19,16 @@ class Polygon
 end
 
 polygons = createMap()
-    polygons.each do |onePolygon|
+polygons.each do |onePolygon|
     polygons.each do |anotherPolygon|
         if(onePolygon != anotherPolygon && onePolygon.neighbourOf?(anotherPolygon) )
             always { onePolygon.color != anotherPolygon.color }
         end
     end
+
     svg = render(polygons)
     f = File.open("./demo/resultMap.svg", "w")
     f.write(svg)
     f.close()
-    sleep(1)
-    puts "Round"
-    end
+    gets.chomp
+end

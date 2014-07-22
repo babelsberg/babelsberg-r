@@ -6,7 +6,7 @@
 <script type="text/javascript" src="./jquery.js"></script>
 <script>
 $(function() {
-    var tid = setInterval(refresh, 500);
+    var tid = setInterval(refresh, 1000);
     function refresh() {
         $.get("resultMap.svg", function(svgDoc) {
  	    //import contents of the svg document into this document
