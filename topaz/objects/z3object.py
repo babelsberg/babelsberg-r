@@ -145,6 +145,8 @@ class W_Z3Object(W_Object):
         rz3.z3_solver_reset(self.ctx, self.solver)
         for constraint in self.enabled_constraints:
             assert isinstance(constraint, W_Z3Ptr)
+            # An enum variable is not a constraint but a variable declaration,
+            # thus it cannot be asserted
             if(not constraint.is_enum_variable):
                 rz3.z3_solver_assert(self.ctx, self.solver, constraint.pointer)
         solve_result = rz3.z3_solver_check(self.ctx, self.solver)
@@ -168,6 +170,11 @@ class W_Z3Object(W_Object):
                 return space.w_nil
 
             assert isinstance(w_ast, W_Z3Ptr)
+
+            # This is necessary as an enum variable is not constraint
+            # thus the solver will not assign a value to it and we have 
+            # to force a value by using model completion (last parameter of
+            # mode_eval)
             if(w_ast.is_enum_variable):
                 interp_ast = rz3.z3_model_eval(self.ctx, model, w_ast.pointer, True)
                 return w_ast.get_value_from_ast(space, interp_ast)
@@ -577,6 +584,9 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         ast_str = rz3.z3_ast_to_string(self.w_z3.ctx, interpreted_ast)
         end = len(ast_str)-1
         assert end >= 2
+
+        # Workaround for different object_ids generated depending whether
+        # in interpreted or compiled mode
         if(ast_str[0] == "|"):
             # |index|
             index = int(ast_str[1:end])
