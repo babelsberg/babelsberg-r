@@ -76,8 +76,7 @@ class ConstraintInterpreter(Interpreter):
         if w_lhs:
             w_rhs = frame.pop()
             frame.push(space.send(w_lhs, "and", [w_rhs]))
-        # else leaves w_lhs on stack, as should be for &&
-        return pc
+        # else leaves w_rhs on stack, as should be for &&
 
     def JUMP_OR(self, space, bytecode, frame, pc, target_pc):
         w_lhs = frame.peek()
@@ -90,13 +89,13 @@ class ConstraintInterpreter(Interpreter):
 
     def JUMP_OR_END(self, space, bytecode, frame, pc):
         w_lhs = self.junction_stack.pop()
-        w_rhs = frame.pop()
         if w_lhs:
+            # rhs should be on the stack
+            w_rhs = frame.pop()
             frame.push(space.send(w_lhs, "or", [w_rhs]))
         else:
-            frame.push(w_lhs) # mimic short-circuit semantics, leaving
-                              # first argument to OR on stack
-        return pc
+            # short-circuit semantics should have left lhs on stack
+            pass
 
     def IS_Q(self, space, bytecode, frame, pc):
         c_rhs = frame.pop()
