@@ -2,7 +2,7 @@ Babelsberg/R
 ============
 [![Build Status](https://travis-ci.org/timfel/babelsberg-r.png?branch=interacting-solvers)](https://travis-ci.org/timfel/babelsberg-r)
 
-A [Topaz](http://www.topazruby.com)-based implementation of Babelsberg, licensed under [MIT](https://github.com/timfel/babelsberg-r/blob/interacting-solvers/LICENSE)
+A [Topaz](http://www.topazruby.com)-based implementation of Babelsberg, licensed under [3-clause BSD](https://github.com/timfel/babelsberg-r/blob/interacting-solvers/LICENSE)
 
 See also [Babelsberg/JS](https://github.com/timfel/babelsberg-js)
 
