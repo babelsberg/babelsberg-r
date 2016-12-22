@@ -30,16 +30,19 @@ else:
     os_opendir = rffi.llexternal("opendir",
         [rffi.CCHARP], DIRP,
         compilation_info=eci,
+        save_err=rffi.RFFI_SAVE_ERRNO,
         macro=True
     )
     os_readdir = rffi.llexternal("readdir",
         [DIRP], DIRENTP,
         compilation_info=eci,
+        save_err=rffi.RFFI_SAVE_ERRNO,
         macro=True
     )
     os_closedir = rffi.llexternal("closedir",
         [DIRP], rffi.INT,
         compilation_info=eci,
+        releasegil=False,
         macro=True
     )
 

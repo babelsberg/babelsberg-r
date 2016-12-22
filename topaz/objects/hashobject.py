@@ -1,10 +1,12 @@
 import copy
+from collections import OrderedDict
+
+from rpython.rlib.objectmodel import r_ordereddict
 from rpython.rlib.rerased import new_static_erasing_pair
 
 from topaz.module import ClassDef, check_frozen
 from topaz.modules.enumerable import Enumerable
 from topaz.objects.objectobject import W_Object
-from topaz.utils.ordereddict import OrderedDict
 from topaz.objects.procobject import W_ProcObject
 
 
@@ -38,7 +40,14 @@ class TypedDictStrategyMixin(object):
         return bool(self.unerase(storage))
 
     def pop(self, storage, w_key, default):
-        return self.unerase(storage).pop(self.unwrap(w_key), default)
+        key = self.unwrap(w_key)
+        r_dict = self.unerase(storage)
+        w_return = r_dict.get(key, default)
+        try:
+            del r_dict[key]
+        except KeyError:
+            pass
+        return w_return
 
     def popitem(self, storage):
         key, value = self.unerase(storage).popitem()
@@ -63,7 +72,7 @@ class ObjectDictStrategy(BaseDictStrategy, TypedDictStrategyMixin):
     iter_erase, iter_unerase = new_static_erasing_pair("ObjectDictStrategyIterator")
 
     def get_empty_storage(self, space):
-        return self.erase(OrderedDict(space.eq_w, space.hash_w))
+        return self.erase(r_ordereddict(space.eq_w, space.hash_w))
 
     def wrap(self, w_key):
         return w_key

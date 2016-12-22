@@ -343,8 +343,10 @@ class Kernel(object):
     def method_sleep(self, space, w_duration=None):
         if w_duration is None:
             raise space.error(space.w_NotImplementedError)
+        elif space.is_kind_of(w_duration, space.w_string):
+            raise space.error(space.w_TypeError, "can't convert String into time interval")
         start = time.time()
-        time.sleep(space.float_w(w_duration))
+        time.sleep(Coerce.float(space, w_duration))
         return space.newint(int(round_double(time.time() - start, 0)))
 
     @moduledef.method("initialize_clone")
@@ -445,6 +447,8 @@ class Kernel(object):
 
     @moduledef.method("catch", name="symbol")
     def method_catch(self, space, name, block):
+        if block is None:
+            raise space.error(space.w_LocalJumpError, "no block given")
         from topaz.interpreter import Throw
         with space.getexecutioncontext().catch_block(name):
             try:

@@ -1,12 +1,13 @@
 import os
 
+from collections import OrderedDict
+
 from rpython.rlib.rsre import rsre_core
 from rpython.rlib.rstring import StringBuilder
 
 from topaz.objects.fileobject import FNM_NOESCAPE, FNM_DOTMATCH
 from topaz.utils import regexp
 from topaz.utils.ll_file import isdir
-from topaz.utils.ordereddict import OrderedDict
 
 
 def regexp_match(cache, re, string):

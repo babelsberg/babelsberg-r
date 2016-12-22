@@ -64,7 +64,7 @@ class Test(BaseTest):
 
 
 @invoke.task
-def install_requirements():
+def install_requirements(ctx):
     t = TEST_TYPES[os.environ["TEST_TYPE"]]
     if t.deps:
         t.install_deps()
@@ -76,23 +76,23 @@ def install_requirements():
 
 
 @invoke.task
-def run_tests():
+def run_tests(ctx):
     t = TEST_TYPES[os.environ["TEST_TYPE"]]
     t.run_tests()
 
 
 @invoke.task
-def tag_specs(files=""):
+def tag_specs(ctx, files=""):
     invoke.run("../mspec/bin/mspec tag -t {} -f spec --config=topaz.mspec {}".format("`pwd`/bin/topaz", files))
 
 
 @invoke.task
-def untag_specs(files=""):
+def untag_specs(ctx, files=""):
     invoke.run("../mspec/bin/mspec tag --del fails -t {} -f spec --config=topaz.mspec {}".format("`pwd`/bin/topaz", files))
 
 
 @invoke.task
-def upload_build():
+def upload_build(ctx):
     t = TEST_TYPES[os.environ["TEST_TYPE"]]
     if t.create_build:
         t.upload_build()
@@ -129,13 +129,7 @@ def run_docs_tests(env):
 
 
 def run_flake8_tests(env):
-    # E124 closing bracket does not match visual indentation
-    # E125 continuation line does not distinguish itself from next logical line
-    # E128 continuation line under-indented for visual indent
-    # E129 visually indented line with same indent as next logical line
-    # E501 line too long
-    # F811 redefinition of unused
-    invoke.run('flake8 . --exclude="__pycache__,.git,docs" --ignore="E124,E125,E128,E129,E501,F811"')
+    invoke.run('flake8 .')
 
 
 TEST_TYPES = {
