@@ -308,11 +308,11 @@ z3_solver_reset = rffi.llexternal("Z3_solver_reset", [Z3_context, Z3_solver], ll
 
 # Refcounting
 z3_solver_inc_ref = rffi.llexternal("Z3_solver_inc_ref", [Z3_context, Z3_solver], lltype.Void, compilation_info=eci)
-z3_solver_dec_ref = rffi.llexternal("Z3_solver_dec_ref", [Z3_context, Z3_solver], lltype.Void, compilation_info=eci)
+z3_solver_dec_ref = rffi.llexternal("Z3_solver_dec_ref", [Z3_context, Z3_solver], lltype.Void, compilation_info=eci, releasegil=False)
 z3_model_inc_ref = rffi.llexternal("Z3_model_inc_ref", [Z3_context, Z3_model], lltype.Void, compilation_info=eci)
-z3_model_dec_ref = rffi.llexternal("Z3_model_dec_ref", [Z3_context, Z3_model], lltype.Void, compilation_info=eci)
+z3_model_dec_ref = rffi.llexternal("Z3_model_dec_ref", [Z3_context, Z3_model], lltype.Void, compilation_info=eci, releasegil=False)
 z3_ast_inc_ref = rffi.llexternal("Z3_inc_ref", [Z3_context, Z3_ast], lltype.Void, compilation_info=eci)
-z3_ast_dec_ref = rffi.llexternal("Z3_dec_ref", [Z3_context, Z3_ast], lltype.Void, compilation_info=eci)
+z3_ast_dec_ref = rffi.llexternal("Z3_dec_ref", [Z3_context, Z3_ast], lltype.Void, compilation_info=eci, releasegil=False)
 
 # Errors
 z3_get_error_code = rffi.llexternal("Z3_get_error_code", [Z3_context], rffi.INT, compilation_info=eci)
