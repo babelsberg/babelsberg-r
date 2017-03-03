@@ -4,7 +4,7 @@ from topaz.main import create_entry_point, get_topaz_config_options
 
 
 def target(driver, args):
-    driver.exe_name = "bin/topaz"
+    driver.exe_name = "bin/babelsberg-r"
     driver.config.set(**get_topaz_config_options())
     return create_entry_point(driver.config), None
 
