@@ -32,8 +32,15 @@ class Lexer(object):
     EXPR_FNAME = 6
     EXPR_DOT = 7
     EXPR_CLASS = 8
-    EXPR_VALUE = 9
-    EXPR_ENDFN = 10
+    EXPR_ENDFN = 9
+    EXPR_LABEL = 10
+    EXPR_LABELED = 11
+    EXPR_FITEM = 12
+
+    EXPR_VALUE = EXPR_BEG
+    EXPR_BEG_ANY = (EXPR_BEG, EXPR_MID, EXPR_CLASS)
+    EXPR_ARG_ANY = (EXPR_ARG, EXPR_CMDARG)
+    EXPR_END_ANY = (EXPR_END, EXPR_ENDARG, EXPR_ENDFN)
 
     keywords = {
         "return": Keyword("RETURN", "RETURN", EXPR_MID),
@@ -83,12 +90,22 @@ class Lexer(object):
         self.idx = 0
         self.columno = 1
         self.state = self.EXPR_BEG
+        self.label_state = 0
         self.paren_nest = 0
         self.left_paren_begin = 0
         self.command_start = True
         self.condition_state = StackState()
         self.cmd_argument_state = StackState()
         self.str_term = None
+
+    @property
+    def state(self):
+        return self._state
+
+    @state.setter
+    def state(self, value):
+        self.label_state = 0
+        self._state = value
 
     def peek(self):
         ch = self.read()
@@ -124,9 +141,19 @@ class Lexer(object):
         while True:
             if self.str_term is not None:
                 tok = self.str_term.next()
-                if tok.gettokentype() in ["STRING_END", "REGEXP_END"]:
+                toktype = tok.gettokentype()
+                if toktype == "STRING_END":
+                    if (((self.state in [self.EXPR_BEG, self.EXPR_ENDFN] and self.condition_state.is_in_state()) or self.is_arg()) and
+                        self.is_label_suffix()):
+                        tok = self.emit("LABEL_END")
+                toktype = tok.gettokentype()
+                if toktype in ["STRING_END", "REGEXP_END", "LABEL_END"]:
                     self.str_term = None
-                    self.state = self.EXPR_END
+                    if toktype == "LABEL_END":
+                        self.state = self.EXPR_BEG
+                        self.label_state = self.EXPR_LABEL
+                    else:
+                        self.state = self.EXPR_END
                 yield tok
                 continue
 
@@ -144,14 +171,24 @@ class Lexer(object):
             elif ch in "\r\n":
                 space_seen = newline_seen = True
                 self.newline(ch)
-                if self.state not in [self.EXPR_BEG, self.EXPR_DOT,
+
+                if (self.state not in [self.EXPR_BEG, self.EXPR_DOT,
                                       self.EXPR_VALUE, self.EXPR_FNAME,
-                                      self.EXPR_CLASS]:
-                    self.add("\n")
-                    while self.peek() in "\r\n ":
+                                      self.EXPR_CLASS] and self.label_state != self.EXPR_LABELED):
+                    while self.peek() in "\r\n \t\f\v":
                         ch = self.read()
                         if ch in "\r\n":
                             self.newline(ch)
+                    if self.peek() in "&.":
+                        space_seen = newline_seen = False
+                        ch = self.read()
+                        ch2 = self.peek()
+                        self.unread()
+                        if ch == "&" and ch2 != ".":
+                            pass
+                        else:
+                            continue
+                    self.add("\n")
                     self.command_start = True
                     self.state = self.EXPR_BEG
                     yield self.emit("LITERAL_NEWLINE")
@@ -227,6 +264,7 @@ class Lexer(object):
             elif ch == ",":
                 self.add(ch)
                 self.state = self.EXPR_BEG
+                self.label_state = self.EXPR_LABEL
                 yield self.emit("LITERAL_COMMA")
             elif ch == "~":
                 self.add(ch)
@@ -281,14 +319,28 @@ class Lexer(object):
         self.idx = idx
         self.columno -= 1
 
+    def is_label_suffix(self):
+        ch = self.read()
+        ch2 = self.peek()
+        if ch == ":" and ch2 != ":":
+            return True
+        else:
+            self.unread()
+            return False
+
     def is_beg(self):
-        return self.state in [self.EXPR_BEG, self.EXPR_MID, self.EXPR_CLASS, self.EXPR_VALUE]
+        return (self.state in self.EXPR_BEG_ANY or
+                (self.state == self.EXPR_ARG and
+                 self.label_state == self.EXPR_LABELED))
 
     def is_arg(self):
-        return self.state in [self.EXPR_ARG, self.EXPR_CMDARG]
+        return self.state in self.EXPR_ARG_ANY
 
     def is_end(self):
-        return self.state in [self.EXPR_END, self.EXPR_ENDARG, self.EXPR_ENDFN]
+        return self.state in self.EXPR_END_ANY
+
+    def is_label_possible(self, command_state):
+        return (((self.label_state == self.EXPR_LABEL or self.state == self.EXPR_ENDFN) and not command_state) or self.is_arg())
 
     def set_expression_state(self):
         if self.state in [self.EXPR_FNAME, self.EXPR_DOT]:
@@ -299,7 +351,11 @@ class Lexer(object):
     def emit_identifier(self, command_state, token_name="IDENTIFIER"):
         value = "".join(self.current_value)
         state = self.state
-        if value in self.keywords and self.state != self.EXPR_DOT:
+        if self.is_label_possible(command_state) and self.is_label_suffix():
+            self.state = self.EXPR_ARG
+            self.label_state = self.EXPR_LABELED
+            return self.emit("LABEL")
+        elif value in self.keywords and self.state != self.EXPR_DOT:
             keyword = self.keywords[value]
 
             if keyword.normal_token == "NOT":
@@ -310,12 +366,13 @@ class Lexer(object):
             if state != self.EXPR_FNAME and keyword.normal_token == "DO":
                 return self.emit_do(state)
 
-            if state in [self.EXPR_BEG, self.EXPR_VALUE]:
+            if state in [self.EXPR_BEG, self.EXPR_VALUE] or self.label_state == self.EXPR_LABELED:
                 token = self.emit(keyword.normal_token)
             else:
                 token = self.emit(keyword.inline_token)
                 if keyword.inline_token != keyword.normal_token:
                     self.state = self.EXPR_BEG
+                    self.label_state = self.EXPR_LABEL
         else:
             if (state == self.EXPR_BEG and not command_state) or self.is_arg():
                 ch = self.read()
@@ -338,6 +395,7 @@ class Lexer(object):
                 self.state = self.EXPR_END
         if token.gettokentype() == "IDENTIFIER" and self.symtable.is_defined(token.getstr()):
             self.state = self.EXPR_END
+            self.label_state = self.EXPR_LABEL
         return token
 
     def emit_do(self, state):
@@ -448,6 +506,12 @@ class Lexer(object):
                 self.add(ch.upper())
                 if self.peek() in "-+":
                     self.add(self.read())
+            elif ch == "i":
+                symbol = "IMAGINARY"
+                self.add(ch)
+            elif ch == "r":
+                symbol = "RATIONAL"
+                self.add(ch)
             else:
                 yield self.emit(symbol)
                 self.unread()
@@ -650,6 +714,12 @@ class Lexer(object):
                 yield self.emit("OP_ASGN")
             else:
                 self.unread()
+                if self.is_arg() and space_seen and not ch3.isspace():
+                    tok_name = "DSTAR"
+                elif self.is_beg():
+                    tok_name = "DSTAR"
+                else:
+                    tok_name = "POW"
                 self.set_expression_state()
                 yield self.emit("POW")
         elif ch2 == "=":
@@ -708,6 +778,8 @@ class Lexer(object):
         else:
             self.unread()
             self.set_expression_state()
+            if self.state not in [self.EXPR_FNAME, self.EXPR_DOT]:
+                self.label_state = self.EXPR_LABEL
             yield self.emit("PIPE")
 
     def ampersand(self, ch, space_seen):
@@ -728,6 +800,10 @@ class Lexer(object):
             self.add(ch2)
             self.state = self.EXPR_BEG
             yield self.emit("OP_ASGN")
+        elif ch2 == ".":
+            self.add(ch2)
+            self.state = self.EXPR_DOT
+            yield self.emit("ANDDOT")
         else:
             self.unread()
             if self.is_arg() and space_seen and not ch2.isspace():
@@ -779,7 +855,7 @@ class Lexer(object):
         ch2 = self.read()
 
         if (ch2 == "<" and self.state not in [self.EXPR_DOT, self.EXPR_CLASS] and
-            not self.is_end() and (not self.is_arg() or space_seen)):
+            not self.is_end() and (not self.is_arg() or self.label_state == self.EXPR_LABELED or space_seen)):
             tokens_yielded = False
             for token in self.here_doc():
                 tokens_yielded = True
@@ -1079,6 +1155,7 @@ class Lexer(object):
         self.condition_state.stop()
         self.cmd_argument_state.stop()
         self.state = self.EXPR_BEG
+        self.label_state = self.EXPR_LABEL
         yield self.emit(tok_name)
 
     def right_paren(self, ch):
@@ -1090,7 +1167,7 @@ class Lexer(object):
 
     def left_bracket(self, ch, space_seen):
         self.paren_nest += 1
-        if self.state in [self.EXPR_FNAME, self.EXPR_DOT]:
+        if self.state in [self.EXPR_FNAME, self.EXPR_DOT]: # IS_AFTER_OPERATOR
             self.state = self.EXPR_ARG
 
             ch2 = self.read()
@@ -1106,6 +1183,7 @@ class Lexer(object):
                     yield self.emit("AREF")
             else:
                 self.unread()
+                self.label_state = self.EXPR_LABEL
                 yield self.emit("LITERAL_LBRACKET")
         else:
             if (self.is_beg() or (self.is_arg() and space_seen)):
@@ -1114,6 +1192,7 @@ class Lexer(object):
                 tok = "LITERAL_LBRACKET"
 
             self.state = self.EXPR_BEG
+            self.label_state = self.EXPR_LABEL
             self.condition_state.stop()
             self.cmd_argument_state.stop()
             yield self.emit(tok)
@@ -1136,7 +1215,9 @@ class Lexer(object):
             self.cmd_argument_state.stop()
             yield self.emit("LAMBEG")
         else:
-            if self.is_arg() or self.state in [self.EXPR_END, self.EXPR_ENDFN]:
+            if self.label_state == self.EXPR_LABELED:
+                tok = "LBRACE"
+            elif self.is_arg() or self.state in [self.EXPR_END, self.EXPR_ENDFN]:
                 tok = "LCURLY"
                 self.command_start = True
             elif self.state == self.EXPR_ENDARG:
@@ -1147,6 +1228,8 @@ class Lexer(object):
             self.condition_state.stop()
             self.cmd_argument_state.stop()
             self.state = self.EXPR_BEG
+            if tok != "LBRACE_ARG":
+                self.label_state = self.EXPR_LABEL
             yield self.emit(tok)
 
     def right_brace(self, ch):
@@ -1234,6 +1317,22 @@ class Lexer(object):
                     break
             self.unread()
             yield self.emit("QWORDS_BEG")
+        elif ch == "I":
+            self.str_term = StringTerm(self, begin, end, expand=True, is_qwords=True)
+            while True:
+                ch = self.read()
+                if not ch.isspace():
+                    break
+            self.unread()
+            yield self.emit("SYMBOLS_BEG")
+        elif ch == "i":
+            self.str_term = StringTerm(self, begin, end, expand=False, is_qwords=True)
+            while True:
+                ch = self.read()
+                if not ch.isspace():
+                    break
+            self.unread()
+            yield self.emit("QSYMBOLS_BEG")
         elif ch == "r":
             self.str_term = StringTerm(self, begin, end, is_regexp=True)
             yield self.emit("REGEXP_BEG")

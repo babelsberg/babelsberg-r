@@ -19,6 +19,7 @@ from topaz.objects.moduleobject import W_ModuleObject
 from topaz.objects.procobject import W_ProcObject
 from topaz.objects.randomobject import W_RandomObject
 from topaz.objects.stringobject import W_StringObject
+from topaz.scope import StaticScope
 
 
 class Kernel(object):
@@ -75,10 +76,19 @@ class Kernel(object):
 
     @moduledef.method("lambda")
     def function_lambda(self, space, block):
-        return block.copy(space, is_lambda=True)
+        if block is None:
+            block = space.getexecutioncontext().gettoprubyframe().block
+        if block is None:
+            raise space.error(space.w_ArgumentError,
+                "tried to create lambda object without a block"
+            )
+        else:
+            return block.copy(space, is_lambda=True)
 
     @moduledef.method("proc")
     def function_proc(self, space, block):
+        if block is None:
+            block = space.getexecutioncontext().gettoprubyframe().block
         if block is None:
             raise space.error(space.w_ArgumentError,
                 "tried to create Proc object without a block"
@@ -104,7 +114,7 @@ class Kernel(object):
         return path
 
     @staticmethod
-    def load_feature(space, path, orig_path):
+    def load_feature(space, path, orig_path, wrap=False):
         if not os.path.exists(path):
             raise space.error(space.w_LoadError, orig_path)
 
@@ -117,7 +127,11 @@ class Kernel(object):
         except OSError as e:
             raise error_for_oserror(space, e)
 
-        space.execute(contents, filepath=path)
+        if wrap:
+            lexical_scope = StaticScope(space.newmodule("Anonymous"), None)
+        else:
+            lexical_scope = None
+        space.execute(contents, filepath=path, lexical_scope=lexical_scope)
 
     @moduledef.function("require", path="path")
     def function_require(self, space, path):
@@ -136,12 +150,12 @@ class Kernel(object):
         w_loaded_features.method_lshift(space, space.newstr_fromstr(path))
         return space.w_true
 
-    @moduledef.function("load", path="path")
-    def function_load(self, space, path):
+    @moduledef.function("load", path="path", wrap="bool")
+    def function_load(self, space, path, wrap=False):
         assert path is not None
         orig_path = path
         path = Kernel.find_feature(space, path)
-        Kernel.load_feature(space, path, orig_path)
+        Kernel.load_feature(space, path, orig_path, wrap=wrap)
         return space.w_true
 
     @moduledef.method("fail")
@@ -169,7 +183,10 @@ class Kernel(object):
             w_exc = space.send(w_exception, "exception")
 
         if w_array is not None:
-            raise NotImplementedError("custom backtrace for Kernel#raise")
+            raise space.error(
+                space.w_NotImplementedError,
+                "custom backtrace for Kernel#raise"
+            )
 
         if not isinstance(w_exc, W_ExceptionObject):
             raise space.error(space.w_TypeError,
@@ -463,6 +480,14 @@ class Kernel(object):
         random_class = space.getclassfor(W_RandomObject)
         default = space.find_const(random_class, "DEFAULT")
         return default.srand(space, w_seed)
+
+    @moduledef.method("autoload")
+    def method_autoload(self, space, args_w):
+        return space.send(space.getclass(self), "autoload", args_w)
+
+    @moduledef.method("autoload?")
+    def method_autoload(self, space, args_w):
+        return space.send(space.getclass(self), "autoload?", args_w)
 
     @moduledef.method("object_id")
     def method_object_id(self, space):

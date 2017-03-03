@@ -229,6 +229,10 @@ class W_FileObject(W_IOObject):
     def method_executablep(self, space, filename):
         return space.newbool(os.path.isfile(filename) and os.access(filename, os.X_OK))
 
+    @classdef.singleton_method("readable?", filename="path")
+    def method_executablep(self, space, filename):
+        return space.newbool(os.path.isfile(filename) and os.access(filename, os.R_OK))
+
     @classdef.singleton_method("identical?", file="path", other="path")
     def method_identicalp(self, space, file, other):
         try:
@@ -249,6 +253,15 @@ class W_FileObject(W_IOObject):
             assert end >= 0
             filename = filename[:end]
         return space.newstr_fromstr(filename)
+
+    @classdef.singleton_method("extname", filename="path")
+    def method_extname(self, space, filename):
+        i = filename.rfind(".")
+        if i < 0:
+            return space.newstr_fromstr("")
+        else:
+            extname = filename[i + 1:]
+            return space.newstr_fromstr(extname)
 
     @classdef.singleton_method("umask", mask="int")
     def method_umask(self, space, mask=-1):

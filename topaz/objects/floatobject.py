@@ -169,6 +169,7 @@ class W_FloatObject(W_RootObject):
             return W_NumericObject.retry_binop_coercing(space, self, w_other, "==")
         except RubyError as e:
             if isinstance(e.w_value, W_ArgumentError):
+                space.mark_topframe_not_escaped()
                 return space.send(w_other, "==", [self])
             else:
                 raise
@@ -186,6 +187,7 @@ class W_FloatObject(W_RootObject):
             return W_NumericObject.retry_binop_coercing(space, self, w_other, "equal?")
         except RubyError as e:
             if isinstance(e.w_value, W_ArgumentError):
+                space.mark_topframe_not_escaped()
                 return space.send(w_other, "equal?", [self])
             else:
                 raise
@@ -240,7 +242,10 @@ class W_FloatObject(W_RootObject):
                 if x == 1.0:
                     return space.newfloat(1.0)
                 elif x < 0.0:
-                    raise NotImplementedError("Complex numbers as results")
+                    raise space.error(
+                        space.w_NotImplementedError,
+                        "Complex numbers as results"
+                    )
                 else:
                     return space.newfloat(y)
             elif math.isinf(y):

@@ -1,7 +1,9 @@
 from rpython.rlib import jit
 
+from topaz.coerce import Coerce
 from topaz.closure import LocalCell
 from topaz.objects.arrayobject import W_ArrayObject
+from topaz.objects.hashobject import W_HashObject
 from topaz.objects.functionobject import W_FunctionObject
 
 
@@ -44,10 +46,14 @@ class Frame(BaseFrame):
         self.cells[pos].set(space, self, pos, w_value)
 
     def handle_block_args(self, space, bytecode, args_w, block):
-        if (len(args_w) == 1 and
-            isinstance(args_w[0], W_ArrayObject) and len(bytecode.arg_pos) >= 2):
+        if (len(args_w) == 1 and (
+                len(bytecode.arg_pos) >= 2 or (
+                    len(bytecode.arg_pos) > 0 and bytecode.splat_arg_pos != -1))):
             w_arg = args_w[0]
-            args_w = space.listview(w_arg)
+            if not space.is_kind_of(w_arg, space.w_array) and space.respond_to(w_arg, "to_ary"):
+                w_arg = space.convert_type(w_arg, space.w_array, "to_ary", raise_error=True, reraise_error=True)
+            if space.is_kind_of(w_arg, space.w_array):
+                args_w = space.listview(w_arg)
         minargc = len(bytecode.arg_pos) - len(bytecode.defaults)
         if len(args_w) < minargc:
             args_w.extend([space.w_nil] * (minargc - len(args_w)))
@@ -60,29 +66,114 @@ class Frame(BaseFrame):
     def handle_args(self, space, bytecode, args_w, block):
         from topaz.interpreter import Interpreter
 
-        if (len(args_w) < (len(bytecode.arg_pos) - len(bytecode.defaults)) or
-            (bytecode.splat_arg_pos == -1 and len(args_w) > len(bytecode.arg_pos))):
+        keywords_hash = None
+        if len(bytecode.kwarg_names) > 0 or bytecode.kwrest_pos != -1:
+            # we only take the hash if we have more than enough arguments
+            if len(args_w) > 0 and len(args_w) > (len(bytecode.arg_pos) - len(bytecode.defaults)):
+                w_obj = args_w[-1]
+                if not space.is_kind_of(w_obj, space.w_hash):
+                    w_obj = space.convert_type(w_obj, space.w_hash, "to_hash", reraise_error=True)
+                if isinstance(w_obj, W_HashObject):
+                    keywords_hash = space.send(w_obj, "clone")
+                    assert isinstance(keywords_hash, W_HashObject)
+
+        if len(bytecode.kw_defaults) < len(bytecode.kwarg_names) and not keywords_hash:
+            raise space.error(space.w_ArgumentError,
+                "missing keywords: %s" % ",".join(bytecode.kwarg_names)
+            )
+
+        pre = 0
+        post = len(args_w) if keywords_hash is None else len(args_w) - 1
+
+        if (post < (len(bytecode.arg_pos) - len(bytecode.defaults)) or
+            (bytecode.splat_arg_pos == -1 and post > len(bytecode.arg_pos))):
             raise space.error(space.w_ArgumentError,
                 "wrong number of arguments (%d for %d)" % (len(args_w), len(bytecode.arg_pos) - len(bytecode.defaults))
             )
 
-        for i in xrange(min(len(args_w), len(bytecode.arg_pos))):
+        if bytecode.default_arg_begin != -1:
+            len_pre_args = bytecode.default_arg_begin
+        elif bytecode.splat_arg_pos != -1:
+            len_pre_args = bytecode.splat_arg_pos
+        else:
+            len_pre_args = len(bytecode.arg_pos)
+        len_post_arg = len(bytecode.arg_pos) - len(bytecode.defaults) - len_pre_args
+
+        # [required args, optional args, splat arg, required args, keywords args, keyword rest, block]
+        #  ^                                                      ^
+        # pre                                                   post
+
+        # fill post-arguments from back.
+        actual_args_len = post
+        offset = len(bytecode.arg_pos) - post
+        for i in xrange(actual_args_len - 1, actual_args_len - len_post_arg - 1, -1):
+            self._set_arg(space, bytecode.arg_pos[i + offset], args_w[i])
+            post -= 1
+        # [required args, optional args, splat arg, required args, keywords args, keyword rest, block]
+        #  ^                                       ^-------------
+        # pre                                    post
+
+        # fill arguments from start as far as we can (until we hit post or the
+        # end of the default arguments + normal arguments
+        for i in xrange(min(post, len_pre_args + len(bytecode.defaults))):
             self._set_arg(space, bytecode.arg_pos[i], args_w[i])
-        defl_start = len(args_w) - (len(bytecode.arg_pos) - len(bytecode.defaults))
-        for i in xrange(len(bytecode.arg_pos) - len(args_w)):
-            bc = bytecode.defaults[i + defl_start]
+            pre += 1
+        # [required args, optional args, splat arg, required args, keywords args, keyword rest, block]
+        #  ------------------------^               ^
+        #                         pre            post
+
+        given_defaults = pre - len_pre_args
+        # fill up remaining default arguments with their default values
+        for i in xrange(given_defaults, len(bytecode.defaults)):
+            bc = bytecode.defaults[i]
             self.bytecode = bc
             w_value = Interpreter().interpret(space, self, bc)
-            self._set_arg(space, bytecode.arg_pos[i + len(args_w)], w_value)
-        self.bytecode = bytecode
+            self._set_arg(space, bytecode.arg_pos[len_pre_args + i], w_value)
 
         if bytecode.splat_arg_pos != -1:
-            if len(bytecode.arg_pos) > len(args_w):
+            if pre >= post:
                 splat_args_w = []
             else:
-                splat_args_w = args_w[len(bytecode.arg_pos):]
+                splat_args_w = args_w[pre:post]
             w_splat_args = space.newarray(splat_args_w)
             self._set_arg(space, bytecode.splat_arg_pos, w_splat_args)
+
+        for i, name in enumerate(bytecode.kwarg_names):
+            w_key = space.newsymbol(name)
+            w_value = None
+            if keywords_hash is not None:
+                try:
+                    w_value = keywords_hash.getitem(w_key)
+                    keywords_hash.delete(w_key)
+                except KeyError:
+                    pass
+            # kword arguments with defaults come first, so if we get an
+            # index error here, we're missing a required keyword argument
+            if w_value is None:
+                try:
+                    bc = bytecode.kw_defaults[i]
+                except IndexError:
+                    raise space.error(space.w_ArgumentError,
+                        "missing keyword: %s" % name
+                    )
+                self.bytecode = bc
+                w_value = Interpreter().interpret(space, self, bc)
+            self._set_arg(space, bytecode.cellvars.index(name), w_value)
+
+        self.bytecode = bytecode
+
+        if bytecode.kwrest_pos != -1:
+            if keywords_hash is not None:
+                self._set_arg(space, bytecode.kwrest_pos, keywords_hash)
+            else:
+                self._set_arg(space, bytecode.kwrest_pos, space.newhash())
+        elif keywords_hash is not None:
+            if keywords_hash.size() > 0:
+                raise space.error(space.w_ArgumentError,
+                    "unknown keywords: %s" % space.str_w(
+                        space.send(space.send(keywords_hash, "keys"), "to_s")
+                    )
+                )
 
         if bytecode.block_arg_pos != -1:
             if block is None:
@@ -148,7 +239,7 @@ class Frame(BaseFrame):
         try:
             return self.bytecode.lineno_table[instr]
         except IndexError:
-            return -1
+            return self.last_instr
 
     def get_code_name(self):
         return self.bytecode.name

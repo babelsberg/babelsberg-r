@@ -4,6 +4,10 @@ from topaz.objects.objectobject import W_Object
 
 class W_ProcObject(W_Object):
     classdef = ClassDef("Proc", W_Object.classdef)
+    _immutable_fields_ = [
+        "bytecode", "w_self", "lexical_scope", "cells[*]",
+        "block", "parent_interp", "top_parent_interp",
+        "regexp_match_cell", "is_lambda"]
 
     def __init__(self, space, bytecode, w_self, lexical_scope, cells, block,
                  parent_interp, top_parent_interp, regexp_match_cell,
@@ -30,6 +34,8 @@ class W_ProcObject(W_Object):
 
     @classdef.singleton_method("new")
     def method_new(self, space, block):
+        if block is None:
+            block = space.getexecutioncontext().gettoprubyframe().block
         if block is None:
             raise space.error(space.w_ArgumentError, "tried to create Proc object without a block")
         return block.copy(space)
@@ -67,3 +73,10 @@ class W_ProcObject(W_Object):
     @classdef.method("binding")
     def method_binding(self, space):
         return space.newbinding_fromblock(self)
+
+    @classdef.method("source_location")
+    def method_source_location(self, space):
+        return space.newarray([
+            space.newstr_fromstr(self.bytecode.filepath),
+            space.newint(self.bytecode.lineno)
+        ])

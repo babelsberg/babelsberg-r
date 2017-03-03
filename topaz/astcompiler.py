@@ -8,7 +8,8 @@ class BaseSymbolTable(object):
 
     NORMAL_ARG = 0
     SPLAT_ARG = 1
-    BLOCK_ARG = 2
+    KW_ARG = 2
+    BLOCK_ARG = 3
 
     def __init__(self, parent_symtable=None):
         self.parent_symtable = parent_symtable
@@ -99,7 +100,18 @@ class CompilerContext(object):
         self.current_block = self.first_block = self.new_block()
         self.frame_blocks = []
 
-    def create_bytecode(self, args, defaults, splat_arg, block_arg):
+    def create_bytecode(self, lineno=-1, args=None, defaults=None,
+                        first_default_arg=None, splat_arg=None, kwargs=None,
+                        kw_defaults=None, kwrest_arg=None, block_arg=None):
+        if args is None:
+            args = []
+        if defaults is None:
+            defaults = []
+        if kwargs is None:
+            kwargs = []
+        if kw_defaults is None:
+            kw_defaults = []
+
         cellvars = []
         freevars = []
 
@@ -126,16 +138,23 @@ class CompilerContext(object):
         depth = self.count_stackdepth(blocks)
         for default in defaults:
             depth = max(depth, default.max_stackdepth)
+        for kw_default in kw_defaults:
+            depth = max(depth, kw_default.max_stackdepth)
         return W_CodeObject(
             self.code_name,
             self.filepath,
+            lineno,
             code,
             depth,
             self.consts[:],
             args,
             splat_arg,
+            kwargs,
+            kwrest_arg,
             block_arg,
             defaults,
+            first_default_arg,
+            kw_defaults,
             cellvars,
             freevars,
             lineno_table,
@@ -354,3 +373,8 @@ class EnterFrameBlockContextManager(object):
         block_type, block = self.ctx.frame_blocks.pop()
         assert block_type == self.block_type
         assert block is self.block
+
+
+class CompilerError(Exception):
+    def __init__(self, msg=None):
+        self.msg = "" if msg is None else msg

@@ -8,7 +8,12 @@ from rpython.rlib.rsre.rsre_core import (
     OPCODE_MARK, OPCODE_REPEAT, OPCODE_ANY, OPCODE_ANY_ALL, OPCODE_MAX_UNTIL,
     OPCODE_MIN_UNTIL, OPCODE_GROUPREF, OPCODE_AT, OPCODE_BRANCH, OPCODE_RANGE,
     OPCODE_JUMP, OPCODE_ASSERT_NOT, OPCODE_CATEGORY, OPCODE_FAILURE, OPCODE_IN,
-    OPCODE_NEGATE
+    OPCODE_NEGATE, OPCODE_GROUPREF_EXISTS
+)
+from rpython.rlib.rsre.rsre_core import (
+    AT_BEGINNING, AT_BEGINNING_LINE, AT_BEGINNING_STRING, AT_BOUNDARY,
+    AT_NON_BOUNDARY, AT_END, AT_END_LINE, AT_END_STRING, AT_LOC_BOUNDARY,
+    AT_LOC_NON_BOUNDARY, AT_UNI_BOUNDARY, AT_UNI_NON_BOUNDARY
 )
 from rpython.rlib.rsre.rsre_char import MAXREPEAT as MAX_REPEAT
 
@@ -49,19 +54,6 @@ CHARACTER_ESCAPES = {
     "t": "\t",
     "v": "\v",
 }
-
-AT_BEGINNING = 0
-AT_BEGINNING_LINE = 1
-AT_BEGINNING_STRING = 2
-AT_BOUNDARY = 3
-AT_NON_BOUNDARY = 4
-AT_END = 5
-AT_END_LINE = 6
-AT_END_STRING = 7
-AT_LOC_BOUNDARY = 8
-AT_LOC_NON_BOUNDARY = 9
-AT_UNI_BOUNDARY = 10
-AT_UNI_NON_BOUNDARY = 11
 
 CATEGORY_DIGIT = 0
 CATEGORY_NOT_DIGIT = 1
@@ -432,6 +424,14 @@ class Sequence(RegexpBase):
         RegexpBase.__init__(self)
         self.items = items
 
+    def getwidth(self):
+        lo, hi = 0, 0
+        for item in self.items:
+            itemlo, itemhi = item.getwidth()
+            lo += itemlo
+            hi += itemhi
+        return lo, hi
+
     def is_empty(self):
         for item in self.items:
             if not item.is_empty():
@@ -741,11 +741,49 @@ class Group(RegexpBase):
         ctx.emit((self.group - 1) * 2 + 1)
 
 
+class GroupExistsBranch(RegexpBase):
+    def __init__(self, info, group, codeyes, codeno):
+        RegexpBase.__init__(self)
+        self.info = info
+        self.group = group
+        self.codeyes = codeyes
+        self.codeno = codeno
+
+    def can_be_affix(self):
+        return False
+
+    def fix_groups(self):
+        if not 1 <= self.group <= self.info.group_count:
+            raise RegexpError("unknown group")
+
+    def optimize(self, info, in_set=False):
+        return self
+
+    def compile(self, ctx):
+        ctx.emit(OPCODE_GROUPREF_EXISTS)
+        skipno = ctx.tell()
+        ctx.emit(self.group - 1)
+        ctx.emit(0)
+        self.codeyes.compile(ctx)
+        ctx.emit(OPCODE_JUMP)
+        skipyes = ctx.tell()
+        ctx.emit(0)
+        ctx.patch(skipno + 1, ctx.tell() - skipno)
+        if self.codeno:
+            self.codeno.compile(ctx)
+        else:
+            ctx.emit(OPCODE_FAILURE)
+        ctx.patch(skipyes, ctx.tell() - skipyes)
+
+
 class RefGroup(RegexpBase):
     def __init__(self, info, group, case_insensitive=False):
         RegexpBase.__init__(self, case_insensitive=case_insensitive)
         self.info = info
         self.group = group
+
+    def can_be_affix(self):
+        return False
 
     def fix_groups(self):
         if not 1 <= self.group <= self.info.group_count:
@@ -837,6 +875,7 @@ class SetIntersection(SetBase):
 POSITION_ESCAPES = {
     "A": AtPosition(AT_BEGINNING_STRING),
     "z": AtPosition(AT_END_STRING),
+    "Z": AtPosition(AT_END_STRING),
 
     "b": AtPosition(AT_BOUNDARY),
     "B": AtPosition(AT_NON_BOUNDARY),
@@ -846,8 +885,20 @@ CHARSET_ESCAPES = {
     "w": Property(CATEGORY_WORD),
 }
 PROPERTIES = {
-    "digit": CATEGORY_DIGIT,
     "alnum": CATEGORY_WORD,
+    "digit": CATEGORY_DIGIT,
+    "space": CATEGORY_SPACE,
+    "graph": CATEGORY_WORD,
+
+}
+EXTRA_POSIX_PROPERTIES = {
+    "print": [Range(32, 255)], # space - ASCII-end
+    "blank": [Character(ord(c)) for c in " \t"],
+    "punct": [Character(ord(c)) for c in '~!@#$%^&*()+-\|{}[]:";\'<>?,./'],
+    "alpha": [Range(ord("a"), ord("z")), Range(ord("A"), ord("Z"))],
+    "lower": [Range(ord("a"), ord("z"))],
+    "upper": [Range(ord("A"), ord("Z"))],
+    "xdigit": [Range(ord("0"), ord("9")), Range(ord("a"), ord("f")), Range(ord("A"), ord("F"))],
 }
 
 
@@ -943,9 +994,9 @@ def _parse_element(source, info):
         elif ch == "[":
             return _parse_set(source, info)
         elif ch == "^":
-            return AtPosition(AT_BEGINNING_STRING)
+            return AtPosition(AT_BEGINNING_LINE)
         elif ch == "$":
-            return AtPosition(AT_END_STRING)
+            return AtPosition(AT_END_LINE)
         elif ch == "{":
             here2 = source.pos
             counts = _parse_quantifier(source, info)
@@ -1016,6 +1067,25 @@ def _parse_paren(source, info):
             subpattern = _parse_pattern(source, info)
             source.expect(")")
             return subpattern
+        elif source.match("("):
+            if source.match("<"):
+                groupref = _parse_name(source)
+                source.expect(">")
+            else:
+                groupref = _parse_name(source)
+            source.expect(")")
+            groupidx = info.normalize_group(groupref)
+            subpattern = _parse_pattern(source, info)
+            source.expect(")")
+            if not isinstance(subpattern, Branch):
+                codeyes = subpattern
+                codeno = None
+            elif len(subpattern.branches) > 2:
+                raise RegexpError("invalid conditional pattern")
+            else:
+                codeyes = subpattern.branches[0]
+                codeno = subpattern.branches[1]
+            return GroupExistsBranch(info, groupidx, codeyes, codeno)
         elif source.match("-") or source.match("m") or source.match("i") or source.match("x"):
             # TODO: parse plain here flags = _parse_plain_flags(source)
             subpattern = _parse_pattern(source, info)
@@ -1290,7 +1360,20 @@ def _parse_posix_class(source, info):
     prop_name, name = _parse_property_name(source)
     if not source.match(":]"):
         raise ParseError
-    return Property(PROPERTIES[name], negate)
+    try:
+        return Property(PROPERTIES[name], negate)
+    except KeyError:
+        try:
+            return _posix_class_as_set(name, negate, info)
+        except KeyError:
+            raise ParseError
+
+
+def _posix_class_as_set(name, negate, info):
+    item = SetUnion(info, EXTRA_POSIX_PROPERTIES[name])
+    if negate:
+        item = item.with_flags(positive=not item.positive)
+    return item
 
 
 def _compile_no_cache(pattern, flags):

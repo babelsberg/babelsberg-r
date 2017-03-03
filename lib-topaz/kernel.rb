@@ -96,7 +96,7 @@ module Kernel
       res = r.read
       Process.waitpid(r.pid)
     end
-    res
+    res.to_s
   end
   private :`
 
@@ -119,4 +119,29 @@ module Kernel
     Random.rand(max)
   end
   private :rand
+
+  def caller(offset=0, limit=nil)
+    begin
+      raise "caller called"
+    rescue Exception => e
+      if limit
+        return e.backtrace[(3 + offset), limit]
+      else
+        return e.backtrace[(3 + offset)..-1]
+      end
+    end
+  end
+  private :caller
+
+  def require_relative(path)
+    caller[0] =~ /^(.*):\d+:/
+    caller_file = $1
+    require File.join(File.dirname(File.expand_path(caller_file)), path)
+  end
+
+  def __dir__
+    caller[0] =~ /^(.*):\d+:/
+    caller_file = $1
+    File.dirname(File.expand_path(caller_file))
+  end
 end
