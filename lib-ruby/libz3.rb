@@ -105,6 +105,12 @@ class FalseClass
   end
 end
 
+class NilClass
+  def constraint_solver
+    Z3::Instance
+  end
+end
+
 class Array
   def alldifferent?(to=[])
     if self.empty?

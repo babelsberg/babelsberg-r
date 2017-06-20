@@ -66,7 +66,7 @@ class W_ConstraintMarkerObject(W_Object):
 class W_ConstraintObject(W_ConstraintMarkerObject):
     _attrs_ = ["w_strength", "block", "enabled",
                "constraint_objects_w", "constraint_variables_w",
-               "assignments_w", "w_solver", "last_cvar"]
+               "assignments_w", "w_solver", "last_cvar", "is_enum_variable"]
     classdef = ClassDef("Constraint", W_ConstraintMarkerObject.classdef)
 
     def __init__(self, space):

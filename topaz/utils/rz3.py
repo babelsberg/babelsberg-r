@@ -6,7 +6,6 @@ from rpython.rtyper.tool import rffi_platform
 from rpython.rtyper.lltypesystem import rffi, lltype
 from rpython.translator.tool.cbuild import ExternalCompilationInfo
 
-
 class Z3Error(Exception):
     pass
 
@@ -174,12 +173,70 @@ z3_get_algebraic_number_upper = rffi.llexternal("Z3_get_algebraic_number_upper",
 z3_get_ast_kind = rffi.llexternal("Z3_get_ast_kind", [Z3_context, Z3_ast], rffi.INT, compilation_info=eci)
 z3_get_app_decl = rffi.llexternal("Z3_get_app_decl", [Z3_context, Z3_ast], Z3_func_decl, compilation_info=eci)
 z3_func_decl_to_ast = rffi.llexternal("Z3_func_decl_to_ast", [Z3_context, Z3_func_decl], Z3_ast, compilation_info=eci)
+z3_mk_app = rffi.llexternal("Z3_mk_app", [Z3_context, Z3_func_decl, rffi.UINT, Z3_astP], Z3_ast, compilation_info=eci)
+
+def z3_func_declp_to_ast(ctx, func_decl_p):
+    return z3_func_decl_to_ast(ctx, rffi.cast(Z3_func_decl, func_decl_p))
+
+# Symbols
+Z3_symbol = rffi.COpaquePtr("Z3_symbol")
+z3_mk_string_symbol = rffi.llexternal(
+    "Z3_mk_string_symbol",
+    [Z3_context, rffi.CCHARP],
+    Z3_symbol,
+    compilation_info=eci
+)
+z3_mk_int_symbol = rffi.llexternal(
+    "Z3_mk_int_symbol",
+    [Z3_context, rffi.INT],
+    Z3_symbol,
+    compilation_info=eci
+)
+
+# Pointers
+Z3_symbolP = rffi.VOIDPP
+Z3_func_declP = rffi.VOIDPP
+Z3_sortP = rffi.VOIDPP
 
 # Sorts
 Z3_sort = rffi.COpaquePtr("Z3_sort")
 z3_mk_int_sort = rffi.llexternal("Z3_mk_int_sort", [Z3_context], Z3_sort, compilation_info=eci)
 z3_mk_real_sort = rffi.llexternal("Z3_mk_real_sort", [Z3_context], Z3_sort, compilation_info=eci)
 z3_mk_bool_sort = rffi.llexternal("Z3_mk_bool_sort", [Z3_context], Z3_sort, compilation_info=eci)
+
+z3_sort_to_ast = rffi.llexternal("Z3_sort_to_ast", [Z3_context, Z3_sort], Z3_ast, compilation_info=eci)
+_z3_get_sort = rffi.llexternal("Z3_get_sort", [Z3_context, Z3_ast], Z3_sort, compilation_info=eci)
+_z3_mk_enumeration_sort = rffi.llexternal("Z3_mk_enumeration_sort", [Z3_context, Z3_symbol, rffi.UINT, Z3_symbolP, Z3_func_declP, Z3_func_declP], Z3_sort, compilation_info=eci)
+
+def z3_mk_enumeration_sort(ctx, name, names):
+    size = len(names)
+
+    consts = lltype.malloc(Z3_func_declP.TO, size, flavor="raw")
+    testers = lltype.malloc(Z3_func_declP.TO, size, flavor="raw")
+
+    llnames = lltype.malloc(Z3_symbolP.TO, size, flavor="raw")
+
+    for i in range(0, size):
+        llnames[i] = z3_mk_string_symbol(ctx, str(names[i]))
+
+    sort = _z3_mk_enumeration_sort(
+            ctx,
+            name,
+            size,
+            llnames,
+            consts,
+            testers)
+
+    # Free the buffers!
+    result_consts = []
+    for i in range(0, size):
+        tmp_const = z3_mk_app(ctx, rffi.cast(Z3_func_decl, consts[i]), 0, rffi.cast(Z3_astP, 0))
+        z3_ast_inc_ref(ctx, tmp_const)
+        result_consts.append(tmp_const)
+
+    z3_ast_inc_ref(ctx, z3_sort_to_ast(ctx, sort))
+
+    return (sort, result_consts)
 
 # Bool
 z3_mk_not = rffi.llexternal("Z3_mk_not", [Z3_context, Z3_ast], Z3_ast, compilation_info=eci)
@@ -245,25 +302,20 @@ def z3_mk_distinct(ctx, asts):
 
 multiop("Z3_mk_and")
 multiop("Z3_mk_or")
+
+_z3_mk_or = rffi.llexternal("Z3_mk_or", [Z3_context, rffi.UINT, Z3_astP], Z3_ast, compilation_info=eci)
+def z3_mk_multior(ctx, w_list):
+    ptr = lltype.malloc(Z3_astP.TO, len(w_list), flavor='raw')
+    for i in range(0, len(w_list)):
+        ptr[i] = w_list[i].pointer
+    ast = _z3_mk_or(ctx, len(w_list), ptr)
+    lltype.free(ptr, flavor='raw')
+    return ast
+
 z3_mk_true = rffi.llexternal("Z3_mk_true", [Z3_context], Z3_ast, compilation_info=eci)
 z3_mk_false = rffi.llexternal("Z3_mk_false", [Z3_context], Z3_ast, compilation_info=eci)
 z3_get_bool_value = rffi.llexternal("Z3_get_bool_value", [Z3_context, Z3_ast], rffi.INT, compilation_info=eci)
 z3_mk_ite = rffi.llexternal("Z3_mk_ite", [Z3_context, Z3_ast, Z3_ast, Z3_ast], Z3_ast, compilation_info=eci)
-
-# Symbols
-Z3_symbol = rffi.COpaquePtr("Z3_symbol")
-z3_mk_string_symbol = rffi.llexternal(
-    "Z3_mk_string_symbol",
-    [Z3_context, rffi.CCHARP],
-    Z3_symbol,
-    compilation_info=eci
-)
-z3_mk_int_symbol = rffi.llexternal(
-    "Z3_mk_int_symbol",
-    [Z3_context, rffi.INT],
-    Z3_symbol,
-    compilation_info=eci
-)
 
 # Constants
 z3_mk_const = rffi.llexternal("Z3_mk_const", [Z3_context, Z3_symbol, Z3_sort], Z3_ast, compilation_info=eci)
@@ -282,6 +334,22 @@ z3_model_has_interp = rffi.llexternal(
     Z3_bool,
     compilation_info=eci
 )
+_z3_model_eval = rffi.llexternal(
+    "Z3_model_eval",
+    [Z3_context, Z3_model, Z3_ast, Z3_bool, Z3_astP],
+    Z3_bool,
+    compilation_info=eci
+)
+def z3_model_eval(ctx, model, ast, completion):
+    evaluated_ast = lltype.malloc(Z3_astP.TO, 1, flavor="raw")
+    z3_completion =  1 if completion else 0
+
+    _z3_model_eval(ctx, model, ast, z3_completion, evaluated_ast)
+    result_ast = rffi.cast(Z3_ast, evaluated_ast[0])
+    z3_ast_inc_ref(ctx, result_ast)
+
+    return result_ast
+
 
 # Solvers
 Z3_solver = rffi.COpaquePtr("Z3_solver")
@@ -320,11 +388,6 @@ _z3_ast_to_string = rffi.llexternal("Z3_ast_to_string", [Z3_context, Z3_ast], rf
 def z3_ast_to_string(ctx, ast):
     return rffi.charp2str(_z3_ast_to_string(ctx, ast))
 
-# SMT-Lib
-Z3_symbolP = rffi.VOIDPP
-Z3_func_declP = rffi.VOIDPP
-Z3_sortP = rffi.VOIDPP
-
 _z3_parse_smtlib2_string = rffi.llexternal(
     "Z3_parse_smtlib2_string",
     [Z3_context, rffi.CCHARP,
@@ -358,6 +421,7 @@ z3_get_smtlib_num_assumptions = rffi.llexternal("Z3_get_smtlib_num_assumptions",
 z3_get_smtlib_assumption = rffi.llexternal("Z3_get_smtlib_assumption", [Z3_context, rffi.UINT], Z3_ast, compilation_info=eci)
 z3_get_smtlib_num_decls = rffi.llexternal("Z3_get_smtlib_num_decls", [Z3_context], rffi.UINT, compilation_info=eci)
 z3_get_smtlib_decl = rffi.llexternal("Z3_get_smtlib_decl", [Z3_context, rffi.UINT], Z3_func_decl, compilation_info=eci)
+
 
 
 if False:
