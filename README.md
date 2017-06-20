@@ -4,7 +4,7 @@ Babelsberg/R
 
 A [Topaz](http://www.topazruby.com)-based implementation of Babelsberg, licensed under [3-clause BSD](https://github.com/timfel/babelsberg-r/blob/interacting-solvers/LICENSE)
 
-See also [Babelsberg/JS](https://github.com/timfel/babelsberg-js)
+See also [Babelsberg/JS](https://github.com/babelsberg/babelsberg-js)
 
 It allows you to solve, for example, the send+more=money puzzle like this:
 ```ruby

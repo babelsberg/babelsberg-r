@@ -5,6 +5,7 @@ from topaz.objects.objectobject import W_Object
 
 class W_BindingObject(W_Object):
     classdef = ClassDef("Binding", W_Object.classdef)
+    _immutable_fields_ = ["names[*]", "cells[*]", "w_self", "lexical_scope"]
 
     def __init__(self, space, names, cells, w_self, lexical_scope):
         W_Object.__init__(self, space)
@@ -20,7 +21,7 @@ class W_BindingObject(W_Object):
         symtable = SymbolTable()
         for name in self.names:
             symtable.cells[name] = symtable.FREEVAR
-        bc = space.compile(source, "", symtable=symtable)
+        bc = space.compile(source, "(eval)", symtable=symtable)
         frame = space.create_frame(bc, w_self=self.w_self, lexical_scope=self.lexical_scope)
         for idx, cell in enumerate(self.cells):
             frame.cells[idx + len(bc.cellvars)] = cell

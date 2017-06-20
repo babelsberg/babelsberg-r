@@ -1,4 +1,5 @@
 import invoke
+import os
 
 from .base import BaseTest
 
@@ -13,7 +14,7 @@ class Rubyspecs(BaseTest):
         self.download_rubyspec()
 
     def mspec(self, args):
-        invoke.run("../mspec/bin/mspec %s -t %s --config=topaz.mspec %s" % (args, self.exe, self.files), echo=True)
+        invoke.run("../mspec/bin/mspec %s -t %s --config=topaz.mspec %s" % (args, self.exe, self.files), echo=True, warn=True)
 
     def run(self):
         self.mspec("run -G fails %s" % self.options)
@@ -23,6 +24,17 @@ class Rubyspecs(BaseTest):
 
     def untag(self):
         self.mspec("tag --del fails -g fails -f spec %s" % self.options)
+
+    def retag(self):
+        assert len(self.files) == 0, "retag task mustn't get a file list"
+        for d in ["core", "command_line", "language", "library"]:
+            for dirname, subdirlist, filelist in os.walk("../rubyspec/%s/" % d):
+                for f in filelist:
+                    if f.endswith("_spec.rb"):
+                        self.files = dirname
+                        self.untag()
+                        self.tag()
+                        break
 
 
 def generate_spectask(taskname):
@@ -36,3 +48,4 @@ def generate_spectask(taskname):
 run = generate_spectask("run")
 tag = generate_spectask("tag")
 untag = generate_spectask("untag")
+retag = generate_spectask("retag")

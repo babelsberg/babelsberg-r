@@ -16,7 +16,17 @@ from topaz.utils.regexp import RegexpError
 
 
 def get_printable_location(pc, bytecode, block_bytecode, w_trace_proc):
-    return "%s at %s" % (bytecode.name, consts.BYTECODE_NAMES[ord(bytecode.code[pc])])
+    try:
+        pcline = bytecode.lineno_table[pc]
+    except IndexError:
+        pcline = -1
+    return "%s:%d(%d):in %s at %s" % (
+        bytecode.filepath,
+        bytecode.lineno,
+        pcline,
+        bytecode.name,
+        consts.BYTECODE_NAMES[ord(bytecode.code[pc])]
+    )
 
 
 class Interpreter(object):
@@ -35,8 +45,8 @@ class Interpreter(object):
     def get_block_bytecode(self, block):
         return block.bytecode if block is not None else None
 
-    def interpret(self, space, frame, bytecode):
-        pc = 0
+    def interpret(self, space, frame, bytecode, startpc=0):
+        pc = startpc
         try:
             while True:
                 self.jitdriver.jit_merge_point(
@@ -235,7 +245,7 @@ class Interpreter(object):
         frame.pop()
         w_name = bytecode.consts_w[idx]
         name = space.symbol_w(w_name)
-        w_res = space._find_lexical_const(jit.promote(frame.lexical_scope), name)
+        w_res = space._find_lexical_const(jit.promote(frame.lexical_scope), name, autoload=False)
         if w_res is None:
             frame.push(space.w_nil)
         else:
@@ -377,7 +387,7 @@ class Interpreter(object):
         w_scope = frame.pop()
 
         name = space.symbol_w(w_name)
-        w_cls = w_scope.find_included_const(space, name)
+        w_cls = w_scope.find_included_const(space, name, autoload=True)
         if w_cls is None:
             if superclass is space.w_nil:
                 superclass = space.w_object
@@ -408,7 +418,7 @@ class Interpreter(object):
         w_scope = frame.pop()
 
         name = space.symbol_w(w_name)
-        w_mod = w_scope.find_included_const(space, name)
+        w_mod = w_scope.find_included_const(space, name, autoload=True)
 
         if w_mod is None:
             w_mod = space.newmodule(name, w_scope=w_scope)
@@ -611,7 +621,11 @@ class Interpreter(object):
             w_block = None
         else:
             assert isinstance(w_block, W_ProcObject)
-        w_res = space.send_super(frame.lexical_scope.w_mod, w_receiver, space.symbol_w(bytecode.consts_w[meth_idx]), args_w, block=w_block)
+        if frame.lexical_scope is not None:
+            w_cls = frame.lexical_scope.w_mod
+        else:
+            w_cls = space.getclass(w_receiver)
+        w_res = space.send_super(w_cls, w_receiver, space.symbol_w(bytecode.consts_w[meth_idx]), args_w, block=w_block)
         frame.push(w_res)
 
     @jit.unroll_safe
@@ -627,7 +641,11 @@ class Interpreter(object):
             w_block = None
         else:
             assert isinstance(w_block, W_ProcObject)
-        w_res = space.send_super(frame.lexical_scope.w_mod, w_receiver, space.symbol_w(bytecode.consts_w[meth_idx]), args_w, block=w_block)
+        if frame.lexical_scope is not None:
+            w_cls = frame.lexical_scope.w_mod
+        else:
+            w_cls = space.getclass(w_receiver)
+        w_res = space.send_super(w_cls, w_receiver, space.symbol_w(bytecode.consts_w[meth_idx]), args_w, block=w_block)
         frame.push(w_res)
 
     def DEFINED_SUPER(self, space, bytecode, frame, pc, meth_idx):

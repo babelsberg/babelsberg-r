@@ -1,12 +1,22 @@
 import os
 
+from rpython.rlib.rpoll import POLLIN, PollError
+
 from topaz.coerce import Coerce
 from topaz.error import error_for_oserror
 from topaz.module import ClassDef
+from topaz.modules.fcntl import fcntl
 from topaz.objects.objectobject import W_Object
 from topaz.objects.stringobject import W_StringObject
 from topaz.utils.filemode import map_filemode
 from topaz.utils.ll_file import close_without_validation
+from topaz.system import IS_WINDOWS
+
+
+if IS_WINDOWS:
+    from rpython.rlib.rpoll import _poll as poll
+else:
+    from rpython.rlib.rpoll import poll
 
 
 class W_IOObject(W_Object):
@@ -101,6 +111,8 @@ class W_IOObject(W_Object):
                 raise space.error(space.w_ArgumentError,
                     "negative length %d given" % length
                 )
+            elif length == 0:
+                return space.newstr_fromstr("")
         else:
             length = -1
         read_bytes = 0
@@ -119,7 +131,7 @@ class W_IOObject(W_Object):
             read_bytes += len(current_read)
             read_chunks += current_read
         # Return nil on EOF if length is given
-        if read_bytes == 0:
+        if read_bytes == 0 and length > 0:
             return space.w_nil
         w_read_str = space.newstr_fromchars(read_chunks)
         if w_str is not None:
@@ -266,3 +278,17 @@ class W_IOObject(W_Object):
     def method_isatty(self, space):
         self.ensure_not_closed(space)
         return space.newbool(os.isatty(self.fd))
+
+    @classdef.method("fcntl", cmd="int", arg="int")
+    def method_fcntl(self, space, cmd, arg=0):
+        fcntl(self.fd, cmd, arg)
+        return self
+
+    @classdef.method("ready?")
+    def method_ready(self, space):
+        retval = None
+        try:
+            retval = poll({self.fd: POLLIN}, 0)
+        except PollError:
+            return space.w_nil
+        return space.newbool(len(retval) > 0)

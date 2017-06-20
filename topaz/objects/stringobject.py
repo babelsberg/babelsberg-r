@@ -49,9 +49,8 @@ def expand_trans_str(source, res_len, inv=False):
     for i in range(res_len):
         if i < len(source):
             char = source[i]
-        if char == "-":
-            # expand the range
-            assert 0 < i < len(source) - 1
+        if char == "-" and 0 < i < len(source) - 1:
+            # Expand the range
             range_beg = ord(source[i - 1])
             range_end = ord(source[i + 1])
             for j in range(range_beg + 1, range_end - 1):
@@ -546,7 +545,23 @@ class W_StringObject(W_Object):
 
     @classdef.method("[]")
     @classdef.method("slice")
+    @classdef.method("byteslice")
     def method_subscript(self, space, w_idx, w_count=None):
+        if space.is_kind_of(w_idx, space.w_string):
+            if space.send(self, "include?", [w_idx]):
+                return w_idx
+            else:
+                return space.w_nil
+
+        if space.is_kind_of(w_idx, space.w_regexp):
+            w_match = space.send(w_idx, "match", [self])
+            if w_match is space.w_nil:
+                return space.w_nil
+            elif not w_count:
+                return space.send(w_match, "[]", [space.newint(0)])
+            else:
+                return space.send(w_match, "[]", [w_count])
+
         start, end, as_range, nil = space.subscript_access(self.length(), w_idx, w_count=w_count)
         if nil:
             return space.w_nil
@@ -556,6 +571,49 @@ class W_StringObject(W_Object):
             return self.strategy.getslice(space, self.str_storage, start, end)
         else:
             return space.newstr_fromstr(self.strategy.getitem(self.str_storage, start))
+
+    @classdef.method("[]=")
+    def method_subscript(self, space, w_idx, w_count, w_other=None):
+        if w_other is None:
+            w_other = w_count
+            w_count = None
+
+        other = Coerce.str(space, w_other)
+        start_idx = -1
+        end_idx = -1
+        if space.is_kind_of(w_idx, space.w_string):
+            other_str = space.str_w(w_idx)
+            start_idx = space.str_w(self).find(other_str)
+            end_idx = start_idx + len(other_str)
+        elif space.is_kind_of(w_idx, space.w_regexp):
+            ctx = w_idx.make_ctx(space.str_w(self))
+            if self.search_context(space, ctx):
+                if w_count is None:
+                    start_idx = ctx.match_start
+                    end_idx = ctx.match_end
+                elif space.is_kind_of(w_count, space.w_string):
+                    raise space.error(
+                        space.w_NotImplementedError,
+                        "string subscript replace with regexp and named group"
+                    )
+                else:
+                    groupnum = Coerce.int(space, w_count)
+                    try:
+                        start_idx, end_idx = ctx.span(groupnum)
+                    except IndexError:
+                        pass
+        else:
+            start_idx, end_idx, as_range, nil = space.subscript_access(self.length(), w_idx, w_count=w_count)
+            if not w_count:
+                end_idx = start_idx + 1
+
+        if start_idx < 0 or end_idx < 0:
+            raise space.error(space.w_IndexError, "cannot find substring in string to replace")
+
+        self.strategy.to_mutable(space, self)
+        self.strategy.delslice(space, self.str_storage, start_idx, end_idx)
+        self.strategy.insert(self.str_storage, start_idx, other)
+        return self
 
     @classdef.method("slice!")
     @check_frozen()
@@ -644,6 +702,7 @@ class W_StringObject(W_Object):
         except rsre_core.Error, e:
             raise space.error(space.w_RuntimeError, e.msg)
 
+    @classdef.method("find_string", offset="int")
     @classdef.method("index", offset="int")
     def method_index(self, space, w_sub, offset=0):
         if offset < 0 or offset >= self.length():
@@ -752,9 +811,8 @@ class W_StringObject(W_Object):
                         begin, end = w_match.get_span(num)
                         begin += last
                         end += last
-                        assert begin >= 0
-                        assert end >= 0
-                        results_w.append(space.newstr_fromstr(string[begin:end]))
+                        if begin >= 0 and end >= 0:
+                            results_w.append(space.newstr_fromstr(string[begin:end]))
                     last = ctx.match_end
                 n += 1
                 ctx.reset(last)
@@ -966,10 +1024,13 @@ class W_StringObject(W_Object):
 
     @classdef.method("%")
     def method_mod(self, space, w_arg):
-        if space.is_kind_of(w_arg, space.w_array):
-            args_w = space.listview(w_arg)
-        else:
+        w_listarg = space.convert_type(
+            w_arg, space.w_array, "to_ary", raise_error=False
+        )
+        if w_listarg is space.w_nil:
             args_w = [w_arg]
+        else:
+            args_w = space.listview(w_listarg)
         elements_w = StringFormatter(space.str_w(self), args_w).format(space)
         return space.newstr_fromstrs(elements_w)
 
@@ -1086,7 +1147,10 @@ class W_StringObject(W_Object):
 
     def gsub_main(self, space, w_pattern, w_replacement, block, first_only):
         if w_replacement is None and block is None:
-            raise NotImplementedError("gsub enumerator")
+            raise space.error(
+                space.w_NotImplementedError,
+                "gsub enumerator"
+            )
 
         w_hash = None
         replacement = None

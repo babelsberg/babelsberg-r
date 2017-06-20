@@ -118,7 +118,7 @@ class IO
 
   def self.popen(cmd, mode = 'r', opts = {}, &block)
     r, w = IO.pipe
-    if mode != 'r' && mode != 'w'
+    if mode != 'r' && mode != 'w' && mode != 'rb' && mode != 'wb'
       raise NotImplementedError.new("mode #{mode} for IO.popen")
     end
 
@@ -145,11 +145,30 @@ class IO
     block ? yield(res) : res
   end
 
+  def self.binread(filename, length=nil, offset=0)
+    File.open(filename, "rb") do |f|
+      f.seek(offset)
+      if length.nil?
+        f.read
+      else
+        f.read(length)
+      end
+    end
+  end
+
   def pid
     @pid
   end
 
   def self.try_convert(arg)
     Topaz.try_convert_type(arg, IO, :to_io)
+  end
+
+  def getbyte
+    if ch = getc
+      return ch.ord
+    else
+      return nil
+    end
   end
 end

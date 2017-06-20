@@ -5,55 +5,16 @@ class MSpecScript
   MSpec.enable_feature :fiber
   MSpec.enable_feature :fork
   MSpec.enable_feature :encoding
+
   core = [
-    "#{Rubyspec}/core/",
-    # Struct: ``Struct.new(:field)``
-    "^#{Rubyspec}/core/string/chomp_spec.rb",
-    # timeout: ``require 'timeout'``
-    "^#{Rubyspec}/core/process/detach_spec.rb",
-    # GC: ``GC``
-    "^#{Rubyspec}/core/gc/profiler/",
-    # openssl: ``require 'openssl'``
-    "^#{Rubyspec}/core/marshal/dump_spec.rb",
-    # openssl: ``require 'openssl'``
-    "^#{Rubyspec}/core/marshal/load_spec.rb",
-    # openssl: ``require 'openssl'``
-    "^#{Rubyspec}/core/marshal/restore_spec.rb",
-    # autoload: ``autoload :Class, "file.rb"``
-    "^#{Rubyspec}/core/kernel/autoload_spec.rb",
-    # FileTest: ``FileTest``
-    "^#{Rubyspec}/core/filetest",
-    # fcntl: ``require 'fcntl'``
-    "^#{Rubyspec}/core/io/reopen_spec.rb",
-    # socket: ``require 'socket'``
-    "^#{Rubyspec}/core/file/socket_spec.rb",
-    # rubyspecs/core/io/fixtures/file_types:
-    #   `find /dev /devices -type b` returns nil
-    #   -> NoMethodError: undefined method `split' for NilClass
-    "^#{Rubyspec}/core/file/ftype_spec.rb",
-    "^#{Rubyspec}/core/file/stat/ftype_spec.rb",
-    # Rational: ``Rational(2, 3)``
-    "^#{Rubyspec}/core/numeric/to_c_spec.rb",
+      "#{Rubyspec}/core/",
+      # socket: ``require 'socket'``
+      "^#{Rubyspec}/core/file/socket_spec.rb",
+      # socket: ``require 'etc'``
+      "^#{Rubyspec}/core/io/advise_spec.rb",
   ]
 
-  language = [
-    "#{Rubyspec}/language",
-    # Required block arg after *args: ``f {|*a, b| }``
-    "^#{Rubyspec}/language/block_spec.rb",
-    # Posix character class: ``/[[:alnum:]]/``
-    "^#{Rubyspec}/language/regexp/character_classes_spec.rb",
-    # Required arg after *arg: ``def f(a, *b, c); end``
-    "^#{Rubyspec}/language/send_spec.rb",
-    # stringio: ``require 'stringio'``
-    "^#{Rubyspec}/language/predefined_spec.rb",
-    # AttributeError: 'File' object has no attribute 'compile_defined'
-    "^#{Rubyspec}/language/defined_spec.rb",
-    # no real reason found (results in an Aborted (core dumped))
-    #   AssertionError in Parser_combine_send_block ?
-    "^#{Rubyspec}/language/return_spec.rb",
-    # command_asgn_lhs_equal_command_asgn
-    "^#{Rubyspec}/language/variables_spec.rb",
-  ]
+  language = ["#{Rubyspec}/language"]
 
   command_line = ["#{Rubyspec}/command_line"]
 

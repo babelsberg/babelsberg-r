@@ -17,7 +17,7 @@ USAGE = "\n".join([
     """Usage: topaz [switches] [--] [programfile] [arguments]""",
     # """  -0[octal]       specify record separator (\0, if no argument)""",
     # """  -a              autosplit mode with -n or -p (splits $_ into $F)""",
-    # """  -c              check syntax only""",
+    """  -c              check syntax only""",
     # """  -Cdirectory     cd to directory, before executing your script""",
     """  -d              set debugging flags (set $DEBUG to true)""",
     """  -e 'command'    one line of script. Several -e's allowed. Omit [programfile]""",
@@ -38,6 +38,7 @@ USAGE = "\n".join([
     # """  -x[directory]   strip off text before #!ruby line and perhaps cd to directory""",
     """  --copyright     print the copyright""",
     """  --version       print the version""",
+    """  --jit args      set JIT arguments for Topaz""",
     ""
 ])
 COPYRIGHT = "topaz - Copyright (c) Alex Gaynor and individual contributors\n"
@@ -47,6 +48,19 @@ RUBY_REVISION = subprocess.check_output([
     "rev-parse", "--short", "HEAD"
 ]).rstrip()
 
+if IS_WINDOWS:
+    def WinStdinStream():
+        # Copied from streamio
+        bufsize = 8192
+        result = []
+        while True:
+            data = os.read(0, bufsize)
+            if not data:
+                break
+            result.append(data)
+            if bufsize < 4194304:    # 4 Megs
+                bufsize <<= 1
+        return ''.join(result)
 
 @specialize.memo()
 def getspace(config):
@@ -56,6 +70,7 @@ def getspace(config):
 def get_topaz_config_options():
     return {
         "translation.continuation": True,
+        "translation.jit_opencoder_model": "big",
     }
 
 
@@ -98,12 +113,17 @@ def _parse_argv(space, argv):
     exprs = []
     reqs = []
     load_path_entries = []
+    jit_params = None
+    syntax_check = False
     argv_w = []
     idx = 1
     while idx < len(argv):
         arg = argv[idx]
         if arg == "-h" or arg == "--help":
             raise ShortCircuitError(USAGE)
+        elif arg == "--jit":
+            idx += 1
+            jit_params = argv[idx]
         elif arg == "--copyright":
             raise ShortCircuitError(COPYRIGHT)
         elif arg == "--version":
@@ -152,6 +172,8 @@ def _parse_argv(space, argv):
         elif arg == "-p":
             do_loop = True
             flag_globals_w["$-p"] = space.w_true
+        elif arg == "-c":
+            syntax_check = True
         elif arg == "--":
             idx += 1
             break
@@ -189,6 +211,8 @@ def _parse_argv(space, argv):
         exprs,
         reqs,
         load_path_entries,
+        jit_params,
+        syntax_check,
         argv_w
     )
 
@@ -201,8 +225,8 @@ def _entry_point(space, argv):
         system, _, _, _, cpu = os.uname()
     platform = "%s-%s" % (cpu, system.lower())
     engine = "topaz"
-    version = "1.9.3"
-    patchlevel = 125
+    version = "2.4.0"
+    patchlevel = 0
     description = "%s (ruby-%sp%d) (git rev %s) [%s]" % (engine, version, patchlevel, RUBY_REVISION, platform)
     space.set_const(space.w_object, "RUBY_ENGINE", space.newstr_fromstr(engine))
     space.set_const(space.w_object, "RUBY_VERSION", space.newstr_fromstr(version))
@@ -221,6 +245,8 @@ def _entry_point(space, argv):
             exprs,
             reqs,
             load_path_entries,
+            jit_params,
+            syntax_check,
             argv_w
         ) = _parse_argv(space, argv)
     except ShortCircuitError as e:
@@ -273,10 +299,10 @@ def _entry_point(space, argv):
         return 0
     else:
         if IS_WINDOWS:
-            raise NotImplementedError("executing from stdin on Windows")
+            source = WinStdinStream().readall()
         else:
             source = fdopen_as_stream(0, "r").readall()
-            path = "-"
+        path = "-"
 
     for globalized_switch in globalized_switches:
         value = None
@@ -295,7 +321,20 @@ def _entry_point(space, argv):
     status = 0
     w_exit_error = None
     explicit_status = False
-    jit.set_param(None, "trace_limit", 10000)
+    jit.set_param(None, "trace_limit", 16000)
+    if jit_params:
+        # Work around TraceLimitTooHigh by setting any trace_limit explicitly
+        parts = jit_params.split(",")
+        limitidx = -1
+        for i, s in enumerate(parts):
+            if "trace_limit" in s:
+                limitidx = i
+                break
+        if limitidx >= 0:
+            limit = parts.pop(limitidx)
+            jit.set_param(None, "trace_limit", int(limit.split("=")[1]))
+        if len(parts) > 0:
+            jit.set_user_param(None, ",".join(parts))
     try:
         if do_loop:
             print_after = space.is_true(flag_globals_w["$-p"])
@@ -309,6 +348,8 @@ def _entry_point(space, argv):
                     w_res = space.execute_frame(frame, bc)
                     if print_after:
                         space.send(space.w_kernel, "print", [w_res])
+        elif syntax_check:
+            space.compile(source, path)
         else:
             space.execute(source, filepath=path)
     except RubyError as e:

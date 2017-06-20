@@ -16,7 +16,7 @@ from rpython.rtyper.lltypesystem import llmemory, rffi
 from rply.errors import ParsingError
 
 from topaz import system
-from topaz.astcompiler import CompilerContext, SymbolTable
+from topaz.astcompiler import CompilerContext, SymbolTable, CompilerError
 from topaz.celldict import GlobalsDict
 from topaz.closure import ClosureCell
 from topaz.constraintinterpreter import ConstraintInterpreter, ConstrainedVariable
@@ -31,6 +31,7 @@ from topaz.modules.enumerable import Enumerable
 from topaz.modules.marshal import Marshal
 from topaz.modules.math import Math
 from topaz.modules.kernel import Kernel
+from topaz.modules.fcntl import Fcntl
 from topaz.modules.ffi import FFI
 from topaz.modules.objectspace import ObjectSpace as ObjectSpaceModule
 from topaz.modules.process import Process
@@ -215,6 +216,7 @@ class ObjectSpace(object):
             self.getmoduleobject(Enumerable.moduledef),
             self.getmoduleobject(Marshal.moduledef),
             self.getmoduleobject(Math.moduledef),
+            self.getmoduleobject(Fcntl.moduledef),
             self.getmoduleobject(FFI.moduledef),
             self.getmoduleobject(Process.moduledef),
             self.getmoduleobject(Signal.moduledef),
@@ -314,8 +316,9 @@ class ObjectSpace(object):
             return parser.parse().getast()
         except ParsingError as e:
             source_pos = e.getsourcepos()
+            token = e.message
             if source_pos is not None:
-                msg = "line %d" % source_pos.lineno
+                msg = "line %d (unexpected %s)" % (source_pos.lineno, token)
             else:
                 msg = ""
             raise self.error(self.w_SyntaxError, msg)
@@ -328,8 +331,11 @@ class ObjectSpace(object):
         astnode = self.parse(source, initial_lineno=initial_lineno, symtable=symtable)
         ctx = CompilerContext(self, "<main>", symtable, filepath)
         with ctx.set_lineno(initial_lineno):
-            astnode.compile(ctx)
-        return ctx.create_bytecode([], [], None, None)
+            try:
+                astnode.compile(ctx)
+            except CompilerError as e:
+                raise self.error(self.w_SyntaxError, "%s" % e.msg)
+        return ctx.create_bytecode(initial_lineno, [], [], None, None)
 
     def execute(self, source, w_self=None, lexical_scope=None, filepath="-e",
                 initial_lineno=1):
@@ -613,7 +619,7 @@ class ObjectSpace(object):
         return self.fromcache(ModuleCache).getorbuild(moduledef)
 
     def find_const(self, w_module, name):
-        w_res = w_module.find_const(self, name)
+        w_res = w_module.find_const(self, name, autoload=True)
         if w_res is None:
             w_res = self.send(w_module, "const_missing", [self.newsymbol(name)])
         return w_res
@@ -639,7 +645,7 @@ class ObjectSpace(object):
         module.set_const(self, name, w_value)
 
     @jit.unroll_safe
-    def _find_lexical_const(self, lexical_scope, name):
+    def _find_lexical_const(self, lexical_scope, name, autoload=True):
         w_res = None
         scope = lexical_scope
         # perform lexical search but skip Object
@@ -647,7 +653,7 @@ class ObjectSpace(object):
             w_mod = scope.w_mod
             if w_mod is self.w_top_self:
                 break
-            w_res = w_mod.find_local_const(self, name)
+            w_res = w_mod.find_local_const(self, name, autoload=autoload)
             if w_res is not None:
                 return w_res
             scope = scope.backscope
@@ -663,7 +669,7 @@ class ObjectSpace(object):
                 # as fallback
                 if w_mod is self.w_basicobject and not object_seen:
                     fallback_scope = None
-                w_res = w_mod.find_const(self, name)
+                w_res = w_mod.find_const(self, name, autoload=autoload)
                 if w_res is not None:
                     return w_res
                 if isinstance(w_mod, W_ClassObject):
@@ -672,7 +678,7 @@ class ObjectSpace(object):
                     break
 
         if fallback_scope is not None:
-            w_res = fallback_scope.find_const(self, name)
+            w_res = fallback_scope.find_const(self, name, autoload=autoload)
         return w_res
 
     @jit.unroll_safe
@@ -840,13 +846,16 @@ class ObjectSpace(object):
 
         return (start, end, as_range, nil)
 
-    def convert_type(self, w_obj, w_cls, method, raise_error=True):
+    def convert_type(self, w_obj, w_cls, method, raise_error=True, reraise_error=False):
         if self.is_kind_of(w_obj, w_cls):
             return w_obj
 
         try:
             w_res = self.send(w_obj, method)
-        except RubyError:
+        except RubyError as e:
+            if reraise_error:
+                raise e
+            self.mark_topframe_not_escaped()
             if not raise_error:
                 return self.w_nil
             src_cls_name = self.obj_to_s(self.getclass(w_obj))
@@ -868,6 +877,9 @@ class ObjectSpace(object):
             )
         else:
             return w_res
+
+    def mark_topframe_not_escaped(self):
+        self.getexecutioncontext().gettopframe().escaped = False
 
     def infect(self, w_dest, w_src, taint=True, untrust=True, freeze=False):
         """
