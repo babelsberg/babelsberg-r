@@ -81,7 +81,7 @@ class Z3
       return Z3::Instance.make_int_variable(value)
     when TrueClass, FalseClass
       Z3::Instance.make_bool_variable(value)
-    when Numeric, nil
+    when Numeric
       return Z3::Instance.make_real_variable(value.to_f)
     end
   end
@@ -100,12 +100,6 @@ class TrueClass
 end
 
 class FalseClass
-  def constraint_solver
-    Z3::Instance
-  end
-end
-
-class NilClass
   def constraint_solver
     Z3::Instance
   end
