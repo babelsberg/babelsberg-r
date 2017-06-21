@@ -276,16 +276,18 @@ class TestConstraintVariableObject(BaseTopazTest):
     def test_div(self, space):
         w_res = space.execute("""
         require "libz3"
-        x = 5.0
-        y = 1.0
+        x = 5.5
+        y = 1.2
         always { x / y == 2 }
+        always { y > 0 }
 
         a = 5
         b = 1
         always { a / b == 2 }
+        always { b > 0 }
         return x, y, a, b
         """)
-        assert self.unwrap(space, w_res) == [-1, 0, 38, 0]
+        assert self.unwrap(space, w_res) == [2, 1, 2, 1]
 
     def test_complex_path_with_z3(self, space):
         w_res = space.execute("""
