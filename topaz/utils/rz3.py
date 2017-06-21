@@ -312,6 +312,15 @@ def z3_mk_multior(ctx, w_list):
     lltype.free(ptr, flavor='raw')
     return ast
 
+_z3_mk_and = rffi.llexternal("Z3_mk_and", [Z3_context, rffi.UINT, Z3_astP], Z3_ast, compilation_info=eci)
+def z3_mk_multiand(ctx, list_p):
+    ptr = lltype.malloc(Z3_astP.TO, len(list_p), flavor='raw')
+    for i in range(0, len(list_p)):
+        ptr[i] = list_p[i]
+    ast = _z3_mk_and(ctx, len(list_p), ptr)
+    lltype.free(ptr, flavor='raw')
+    return ast
+
 z3_mk_true = rffi.llexternal("Z3_mk_true", [Z3_context], Z3_ast, compilation_info=eci)
 z3_mk_false = rffi.llexternal("Z3_mk_false", [Z3_context], Z3_ast, compilation_info=eci)
 z3_get_bool_value = rffi.llexternal("Z3_get_bool_value", [Z3_context, Z3_ast], rffi.INT, compilation_info=eci)

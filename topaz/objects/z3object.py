@@ -1,5 +1,6 @@
 from __future__ import absolute_import
 
+from rpython.rlib import jit
 from rpython.rlib.rfloat import float_as_rbigint_ratio
 from rpython.rlib.rarithmetic import intmask, r_uint
 
@@ -500,6 +501,7 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         return W_Z3Ptr(space, self.w_z3, ast)
 
     @classdef.method("alldifferent")
+    @jit.unroll_safe # there are a limited number of sorts
     def method_alldifferent(self, space, args_w):
         w_constraint = space.current_constraint()
         if not w_constraint:
@@ -507,7 +509,22 @@ class W_Z3Ptr(W_ConstraintMarkerObject):
         else:
             asts_w = [self.coerce_constant_arg(space, w_arg) for w_arg in args_w]
             asts_w.append(self.pointer)
-            return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_distinct(self.w_z3.ctx, asts_w))
+            res_w = None
+            distinct_p = []
+            while len(asts_w) > 0:
+                # We need to assert distinctness of every different kind of sort
+                # separately. we get all elements with the same sort from the
+                # list and assert their distinctness, then we conjungate all
+                sort_p = rz3._z3_get_sort(self.w_z3.ctx, asts_w[0])
+                current_sort_asts = [asts_w.pop(0)]
+                idx = 0
+                while idx < len(asts_w):
+                    if rz3._z3_get_sort(self.w_z3.ctx, asts_w[idx]) == sort_p:
+                        current_sort_asts.append(asts_w.pop(idx))
+                    else:
+                        idx += 1
+                distinct_p.append(rz3.z3_mk_distinct(self.w_z3.ctx, current_sort_asts))
+            return W_Z3Ptr(space, self.w_z3, rz3.z3_mk_multiand(self.w_z3.ctx, distinct_p))
 
     @classdef.method("-@")
     def method_unary_minus(self, space):
