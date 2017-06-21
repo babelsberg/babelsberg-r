@@ -56,7 +56,7 @@ class IntCell(ClosureCell):
         ClosureCell.__init__(self, W_MutableFixnumObject(None, intvalue))
 
     def set(self, space, frame, pos, w_value):
-        if isinstance(w_value, W_FixnumObject):
+        if isinstance(w_value, W_FixnumObject) and isinstance(self.w_value, W_FixnumObject):
             self.w_value.set_intvalue(w_value.intvalue)
         else:
             ClosureCell.set(self, space, frame, pos, w_value)
